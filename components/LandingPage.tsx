@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ArrowRight, Zap, Globe, MessageSquare, BarChart3, Shield, Mic, Calendar, CheckCircle, Search, Lightbulb, LayoutDashboard } from 'lucide-react';
 
@@ -60,41 +59,89 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             </button>
           </div>
           
-          {/* Hero Image Mockup */}
-          <div className="mt-16 relative mx-auto max-w-5xl rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200">
+          {/* Hero Image Mockup - Replaced with Dashboard UI */}
+          <div className="mt-16 relative mx-auto max-w-6xl rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200 text-left">
+             {/* Browser Bar */}
              <div className="bg-slate-900 p-2 flex items-center gap-2">
                  <div className="flex gap-1.5 ml-2">
                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
                  </div>
-                 <div className="bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-md mx-auto w-1/2 text-center">socialai.app/dashboard</div>
+                 <div className="bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-md mx-auto w-1/3 text-center truncate">socialai.app/dashboard</div>
              </div>
-             <div className="bg-slate-50 p-6 md:p-10 flex gap-6">
-                 {/* Sidebar Mockup */}
-                 <div className="w-48 hidden md:block space-y-4">
-                     <div className="h-8 w-32 bg-slate-200 rounded animate-pulse"></div>
-                     <div className="space-y-2 pt-4">
-                         <div className="h-8 w-full bg-brand-100 border-l-4 border-brand-500 rounded"></div>
-                         <div className="h-8 w-full bg-white rounded border border-slate-100"></div>
-                         <div className="h-8 w-full bg-white rounded border border-slate-100"></div>
-                     </div>
+             
+             {/* App Interface Mockup */}
+             <div className="bg-slate-50 flex h-[600px] overflow-hidden">
+                 
+                 {/* Sidebar */}
+                 <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 hidden md:flex">
+                    <div className="p-6 border-b border-slate-100">
+                      <div className="flex items-center gap-2 text-brand-600 font-bold text-xl">
+                         <span className="p-1 bg-brand-600 text-white rounded">AI</span> SocialAI
+                      </div>
+                    </div>
+                    <div className="flex-1 p-4 space-y-1">
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium bg-brand-50 text-brand-700">
+                         <LayoutDashboard size={20}/> Dashboard
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600">
+                         <Search size={20}/> Market Research
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600">
+                         <Lightbulb size={20}/> Strategy (Reasoning)
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600">
+                         <Calendar size={20}/> Content Calendar
+                      </div>
+                    </div>
+                    <div className="p-4 border-t border-slate-100 space-y-4">
+                       <div className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg">
+                          <Mic size={20} /> Live Consultant
+                       </div>
+                       <div className="flex items-center gap-2 text-slate-500 px-2 py-1 text-sm">
+                          <ArrowRight size={16} className="rotate-180"/> Logout / Reset
+                       </div>
+                    </div>
                  </div>
-                 {/* Content Mockup */}
-                 <div className="flex-1 space-y-6">
-                     <div className="flex justify-between items-center">
-                         <div className="h-8 w-48 bg-slate-200 rounded"></div>
-                         <div className="h-8 w-24 bg-brand-600 rounded"></div>
-                     </div>
-                     <div className="grid grid-cols-3 gap-4">
-                         {[1,2,3].map(i => (
-                             <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                 <div className="w-full aspect-square bg-slate-100 rounded-lg mb-3"></div>
-                                 <div className="h-3 w-3/4 bg-slate-100 rounded mb-2"></div>
-                                 <div className="h-3 w-1/2 bg-slate-100 rounded"></div>
-                             </div>
-                         ))}
-                     </div>
+
+                 {/* Main Content */}
+                 <div className="flex-1 p-8 overflow-y-auto">
+                    <header className="mb-10">
+                      <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+                      <p className="text-slate-500">Welcome back, shakes travel.</p>
+                    </header>
+
+                    {/* Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
+                        <h3 className="text-lg font-semibold mb-1">Market Research</h3>
+                        <p className="text-sm text-slate-500">View latest trends and competitor analysis powered by Google Search.</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4"><Lightbulb size={24} /></div>
+                        <h3 className="text-lg font-semibold mb-1">Strategic Plan</h3>
+                        <p className="text-sm text-slate-500">Deep-dive marketing strategy generated by reasoning models.</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4"><Calendar size={24} /></div>
+                        <h3 className="text-lg font-semibold mb-1">Content Calendar</h3>
+                        <p className="text-sm text-slate-500">Manage posts, generate content, and schedule for platforms.</p>
+                      </div>
+                    </div>
+
+                    {/* Banner */}
+                    <div className="bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
+                      <div className="relative z-10">
+                        <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
+                        <p className="mb-6 opacity-90 max-w-lg">Talk directly to your AI marketing consultant using Gemini Live Native Audio.</p>
+                        <div className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold inline-flex items-center gap-2">
+                          <Mic size={18} /> Start Conversation
+                        </div>
+                      </div>
+                      <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent"></div>
+                    </div>
                  </div>
              </div>
           </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -24,9 +23,16 @@ import { LandingPage } from './components/LandingPage';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 
-// --- Subcomponents for Views ---
+// Custom Shakes Logo (Small version for Sidebar)
+const ShakesLogoSmall = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="6" className="text-brand-600" />
+    <rect x="28" y="35" width="44" height="30" rx="3" stroke="currentColor" strokeWidth="4" className="text-slate-800" fill="transparent"/>
+    <line x1="28" y1="45" x2="72" y2="45" stroke="currentColor" strokeWidth="3" className="text-slate-800" />
+    <path d="M46 52 L56 57 L46 62 V52 Z" fill="currentColor" className="text-slate-800" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+  </svg>
+);
 
-// 1. Onboarding View
 const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = ({ onComplete }) => {
   const [formData, setFormData] = useState<CompanyProfile>({
     name: '',
@@ -53,7 +59,6 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome to SocialAI</h1>
         <p className="text-slate-500 mb-8">Let's set up your business profile to generate tailored strategies.</p>
-        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
@@ -65,12 +70,10 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
               <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
             </div>
           </div>
-          
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">What do you do?</label>
             <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Describe your products or services..." />
           </div>
-
           <div className="grid grid-cols-2 gap-6">
              <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
@@ -81,12 +84,10 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
               <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Witty, Friendly..." />
              </div>
           </div>
-
           <div>
              <label className="block text-sm font-medium text-slate-700 mb-1">Marketing Goals</label>
              <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
           </div>
-
           <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-lg hover:bg-brand-700 transition-colors">
             Initialize Assistant
           </button>
@@ -96,7 +97,6 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
   );
 };
 
-// 2. Dashboard View
 const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView) => void }> = ({ profile, onNavigate }) => {
   return (
     <div className="p-8">
@@ -104,7 +104,6 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
         <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-slate-500">Welcome back, {profile.name}.</p>
       </header>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div onClick={() => onNavigate(AppView.RESEARCH)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
           <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
@@ -122,7 +121,6 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
           <p className="text-sm text-slate-500">Manage posts, generate content, and schedule for platforms.</p>
         </div>
       </div>
-
       <div className="bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
         <div className="relative z-10">
           <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
@@ -137,10 +135,8 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
   );
 };
 
-// 3. Research View
 const ResearchView: React.FC<{ profile: CompanyProfile, report: ResearchReport | null, setReport: any }> = ({ profile, report, setReport }) => {
   const [loading, setLoading] = useState(false);
-
   const runResearch = async () => {
     setLoading(true);
     try {
@@ -152,27 +148,21 @@ const ResearchView: React.FC<{ profile: CompanyProfile, report: ResearchReport |
       setLoading(false);
     }
   };
-
   useEffect(() => {
     if (!report) runResearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   if (loading) return <div className="p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse">Analysing market with Google Search...</div></div>;
-
   return (
     <div className="p-8 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Market Research</h1>
         <button onClick={runResearch} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate</button>
       </div>
-      
       {report && (
         <div className="flex gap-8">
             <div className="flex-1 bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none">
                 <ReactMarkdown>{report.rawContent}</ReactMarkdown>
             </div>
-            
             {report.sources.length > 0 && (
                 <div className="w-80 space-y-4">
                     <h3 className="font-semibold text-slate-700">Sources</h3>
@@ -190,14 +180,11 @@ const ResearchView: React.FC<{ profile: CompanyProfile, report: ResearchReport |
   );
 };
 
-// 4. Calendar & Post Creation
 const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [generatingTopics, setGeneratingTopics] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-  
-  // Auto-Pilot State
   const [showAutoPilotSettings, setShowAutoPilotSettings] = useState(false);
   const [autoPilotConfig, setAutoPilotConfig] = useState<AutoPilotConfig>({
       enabled: false,
@@ -208,8 +195,6 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<SocialPost[]>([]);
   const [showReviewDashboard, setShowReviewDashboard] = useState(false);
-
-  // Post Creator State
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [creatorState, setCreatorState] = useState({
       platform: 'Instagram',
@@ -227,21 +212,17 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
     setTopics(newTopics);
     setGeneratingTopics(false);
   };
-
   const openCreator = (topic: string) => {
     setSelectedTopic(topic);
     setCreatorState({ ...creatorState, caption: '', generatedImage: '', imagePrompt: `High quality professional photo for ${topic}` });
     setIsCreatorOpen(true);
-    // Auto generate caption
     handleGenCaption(topic);
   };
-
   const handleGenCaption = async (topic: string) => {
       setCreatorState(prev => ({ ...prev, loadingCaption: true }));
       const cap = await generatePostCaption(profile, topic, creatorState.platform);
       setCreatorState(prev => ({ ...prev, caption: cap, loadingCaption: false }));
   };
-
   const handleGenImage = async () => {
       if (!creatorState.imagePrompt) return;
       setCreatorState(prev => ({ ...prev, loadingImage: true }));
@@ -254,7 +235,6 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
           setCreatorState(prev => ({ ...prev, loadingImage: false }));
       }
   };
-
   const savePost = () => {
       const newPost: SocialPost = {
           id: Date.now().toString(),
@@ -268,8 +248,6 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
       setPosts([...posts, newPost]);
       setIsCreatorOpen(false);
   };
-
-  // --- Auto-Pilot Handlers ---
   const handleRunAutoPilot = async () => {
       setShowAutoPilotSettings(false);
       setIsAutoGenerating(true);
@@ -285,22 +263,18 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
           alert("Auto-Pilot generation failed. Try fewer posts.");
       } finally {
           setIsAutoGenerating(false);
-          // Ensure enabled is on
           setAutoPilotConfig(prev => ({ ...prev, enabled: true }));
       }
   };
-  
   const handleApproveAll = () => {
       setPosts(prev => [...prev, ...pendingPosts.map(p => ({ ...p, status: 'Scheduled' } as SocialPost))]);
       setPendingPosts([]);
       setShowReviewDashboard(false);
   };
-  
   const handleRejectAll = () => {
       setPendingPosts([]);
       setShowReviewDashboard(false);
   };
-  
   const handleApproveSingle = (id: string) => {
       const post = pendingPosts.find(p => p.id === id);
       if (post) {
@@ -309,16 +283,11 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
       }
       if (pendingPosts.length <= 1) setShowReviewDashboard(false);
   };
-
   const handleRejectSingle = (id: string) => {
       setPendingPosts(prev => prev.filter(p => p.id !== id));
       if (pendingPosts.length <= 1) setShowReviewDashboard(false);
   };
-  
   const handleGeneratePendingImage = async (id: string, prompt: string) => {
-      // Find post and update loading state (simulated by forcing update)
-      // Real app would have per-card loading state.
-      // For demo, we block ui slightly
       try {
         const img = await generatePostImage(prompt, { size: '1K', aspectRatio: '1:1' });
         setPendingPosts(prev => prev.map(p => p.id === id ? { ...p, imageUrl: img } : p));
@@ -330,23 +299,16 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">Content Calendar</h1>
         <div className="flex gap-2">
-            <button 
-                onClick={() => setShowAutoPilotSettings(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${autoPilotConfig.enabled ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
-            >
+            <button onClick={() => setShowAutoPilotSettings(true)} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${autoPilotConfig.enabled ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}`}>
                 <Zap size={18} className={autoPilotConfig.enabled ? 'fill-current' : ''} />
                 {autoPilotConfig.enabled ? 'Auto-Pilot Active' : 'Enable Auto-Pilot'}
             </button>
-            <button onClick={generateTopics} className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700">
-                <PlusCircle size={18} /> {generatingTopics ? 'Thinking...' : 'Generate Ideas'}
-            </button>
+            <button onClick={generateTopics} className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700"><PlusCircle size={18} /> {generatingTopics ? 'Thinking...' : 'Generate Ideas'}</button>
         </div>
       </div>
-
       <div className="flex gap-8 h-full overflow-hidden">
-        {/* Ideas Column */}
         <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pb-20">
-            <h3 className="font-semibold text-slate-700">Topic Ideas (Flash Lite)</h3>
+            <h3 className="font-semibold text-slate-700">Topic Ideas</h3>
             {topics.length === 0 && <div className="text-slate-400 italic text-sm">No topics yet. Click generate.</div>}
             {topics.map((t, i) => (
                 <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex justify-between items-center group">
@@ -355,8 +317,6 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
                 </div>
             ))}
         </div>
-
-        {/* Calendar Grid */}
         <div className="flex-1 bg-white rounded-xl border border-slate-200 p-6 overflow-y-auto relative">
             {pendingPosts.length > 0 && !showReviewDashboard && (
                  <div className="mb-4 bg-indigo-50 border border-indigo-200 p-3 rounded-lg flex justify-between items-center">
@@ -364,198 +324,73 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
                      <button onClick={() => setShowReviewDashboard(true)} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded">Review Now</button>
                  </div>
             )}
-        
             <h3 className="font-semibold text-slate-700 mb-4">Upcoming Posts</h3>
             <div className="space-y-4">
                 {posts.length === 0 && <div className="text-slate-400 text-center mt-10">No scheduled posts.</div>}
                 {posts.map(post => (
                     <div key={post.id} className="flex gap-4 p-4 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
-                        {post.imageUrl ? (
-                            <img src={post.imageUrl} alt="Post" className="w-24 h-24 object-cover rounded-md bg-slate-100" />
-                        ) : (
-                            <div className="w-24 h-24 bg-slate-100 rounded-md flex items-center justify-center text-slate-300"><ImageIcon size={24}/></div>
-                        )}
+                        {post.imageUrl ? <img src={post.imageUrl} alt="Post" className="w-24 h-24 object-cover rounded-md bg-slate-100" /> : <div className="w-24 h-24 bg-slate-100 rounded-md flex items-center justify-center text-slate-300"><ImageIcon size={24}/></div>}
                         <div className="flex-1">
                             <div className="flex justify-between mb-2">
                                 <span className={`text-xs px-2 py-1 rounded-full ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' : post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>{post.platform}</span>
-                                <span className="text-xs text-slate-400">{post.date.toLocaleDateString()}</span>
+                                <span className="text-xs text-slate-400">{post.date instanceof Date ? post.date.toLocaleDateString() : new Date(post.date).toLocaleDateString()}</span>
                             </div>
                             <h4 className="font-medium text-slate-800 mb-1">{post.topic}</h4>
                             <p className="text-sm text-slate-500 line-clamp-2">{post.caption}</p>
                         </div>
-                        <div className="flex items-center px-4">
-                            <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">Scheduled</span>
-                        </div>
+                        <div className="flex items-center px-4"><span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">Scheduled</span></div>
                     </div>
                 ))}
             </div>
         </div>
       </div>
-
-      {/* Auto-Pilot Loading Overlay */}
       {isAutoGenerating && (
          <div className="fixed inset-0 bg-white/80 z-50 flex flex-col items-center justify-center backdrop-blur-sm">
              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
              <h2 className="text-2xl font-bold text-slate-800">Auto-Pilot Running...</h2>
-             <p className="text-slate-500 mt-2">Generating topics, writing captions, and planning visuals.</p>
          </div>
       )}
-
-      {/* Auto-Pilot Settings Modal */}
       {showAutoPilotSettings && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
              <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl">
-                 <div className="flex justify-between items-center mb-6">
-                     <h2 className="text-2xl font-bold flex items-center gap-2"><Zap className="text-indigo-600" /> Auto-Pilot Settings</h2>
-                     <button onClick={() => setShowAutoPilotSettings(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
-                 </div>
-                 
+                 <button onClick={() => setShowAutoPilotSettings(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={24}/></button>
                  <div className="space-y-6">
-                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                         <div>
-                             <h3 className="font-medium">Enable Auto-Pilot</h3>
-                             <p className="text-sm text-slate-500">Automatically generate posts periodically.</p>
-                         </div>
-                         <div 
-                            onClick={() => setAutoPilotConfig({...autoPilotConfig, enabled: !autoPilotConfig.enabled})}
-                            className={`w-14 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors ${autoPilotConfig.enabled ? 'bg-green-500' : 'bg-slate-300'}`}
-                         >
-                             <div className={`bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform ${autoPilotConfig.enabled ? 'translate-x-6' : ''}`}></div>
-                         </div>
-                     </div>
-
-                     <div>
-                         <label className="block text-sm font-medium mb-2">Cadence</label>
-                         <div className="flex gap-4">
-                             {['Weekly', 'Monthly'].map(c => (
-                                 <button 
-                                    key={c}
-                                    onClick={() => setAutoPilotConfig({...autoPilotConfig, cadence: c as any})}
-                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${autoPilotConfig.cadence === c ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}
-                                 >
-                                     {c}
-                                 </button>
-                             ))}
-                         </div>
-                     </div>
-
-                     <div>
-                         <label className="block text-sm font-medium mb-3">Posts per {autoPilotConfig.cadence.toLowerCase()}</label>
-                         <div className="space-y-3">
-                             {Object.keys(autoPilotConfig.postingFrequency).map(platform => (
-                                 <div key={platform} className="flex items-center gap-4">
-                                     <span className="w-24 text-sm text-slate-600">{platform}</span>
-                                     <input 
-                                        type="range" min="0" max="10" 
-                                        value={(autoPilotConfig.postingFrequency as any)[platform]}
-                                        onChange={(e) => setAutoPilotConfig({
-                                            ...autoPilotConfig, 
-                                            postingFrequency: {
-                                                ...autoPilotConfig.postingFrequency,
-                                                [platform]: parseInt(e.target.value)
-                                            }
-                                        })}
-                                        className="flex-1 accent-indigo-600"
-                                     />
-                                     <span className="w-6 text-center text-sm font-bold">{(autoPilotConfig.postingFrequency as any)[platform]}</span>
-                                 </div>
-                             ))}
-                         </div>
-                     </div>
-                     
-                     <div className="flex items-center gap-2 mt-4">
-                         <input 
-                            type="checkbox" 
-                            id="autoApprove"
-                            checked={autoPilotConfig.autoApprove}
-                            onChange={(e) => setAutoPilotConfig({...autoPilotConfig, autoApprove: e.target.checked})}
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                         />
-                         <label htmlFor="autoApprove" className="text-sm text-slate-700">Auto-approve generated posts (Skip review)</label>
-                     </div>
-
-                     <button 
-                        onClick={handleRunAutoPilot}
-                        className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-md transition-all mt-4"
-                     >
-                         Save & Run Now
-                     </button>
+                     <h2 className="text-2xl font-bold">Auto-Pilot Settings</h2>
+                     <button onClick={handleRunAutoPilot} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold">Run Now</button>
                  </div>
              </div>
           </div>
       )}
-
-      {/* Review Dashboard Overlay */}
       {showReviewDashboard && (
           <div className="absolute inset-0 bg-slate-50 z-40 p-8 overflow-y-auto">
               <div className="max-w-5xl mx-auto">
                   <div className="flex justify-between items-center mb-8 sticky top-0 bg-slate-50 py-4 z-10 border-b border-slate-200">
-                      <div>
-                          <h1 className="text-2xl font-bold text-indigo-900">Review Auto-Generated Content</h1>
-                          <p className="text-slate-500">{pendingPosts.length} posts waiting for your approval</p>
-                      </div>
+                      <h1 className="text-2xl font-bold text-indigo-900">Review Auto-Generated Content</h1>
                       <div className="flex gap-3">
-                          <button onClick={handleRejectAll} className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium">Reject All</button>
-                          <button onClick={handleApproveAll} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md font-medium">Approve All</button>
+                          <button onClick={handleRejectAll} className="px-4 py-2 border border-red-200 text-red-600 rounded-lg">Reject All</button>
+                          <button onClick={handleApproveAll} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Approve All</button>
                       </div>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                       {pendingPosts.map(post => (
-                          <div key={post.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group hover:shadow-md transition-shadow">
+                          <div key={post.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                  <div className="flex items-center gap-2">
-                                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' : post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>{post.platform}</span>
-                                      <span className="text-xs text-slate-500">{post.date.toDateString()}</span>
-                                  </div>
+                                  <span className="text-xs px-2 py-1 rounded-full font-bold bg-slate-200">{post.platform}</span>
                                   <div className="flex gap-2">
-                                      <button onClick={() => handleRejectSingle(post.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><XCircle size={18}/></button>
-                                      <button onClick={() => handleApproveSingle(post.id)} className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded"><CheckCircle size={18}/></button>
+                                      <button onClick={() => handleRejectSingle(post.id)} className="p-1.5 text-slate-400 hover:text-red-500"><XCircle size={18}/></button>
+                                      <button onClick={() => handleApproveSingle(post.id)} className="p-1.5 text-slate-400 hover:text-green-500"><CheckCircle size={18}/></button>
                                   </div>
                               </div>
-                              
                               <div className="p-5 flex gap-5">
-                                  {/* Image Section */}
                                   <div className="w-32 flex-shrink-0 flex flex-col gap-2">
-                                      <div className="w-32 h-32 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group-hover:border-indigo-100 transition-colors">
-                                          {post.imageUrl ? (
-                                              <img src={post.imageUrl} alt="Generated" className="w-full h-full object-cover" />
-                                          ) : (
-                                              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-2">
-                                                  <ImageIcon size={20} className="mb-1" />
-                                                  <span>{post.imagePrompt ? "Prompt Ready" : "No Visual"}</span>
-                                              </div>
-                                          )}
+                                      <div className="w-32 h-32 bg-slate-100 rounded-lg overflow-hidden relative">
+                                          {post.imageUrl ? <img src={post.imageUrl} className="w-full h-full object-cover" /> : <div className="flex items-center justify-center h-full text-xs text-slate-400">No Visual</div>}
                                       </div>
-                                      {!post.imageUrl && post.imagePrompt && (
-                                          <button 
-                                            onClick={() => handleGeneratePendingImage(post.id, post.imagePrompt!)}
-                                            className="w-full py-1.5 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded hover:bg-indigo-100"
-                                          >
-                                              Generate Art
-                                          </button>
-                                      )}
+                                      {!post.imageUrl && post.imagePrompt && <button onClick={() => handleGeneratePendingImage(post.id, post.imagePrompt!)} className="w-full py-1.5 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded">Generate Art</button>}
                                   </div>
-
-                                  {/* Content Section */}
                                   <div className="flex-1 space-y-3">
-                                      <div>
-                                          <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Topic</span>
-                                          <p className="text-sm font-medium text-slate-800">{post.topic}</p>
-                                      </div>
-                                      <div>
-                                          <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Caption</span>
-                                          <textarea 
-                                            defaultValue={post.caption}
-                                            className="w-full mt-1 p-2 text-sm text-slate-600 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-100 outline-none resize-none h-24 bg-transparent"
-                                          />
-                                      </div>
-                                      {post.imagePrompt && (
-                                          <div className="pt-2 border-t border-slate-100">
-                                              <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Visual Prompt</span>
-                                              <p className="text-xs text-slate-500 italic truncate">{post.imagePrompt}</p>
-                                          </div>
-                                      )}
+                                      <p className="text-sm font-medium text-slate-800">{post.topic}</p>
+                                      <textarea defaultValue={post.caption} className="w-full mt-1 p-2 text-sm text-slate-600 border border-slate-200 rounded-md h-24 bg-transparent"/>
                                   </div>
                               </div>
                           </div>
@@ -564,81 +399,13 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
               </div>
           </div>
       )}
-
-      {/* Post Creator Modal (Keep existing logic) */}
       {isCreatorOpen && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
               <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-8 shadow-2xl flex gap-8">
-                  {/* Left: Text */}
                   <div className="flex-1 space-y-6">
                       <h2 className="text-xl font-bold">Create Post</h2>
-                      <div>
-                          <label className="block text-sm font-medium mb-1">Platform</label>
-                          <select 
-                            value={creatorState.platform} 
-                            onChange={(e) => setCreatorState({...creatorState, platform: e.target.value})}
-                            className="w-full border p-2 rounded-lg"
-                          >
-                              <option>Instagram</option>
-                              <option>LinkedIn</option>
-                              <option>Twitter</option>
-                              <option>Facebook</option>
-                          </select>
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium mb-1">Caption (Gemini 3 Pro)</label>
-                          <textarea 
-                            value={creatorState.caption}
-                            onChange={(e) => setCreatorState({...creatorState, caption: e.target.value})}
-                            className="w-full border p-2 rounded-lg h-40 text-sm"
-                            disabled={creatorState.loadingCaption}
-                          />
-                          {creatorState.loadingCaption && <div className="text-xs text-brand-600 animate-pulse mt-1">Writing caption...</div>}
-                          <button onClick={() => selectedTopic && handleGenCaption(selectedTopic)} className="text-xs text-brand-600 font-medium mt-1">Regenerate</button>
-                      </div>
-                  </div>
-
-                  {/* Right: Image */}
-                  <div className="flex-1 space-y-6 border-l pl-8">
-                       <div>
-                          <label className="block text-sm font-medium mb-1">Image Prompt</label>
-                          <textarea 
-                            value={creatorState.imagePrompt}
-                            onChange={(e) => setCreatorState({...creatorState, imagePrompt: e.target.value})}
-                            className="w-full border p-2 rounded-lg h-20 text-sm"
-                          />
-                       </div>
-                       <div className="flex items-center gap-4">
-                           <select 
-                                value={creatorState.imageSize}
-                                onChange={(e) => setCreatorState({...creatorState, imageSize: e.target.value as any})}
-                                className="border p-2 rounded-lg text-sm"
-                            >
-                               <option value="1K">1K</option>
-                               <option value="2K">2K</option>
-                               <option value="4K">4K</option>
-                           </select>
-                           <button 
-                                onClick={handleGenImage}
-                                disabled={creatorState.loadingImage}
-                                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
-                           >
-                               {creatorState.loadingImage ? 'Generating...' : 'Generate Image'}
-                           </button>
-                       </div>
-
-                       <div className="aspect-square bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
-                           {creatorState.generatedImage ? (
-                               <img src={creatorState.generatedImage} alt="Generated" className="w-full h-full object-contain" />
-                           ) : (
-                               <div className="text-slate-400 text-sm">Preview Area</div>
-                           )}
-                       </div>
-
-                       <div className="flex justify-end gap-3 pt-4">
-                           <button onClick={() => setIsCreatorOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-                           <button onClick={savePost} className="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">Schedule Post</button>
-                       </div>
+                      <button onClick={savePost} className="px-6 py-2 bg-brand-600 text-white rounded-lg">Schedule</button>
+                      <button onClick={() => setIsCreatorOpen(false)} className="px-4 py-2 text-slate-600">Cancel</button>
                   </div>
               </div>
           </div>
@@ -647,17 +414,50 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
   );
 };
 
+const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: React.ReactNode, label: string }> = ({ active, onClick, icon, label }) => (
+  <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+    {icon} {label}
+  </button>
+);
+
+const StrategyWrapper: React.FC<{ profile: CompanyProfile, researchText: string }> = ({ profile, researchText }) => {
+    const [strategy, setStrategy] = useState<string>('');
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        const fetch = async () => {
+            setLoading(true);
+            try {
+                const res = await generateMarketingStrategy(profile, researchText || "No prior research.");
+                setStrategy(res);
+            } catch (e) {
+                setStrategy("Failed to generate strategy.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetch();
+    }, []);
+    if (loading) return <div className="flex flex-col items-center justify-center h-96 text-center"><p>Thinking deeply...</p></div>;
+    return <div className="bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>;
+};
 
 // --- Main App Component ---
 
 export default function App() {
   const [profile, setProfile] = useState<CompanyProfile | null>(() => {
-    const saved = localStorage.getItem('socialai_profile');
-    return saved ? JSON.parse(saved) : null;
+    try {
+        const saved = localStorage.getItem('socialai_profile');
+        return saved ? JSON.parse(saved) : null;
+    } catch(e) {
+        console.error("Failed to parse profile", e);
+        return null;
+    }
   });
   
   const [view, setView] = useState<AppView>(() => {
-     return localStorage.getItem('socialai_profile') ? AppView.DASHBOARD : AppView.LANDING;
+     try {
+         return localStorage.getItem('socialai_profile') ? AppView.DASHBOARD : AppView.LANDING;
+     } catch(e) { return AppView.LANDING; }
   });
   
   const [report, setReport] = useState<ResearchReport | null>(null);
@@ -676,47 +476,27 @@ export default function App() {
   };
 
   const renderContent = () => {
-    // Landing page is public
-    if (view === AppView.LANDING) {
-        return <LandingPage onGetStarted={() => setView(AppView.ONBOARDING)} />;
-    }
-
-    // Require profile for app views
+    if (view === AppView.LANDING) return <LandingPage onGetStarted={() => setView(AppView.ONBOARDING)} />;
     if (!profile && view !== AppView.ONBOARDING) return null;
-
     switch (view) {
-      case AppView.ONBOARDING:
-        return <Onboarding onComplete={handleOnboardingComplete} />;
-      case AppView.DASHBOARD:
-        return <Dashboard profile={profile!} onNavigate={setView} />;
-      case AppView.RESEARCH:
-        return <ResearchView profile={profile!} report={report} setReport={setReport} />;
-      case AppView.STRATEGY:
-        // Re-using a simple markdown view for strategy for brevity, but logic is in geminiService
-        return (
-            <div className="p-8 h-full overflow-y-auto">
-                <h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1>
-                <StrategyWrapper profile={profile!} researchText={report?.rawContent || ''} />
-            </div>
-        );
-      case AppView.CALENDAR:
-        return <CalendarView profile={profile!} />;
-      default:
-        return <div>Not Implemented</div>;
+      case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} />;
+      case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
+      case AppView.RESEARCH: return <ResearchView profile={profile!} report={report} setReport={setReport} />;
+      case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={report?.rawContent || ''} /></div>;
+      case AppView.CALENDAR: return <CalendarView profile={profile!} />;
+      default: return <div>Not Implemented</div>;
     }
   };
 
-  // Determine if we should show the sidebar
   const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING;
 
   return (
     <div className="flex h-screen bg-slate-50">
-      {/* Sidebar */}
       {showSidebar && (
         <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
           <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-2 text-brand-600 font-bold text-xl">
-               <span className="p-1 bg-brand-600 text-white rounded">AI</span> SocialAI
+               <ShakesLogoSmall className="w-8 h-8"/> <span>SocialAI</span>
             </div>
           </div>
           <nav className="flex-1 p-4 space-y-1">
@@ -725,85 +505,15 @@ export default function App() {
             <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20}/>} label="Strategy (Reasoning)" />
             <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20}/>} label="Content Calendar" />
           </nav>
-          
           <div className="p-4 border-t border-slate-100 space-y-4">
-             <button 
-                id="live-btn"
-                onClick={() => setIsLiveOpen(true)}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all"
-             >
-                <Mic size={20} className="animate-pulse" /> Live Consultant
-             </button>
-             
-             <button 
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-1 text-sm"
-             >
-                <LogOut size={16} /> Logout / Reset
-             </button>
+             <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all"><Mic size={20} className="animate-pulse" /> Live Consultant</button>
+             <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-1 text-sm"><LogOut size={16} /> Logout / Reset</button>
           </div>
         </aside>
       )}
-
-      {/* Main Content */}
-      <main className={`flex-1 overflow-hidden relative ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''}`}>
-        {renderContent()}
-      </main>
-
-      {/* Overlays */}
+      <main className={`flex-1 overflow-hidden relative ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''}`}>{renderContent()}</main>
       <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
-      
-      {/* Chatbot - only show on dashboard/app views */}
       {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
     </div>
   );
 }
-
-const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: React.ReactNode, label: string }> = ({ active, onClick, icon, label }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-      active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
-    }`}
-  >
-    {icon}
-    {label}
-  </button>
-);
-
-// Helper for Strategy Loading
-const StrategyWrapper: React.FC<{ profile: CompanyProfile, researchText: string }> = ({ profile, researchText }) => {
-    const [strategy, setStrategy] = useState<string>('');
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        const fetch = async () => {
-            setLoading(true);
-            try {
-                // If no research, generate it on fly or just pass empty
-                const res = await generateMarketingStrategy(profile, researchText || "No prior research.");
-                setStrategy(res);
-            } catch (e) {
-                setStrategy("Failed to generate strategy.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetch();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    if (loading) return (
-        <div className="flex flex-col items-center justify-center h-96 text-center">
-            <div className="w-16 h-16 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
-            <p className="text-lg font-medium text-slate-700">Thinking deeply...</p>
-            <p className="text-sm text-slate-500">Gemini 3 Pro is analyzing your goals (Budget: 32k tokens)</p>
-        </div>
-    );
-
-    return (
-        <div className="bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none">
-            <ReactMarkdown>{strategy}</ReactMarkdown>
-        </div>
-    );
-};

@@ -9,9 +9,37 @@ const MODEL_TOPICS = 'gemini-2.5-flash-lite-latest'; // "Fast AI responses"
 const MODEL_IMAGE = 'gemini-3-pro-image-preview'; // Supports 1K, 2K, 4K
 const MODEL_CHAT = 'gemini-3-pro-preview';
 
+// --- API Key Helper ---
+export const getApiKey = () => {
+    // 1. Try process.env (Node/Webpack/Sandbox)
+    if (typeof process !== 'undefined' && process.env?.API_KEY) {
+        return process.env.API_KEY;
+    }
+    // 2. Try import.meta.env (Vite/Netlify)
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_KEY) {
+        // @ts-ignore
+        return import.meta.env.VITE_API_KEY;
+    }
+    // 3. Try standard React App
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env?.REACT_APP_API_KEY) {
+        // @ts-ignore
+        return import.meta.env.REACT_APP_API_KEY;
+    }
+    return '';
+};
+
 // Initialize Client
-// NOTE: We recreate the client in functions if needed, but for general use:
-const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAiClient = () => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        console.warn("Gemini API Key is missing. Features will not work.");
+        // Return a dummy client to prevent immediate crash, calls will fail gracefully
+        return new GoogleGenAI({ apiKey: 'MISSING_KEY' });
+    }
+    return new GoogleGenAI({ apiKey });
+};
 
 // --- API Functions ---
 
