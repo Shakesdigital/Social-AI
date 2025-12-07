@@ -1,0 +1,7 @@
+{
+  "name": "SocialAI - Intelligent Marketing Assistant",
+  "description": "A comprehensive AI-powered social media marketing assistant for businesses. Features market research, strategy generation, content calendar planning, and automated post creation using Google Gemini 2.5 and 3.0 models.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
