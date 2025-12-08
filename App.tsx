@@ -14,13 +14,14 @@ import {
   XCircle,
   Image as ImageIcon,
   Loader,
-  LogOut
+  LogOut,
+  AlertTriangle
 } from 'lucide-react';
 import { AppView, CompanyProfile, ResearchReport, SocialPost, AutoPilotConfig } from './types';
 import { LiveAssistant } from './components/LiveAssistant';
 import { ChatBot } from './components/ChatBot';
 import { LandingPage } from './components/LandingPage';
-import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/geminiService';
+import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent, getApiKey } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 
 // Custom Shakes Logo (Small version for Sidebar)
@@ -55,12 +56,12 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh]">
+    <div className="flex items-center justify-center min-h-[80vh] px-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome to SocialAI</h1>
         <p className="text-slate-500 mb-8">Let's set up your business profile to generate tailored strategies.</p>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
               <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
@@ -74,7 +75,7 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
             <label className="block text-sm font-medium text-slate-700 mb-1">What do you do?</label>
             <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Describe your products or services..." />
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
               <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business Owners..." />
@@ -142,8 +143,8 @@ const ResearchView: React.FC<{ profile: CompanyProfile, report: ResearchReport |
     try {
       const result = await generateMarketResearch(profile);
       setReport({ rawContent: result.text, sources: result.sources, lastUpdated: new Date().toISOString() });
-    } catch (e) {
-      alert("Failed to generate research.");
+    } catch (e: any) {
+      alert(`Research Failed: ${e.message}. Ensure VITE_API_KEY is set in Netlify.`);
     } finally {
       setLoading(false);
     }
@@ -208,8 +209,10 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
 
   const generateTopics = async () => {
     setGeneratingTopics(true);
-    const newTopics = await generateContentTopics(profile);
-    setTopics(newTopics);
+    try {
+        const newTopics = await generateContentTopics(profile);
+        setTopics(newTopics);
+    } catch(e: any) { alert(`Failed: ${e.message}`); }
     setGeneratingTopics(false);
   };
   const openCreator = (topic: string) => {
@@ -259,8 +262,8 @@ const CalendarView: React.FC<{ profile: CompanyProfile }> = ({ profile }) => {
               setPendingPosts(generatedPosts);
               setShowReviewDashboard(true);
           }
-      } catch (e) {
-          alert("Auto-Pilot generation failed. Try fewer posts.");
+      } catch (e: any) {
+          alert(`Auto-Pilot failed: ${e.message}`);
       } finally {
           setIsAutoGenerating(false);
           setAutoPilotConfig(prev => ({ ...prev, enabled: true }));
@@ -429,8 +432,8 @@ const StrategyWrapper: React.FC<{ profile: CompanyProfile, researchText: string 
             try {
                 const res = await generateMarketingStrategy(profile, researchText || "No prior research.");
                 setStrategy(res);
-            } catch (e) {
-                setStrategy("Failed to generate strategy.");
+            } catch (e: any) {
+                setStrategy(`Failed to generate strategy: ${e.message}`);
             } finally {
                 setLoading(false);
             }
@@ -456,12 +459,29 @@ export default function App() {
   
   const [view, setView] = useState<AppView>(() => {
      try {
-         return localStorage.getItem('socialai_profile') ? AppView.DASHBOARD : AppView.LANDING;
+         // Critical Fix: Only go to Dashboard if profile actually exists
+         const hasProfile = !!localStorage.getItem('socialai_profile');
+         return hasProfile ? AppView.DASHBOARD : AppView.LANDING;
      } catch(e) { return AppView.LANDING; }
   });
+
+  const [hasApiKey, setHasApiKey] = useState(true);
+  
+  useEffect(() => {
+      // Check for API key on mount to warn user
+      const key = getApiKey();
+      if (!key) setHasApiKey(false);
+  }, []);
   
   const [report, setReport] = useState<ResearchReport | null>(null);
   const [isLiveOpen, setIsLiveOpen] = useState(false);
+
+  // Sync state: If profile is null, force view to Landing or Onboarding
+  useEffect(() => {
+      if (!profile && view !== AppView.LANDING && view !== AppView.ONBOARDING) {
+          setView(AppView.LANDING);
+      }
+  }, [profile, view]);
 
   const handleOnboardingComplete = (p: CompanyProfile) => {
     setProfile(p);
@@ -477,7 +497,7 @@ export default function App() {
 
   const renderContent = () => {
     if (view === AppView.LANDING) return <LandingPage onGetStarted={() => setView(AppView.ONBOARDING)} />;
-    if (!profile && view !== AppView.ONBOARDING) return null;
+    if (!profile && view !== AppView.ONBOARDING) return null; // Should be handled by useEffect, but safe guard
     switch (view) {
       case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} />;
       case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
@@ -492,6 +512,14 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50">
+      {/* API Key Warning Banner */}
+      {!hasApiKey && (
+          <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
+              <AlertTriangle size={12} />
+              WARNING: Gemini API Key is missing. Please add VITE_API_KEY to your Netlify Environment Variables.
+          </div>
+      )}
+
       {showSidebar && (
         <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
           <div className="p-6 border-b border-slate-100">
@@ -511,7 +539,7 @@ export default function App() {
           </div>
         </aside>
       )}
-      <main className={`flex-1 overflow-hidden relative ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''}`}>{renderContent()}</main>
+      <main className={`flex-1 overflow-hidden relative ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''} ${!hasApiKey ? 'mt-6' : ''}`}>{renderContent()}</main>
       <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
       {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
     </div>

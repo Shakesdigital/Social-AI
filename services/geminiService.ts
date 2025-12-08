@@ -11,23 +11,32 @@ const MODEL_CHAT = 'gemini-3-pro-preview';
 
 // --- API Key Helper ---
 export const getApiKey = () => {
+    let key = '';
+
     // 1. Try process.env (Node/Webpack/Sandbox)
     if (typeof process !== 'undefined' && process.env?.API_KEY) {
-        return process.env.API_KEY;
+        key = process.env.API_KEY;
     }
+    
     // 2. Try import.meta.env (Vite/Netlify)
     // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_KEY) {
+    if (!key && typeof import.meta !== 'undefined' && import.meta.env) {
         // @ts-ignore
-        return import.meta.env.VITE_API_KEY;
-    }
-    // 3. Try standard React App
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env?.REACT_APP_API_KEY) {
+        if (import.meta.env.VITE_API_KEY) key = import.meta.env.VITE_API_KEY;
         // @ts-ignore
-        return import.meta.env.REACT_APP_API_KEY;
+        else if (import.meta.env.GOOGLE_API_KEY) key = import.meta.env.GOOGLE_API_KEY;
+        // @ts-ignore
+        else if (import.meta.env.REACT_APP_API_KEY) key = import.meta.env.REACT_APP_API_KEY;
     }
-    return '';
+
+    if (key) {
+        // Safe logging for debug (only show first 4 chars)
+        console.log(`[GeminiService] API Key found: ${key.substring(0, 4)}...`);
+        return key.trim();
+    } else {
+        console.error("[GeminiService] API Key NOT found. Checked process.env.API_KEY, VITE_API_KEY, REACT_APP_API_KEY.");
+        return '';
+    }
 };
 
 // Initialize Client
@@ -79,9 +88,9 @@ export const generateMarketResearch = async (profile: CompanyProfile) => {
       .filter((web: any) => web) || [];
 
     return { text, sources };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Market Research Error:", error);
-    throw error;
+    throw new Error(error.message || "Failed to generate market research");
   }
 };
 
@@ -120,9 +129,9 @@ export const generateMarketingStrategy = async (profile: CompanyProfile, researc
     });
 
     return response.text || "No strategy generated.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Strategy Generation Error:", error);
-    throw error;
+    throw new Error(error.message || "Failed to generate strategy");
   }
 };
 
@@ -159,7 +168,7 @@ export const generateContentTopics = async (profile: CompanyProfile, count: numb
     return JSON.parse(text) as string[];
   } catch (error) {
     console.error("Topic Generation Error:", error);
-    return [];
+    return ["Error generating topics. Please try again."];
   }
 };
 
