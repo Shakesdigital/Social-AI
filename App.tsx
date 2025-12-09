@@ -21,7 +21,7 @@ import { AppView, CompanyProfile, ResearchReport, SocialPost, AutoPilotConfig } 
 import { LiveAssistant } from './components/LiveAssistant';
 import { ChatBot } from './components/ChatBot';
 import { LandingPage } from './components/LandingPage';
-import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent, getApiKey } from './services/geminiService';
+import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import ReactMarkdown from 'react-markdown';
 
 // Custom Shakes Logo (Small version for Sidebar)

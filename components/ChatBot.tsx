@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, Bot, ChevronDown } from 'lucide-react';
-import { sendChatMessage } from '../services/geminiService';
+import { sendChatMessage } from '../services/openaiService';
 
 export const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { Mic, MicOff, Volume2, X } from 'lucide-react';
-import { getApiKey } from '../services/geminiService';
+// API key is now configured directly in the component via environment variable
 
 // Audio Utils
 function createBlob(data: Float32Array): { data: string; mimeType: string } {
