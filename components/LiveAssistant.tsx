@@ -119,82 +119,137 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const startSession = async () => {
     setError(null);
     try {
-      const apiKey = getApiKey();
-      if (!apiKey) throw new Error("API Key missing or invalid.");
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new OpenAI({ 
+        apiKey: import.meta.env.VITE_OPENAI_API_KEY || "your-api-key-here",
+        dangerouslyAllowBrowser: true
+      });
       
-      inputAudioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      // Initialize Audio Context for output
       outputAudioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      
-      const outputNode = outputAudioContext.current.createGain();
-      outputNode.connect(outputAudioContext.current.destination);
 
+      // Get Microphone Stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-
-      const config = {
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-        callbacks: {
-          onopen: () => {
-            console.log('Live Session Opened');
-            setIsConnected(true);
-            
-            if (!inputAudioContext.current) return;
-            const source = inputAudioContext.current.createMediaStreamSource(stream);
-            const processor = inputAudioContext.current.createScriptProcessor(4096, 1, 1);
-            scriptProcessorRef.current = processor;
-
-            processor.onaudioprocess = (e) => {
-              if (isMuted) return;
-              const inputData = e.inputBuffer.getChannelData(0);
-              const pcmBlob = createBlob(inputData);
-              if (sessionRef.current) {
-                sessionRef.current.then(session => {
-                  try { session.sendRealtimeInput({ media: pcmBlob }); } catch(e) {}
-                });
-              }
-            };
-            source.connect(processor);
-            processor.connect(inputAudioContext.current.destination);
-          },
-          onmessage: async (message: LiveServerMessage) => {
-            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (base64Audio && outputAudioContext.current) {
-               const ctx = outputAudioContext.current;
-               nextStartTime.current = Math.max(nextStartTime.current, ctx.currentTime);
-               const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
-               const source = ctx.createBufferSource();
-               source.buffer = audioBuffer;
-               source.connect(outputNode);
-               source.addEventListener('ended', () => { sourcesRef.current.delete(source); });
-               source.start(nextStartTime.current);
-               nextStartTime.current += audioBuffer.duration;
-               sourcesRef.current.add(source);
-            }
-          },
-          onclose: () => { setIsConnected(false); },
-          onerror: (e: any) => {
-            console.error("Session error:", e);
-            setError("Service unavailable.");
-            setIsConnected(false);
-          }
-        },
-        config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-            },
-            systemInstruction: {
-                parts: [{ text: "You are a helpful, energetic social media marketing consultant named SocialAI. Provide quick, spoken advice." }]
-            }
+      
+      setIsConnected(true);
+      
+      // Use MediaRecorder for capturing audio chunks
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const audioChunks: Blob[] = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
         }
       };
-
-      sessionRef.current = ai.live.connect(config);
+      
+      mediaRecorder.onstop = async () => {
+        if (audioChunks.length === 0 || isMuted) return;
+        
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        audioChunks.length = 0; // Clear chunks
+        
+        try {
+          // Transcribe audio using OpenAI Whisper
+          const transcription = await ai.audio.transcriptions.create({
+            file: audioBlob as any,
+            model: 'whisper-1',
+          });
+          
+          const userText = transcription.text;
+          if (!userText.trim()) {
+            // Restart recording
+            if (isConnected && streamRef.current) {
+              mediaRecorder.start();
+              setTimeout(() => {
+                if (mediaRecorder.state === 'recording') {
+                  mediaRecorder.stop();
+                }
+              }, 3000);
+            }
+            return;
+          }
+          
+          // Get response from ChatGPT
+          const chatResponse = await ai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a helpful, energetic social media marketing consultant named SocialAI. Provide quick, spoken advice to the user about their marketing strategy. Keep answers concise and conversational.'
+              },
+              {
+                role: 'user',
+                content: userText
+              }
+            ],
+            temperature: 0.8,
+          });
+          
+          const responseText = chatResponse.choices[0]?.message?.content || "I'm sorry, I didn't catch that.";
+          
+          // Convert response to speech using OpenAI TTS
+          const speechResponse = await ai.audio.speech.create({
+            model: 'tts-1',
+            voice: 'nova',
+            input: responseText,
+          });
+          
+          // Play the audio response
+          const audioArrayBuffer = await speechResponse.arrayBuffer();
+          if (outputAudioContext.current) {
+            const audioBuffer = await outputAudioContext.current.decodeAudioData(audioArrayBuffer);
+            const source = outputAudioContext.current.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(outputAudioContext.current.destination);
+            source.addEventListener('ended', () => {
+              // Restart recording after response finishes
+              if (isConnected && streamRef.current) {
+                mediaRecorder.start();
+                setTimeout(() => {
+                  if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                  }
+                }, 3000);
+              }
+            });
+            source.start();
+          }
+          
+        } catch (error) {
+          console.error('Processing error:', error);
+          // Restart recording on error
+          if (isConnected && streamRef.current) {
+            mediaRecorder.start();
+            setTimeout(() => {
+              if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+              }
+            }, 3000);
+          }
+        }
+      };
+      
+      // Start recording in 3-second chunks
+      mediaRecorder.start();
+      setTimeout(() => {
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+      }, 3000);
+      
+      // Store reference for cleanup
+      sessionRef.current = Promise.resolve({ 
+        close: () => {
+          if (mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+          }
+        }
+      });
 
     } catch (err) {
       console.error(err);
-      setError("Connection failed.");
+      setError("Failed to initialize session. Please check microphone permissions.");
     }
   };
 
@@ -210,7 +265,10 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
             </div>
         </div>
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Live Marketing Consultant</h2>
-        <p className="text-slate-500 mb-8 min-h-[1.5em]">{isConnected ? "Listening..." : error ? <span className="text-red-500">{error}</span> : "Connecting..."}</p>
+        <p className="text-slate-500 mb-8 min-h-[1.5em]">{isConnected ? "Listening... Ask me about your strategy!" : error ? <span className="text-red-500">{error}</span> : "Connecting to voice assistant..."}</p>
+        <div className="mt-6 text-xs text-slate-400">
+           Powered by ChatGPT-4o + Whisper
+        </div>
         <div className="flex justify-center gap-4">
             <button onClick={() => setIsMuted(!isMuted)} className={`p-4 rounded-full transition-colors shadow-sm ${isMuted ? 'bg-red-100 text-red-600' : 'bg-brand-100 text-brand-600'}`}>
                 {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
