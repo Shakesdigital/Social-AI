@@ -469,7 +469,7 @@ export default function App() {
   
   useEffect(() => {
       // Check for API key on mount to warn user
-      const key = getApiKey();
+      const key = import.meta.env.VITE_OPENAI_API_KEY;
       if (!key) setHasApiKey(false);
   }, []);
   
@@ -516,7 +516,7 @@ export default function App() {
       {!hasApiKey && (
           <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
               <AlertTriangle size={12} />
-              WARNING: Gemini API Key is missing. Please add VITE_API_KEY to your Netlify Environment Variables.
+              WARNING: OpenAI API Key is missing. Please add VITE_OPENAI_API_KEY to your Netlify Environment Variables.
           </div>
       )}
 
