@@ -318,7 +318,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                         )}
                         {posts.map(post => (
                             <div key={post.id} className="flex gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all group">
-                                <div className="w-24 h-24 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative border border-slate-200">
+                                {/* Date column */}
+                                <div className="w-16 flex-shrink-0 text-center">
+                                    <div className="bg-brand-50 rounded-xl p-2 border border-brand-100">
+                                        <p className="text-[10px] font-bold text-brand-600 uppercase">
+                                            {post.date instanceof Date
+                                                ? post.date.toLocaleDateString('en-US', { weekday: 'short' })
+                                                : new Date(post.date).toLocaleDateString('en-US', { weekday: 'short' })
+                                            }
+                                        </p>
+                                        <p className="text-xl font-bold text-brand-700">
+                                            {post.date instanceof Date
+                                                ? post.date.getDate()
+                                                : new Date(post.date).getDate()
+                                            }
+                                        </p>
+                                        <p className="text-[10px] text-brand-600">
+                                            {post.date instanceof Date
+                                                ? post.date.toLocaleDateString('en-US', { month: 'short' })
+                                                : new Date(post.date).toLocaleDateString('en-US', { month: 'short' })
+                                            }
+                                        </p>
+                                        <p className="text-[9px] font-medium text-slate-500 mt-1">
+                                            {post.date instanceof Date
+                                                ? post.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                                                : new Date(post.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                                {/* Image */}
+                                <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative border border-slate-200">
                                     {post.imageUrl ? (
                                         <img src={post.imageUrl} alt="Post" className="w-full h-full object-cover" />
                                     ) : (
@@ -327,27 +357,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex gap-2">
-                                            <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
-                                                post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-slate-200 text-slate-700'
-                                                }`}>
-                                                {post.platform}
-                                            </span>
-                                        </div>
-                                        <span className="text-xs text-slate-400 font-medium">
-                                            {post.date instanceof Date ? post.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : new Date(post.date).toLocaleDateString()}
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
+                                            post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
+                                                post.platform === 'Facebook' ? 'bg-blue-100 text-blue-600' :
+                                                    post.platform === 'TikTok' ? 'bg-slate-900 text-white' :
+                                                        post.platform === 'YouTube' ? 'bg-red-100 text-red-700' :
+                                                            post.platform === 'Pinterest' ? 'bg-red-50 text-red-600' :
+                                                                post.platform === 'Threads' ? 'bg-slate-100 text-slate-700' :
+                                                                    'bg-slate-200 text-slate-700'
+                                            }`}>
+                                            {post.platform}
+                                        </span>
+                                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full border border-teal-100">
+                                            Scheduled
                                         </span>
                                     </div>
-                                    <h4 className="font-semibold text-slate-900 mb-1 text-sm">{post.topic}</h4>
+                                    <h4 className="font-semibold text-slate-900 mb-1 text-sm truncate">{post.topic}</h4>
                                     <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{post.caption}</p>
-                                </div>
-                                <div className="flex items-center px-4">
-                                    <span className="text-[10px] uppercase font-bold px-2 py-1 bg-teal-50 text-teal-700 rounded-lg border border-teal-100">
-                                        Scheduled
-                                    </span>
                                 </div>
                             </div>
                         ))}
@@ -427,8 +456,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                                             key={cad}
                                             onClick={() => setAutoPilotConfig({ ...autoPilotConfig, cadence: cad as any })}
                                             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${autoPilotConfig.cadence === cad
-                                                    ? 'bg-indigo-600 text-white shadow-lg'
-                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                ? 'bg-indigo-600 text-white shadow-lg'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                                 }`}
                                         >
                                             {cad}
@@ -592,11 +621,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                             {pendingPosts.map(post => (
                                 <div key={post.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden group hover:shadow-md transition-all">
-                                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider">
-                                        <span className={`px-2 py-0.5 rounded-full ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
-                                            post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
-                                                'bg-slate-200 text-slate-700'
-                                            }`}>{post.platform}</span>
+                                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
+                                                    post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
+                                                        post.platform === 'Facebook' ? 'bg-blue-100 text-blue-600' :
+                                                            post.platform === 'TikTok' ? 'bg-slate-900 text-white' :
+                                                                post.platform === 'YouTube' ? 'bg-red-100 text-red-700' :
+                                                                    'bg-slate-200 text-slate-700'
+                                                }`}>{post.platform}</span>
+                                            <div className="flex items-center gap-1 text-xs text-slate-600 bg-brand-50 px-2 py-1 rounded-lg">
+                                                <span className="font-bold">
+                                                    {post.date instanceof Date
+                                                        ? post.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                                                        : new Date(post.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                                                    }
+                                                </span>
+                                                <span className="text-slate-400">•</span>
+                                                <span>
+                                                    {post.date instanceof Date
+                                                        ? post.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                                                        : new Date(post.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
                                         <div className="flex gap-1.5">
                                             <button onClick={() => handleRejectSingle(post.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><XCircle size={18} /></button>
                                             <button onClick={() => handleApproveSingle(post.id)} className="p-1.5 text-slate-400 hover:text-teal-500 hover:bg-teal-50 rounded-lg transition-all"><CheckCircle size={18} /></button>

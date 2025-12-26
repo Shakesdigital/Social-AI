@@ -516,26 +516,71 @@ Return JSON:
 
     const posts: SocialPost[] = [];
     const today = new Date();
-    const daysInPeriod = config.cadence === 'Weekly' ? 7 : 30;
 
-    planData.forEach((item: any, index: number) => {
-      const dayOffset = (index % daysInPeriod) + 1;
-      const postDate = new Date(today);
-      postDate.setDate(today.getDate() + dayOffset);
+    // Calculate days in period based on cadence
+    const daysInPeriod = config.cadence === 'Daily' ? 1 : config.cadence === 'Weekly' ? 7 : 30;
 
-      posts.push({
-        id: Date.now() + index + Math.random().toString(),
-        date: postDate,
-        platform: item.platform as any,
-        topic: item.topic,
-        caption: item.caption,
-        imagePrompt: item.imagePrompt,
-        status: 'PendingApproval'
-      });
-
-      // Track each topic in memory
-      addGeneratedTopic(item.topic);
+    // Group posts by platform to distribute them evenly
+    const platformPosts: { [key: string]: any[] } = {};
+    planData.forEach((item: any) => {
+      const platform = item.platform;
+      if (!platformPosts[platform]) platformPosts[platform] = [];
+      platformPosts[platform].push(item);
     });
+
+    // Schedule posts with proper date distribution
+    let globalIndex = 0;
+    Object.entries(platformPosts).forEach(([platform, items]) => {
+      const postsCount = items.length;
+      const interval = postsCount > 1 ? daysInPeriod / postsCount : 1;
+
+      items.forEach((item: any, index: number) => {
+        // Calculate posting date
+        const dayOffset = config.cadence === 'Daily'
+          ? Math.floor(index / 3) // Max 3 posts per day for daily
+          : Math.floor(index * interval);
+
+        const postDate = new Date(today);
+        postDate.setDate(today.getDate() + dayOffset + 1); // Start from tomorrow
+
+        // Parse suggested time or use default optimal times
+        let postTime = item.bestTime || '10:00 AM';
+        const timeMatch = postTime.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1]);
+          const minutes = parseInt(timeMatch[2]) || 0;
+          const isPM = timeMatch[3]?.toUpperCase() === 'PM';
+          if (isPM && hours < 12) hours += 12;
+          if (!isPM && hours === 12) hours = 0;
+          postDate.setHours(hours, minutes, 0, 0);
+        } else {
+          // Default times based on platform
+          const defaultTimes: { [key: string]: number } = {
+            'Instagram': 11, 'Facebook': 13, 'LinkedIn': 9,
+            'Twitter': 12, 'TikTok': 19, 'YouTube': 14,
+            'Pinterest': 20, 'Threads': 10
+          };
+          postDate.setHours(defaultTimes[platform] || 10, 0, 0, 0);
+        }
+
+        posts.push({
+          id: Date.now() + globalIndex + Math.random().toString(),
+          date: postDate,
+          platform: item.platform as any,
+          topic: item.topic,
+          caption: item.caption,
+          imagePrompt: item.imagePrompt,
+          status: 'PendingApproval'
+        });
+
+        // Track each topic in memory
+        addGeneratedTopic(item.topic);
+        globalIndex++;
+      });
+    });
+
+    // Sort posts by date
+    posts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Track the batch generation
     incrementGeneratedCount('posts', posts.length);
