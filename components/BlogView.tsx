@@ -23,7 +23,12 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
         setIsLoadingTopics(true);
         try {
             const newTopics = await researchTrendingTopics(nicheInput, profile, 5);
-            setTopics(newTopics);
+            // Append new topics, avoiding duplicates
+            setTopics(prev => {
+                const existingIds = new Set(prev.map(t => t.topic.toLowerCase()));
+                const uniqueNew = newTopics.filter(t => !existingIds.has(t.topic.toLowerCase()));
+                return [...uniqueNew, ...prev];
+            });
         } catch (e) {
             console.error('Failed to research topics:', e);
         } finally {
@@ -34,7 +39,8 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
     const handleGeneratePost = async (topic: TrendingTopic) => {
         setIsLoadingPost(true);
         try {
-            const post = await generateBlogPost(topic, profile, 1200);
+            // Generate a full comprehensive blog post (1500+ words)
+            const post = await generateBlogPost(topic, profile, 1500);
             setPosts(prev => [post, ...prev]);
             setSelectedPost(post);
         } catch (e) {
@@ -160,6 +166,32 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                                 </p>
                             )}
                         </div>
+
+                        {/* Generate More Trends Button */}
+                        {topics.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <button
+                                    onClick={handleResearchTopics}
+                                    disabled={isLoadingTopics || !isConfigured}
+                                    className="w-full py-2.5 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-lg hover:from-brand-700 hover:to-brand-800 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-brand-600/25 transition-all hover:scale-[1.02]"
+                                >
+                                    {isLoadingTopics ? (
+                                        <>
+                                            <Loader size={16} className="animate-spin" />
+                                            Finding more...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus size={16} />
+                                            Generate More Trends
+                                        </>
+                                    )}
+                                </button>
+                                <p className="text-center text-xs text-slate-400 mt-2">
+                                    {topics.length} topics found • New trends will be added
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Posts List */}
@@ -174,15 +206,15 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                                     key={post.id}
                                     onClick={() => setSelectedPost(post)}
                                     className={`w-full text-left p-3 rounded-lg transition-colors ${selectedPost?.id === post.id
-                                            ? 'bg-brand-50 border-brand-300 border'
-                                            : 'border border-slate-200 hover:border-slate-300'
+                                        ? 'bg-brand-50 border-brand-300 border'
+                                        : 'border border-slate-200 hover:border-slate-300'
                                         }`}
                                 >
                                     <p className="text-sm font-medium text-slate-800 line-clamp-2">{post.title}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className={`text-xs px-1.5 py-0.5 rounded ${post.status === 'Published' ? 'bg-green-100 text-green-700' :
-                                                post.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-slate-100 text-slate-600'
+                                            post.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
+                                                'bg-slate-100 text-slate-600'
                                             }`}>
                                             {post.status}
                                         </span>
@@ -225,6 +257,14 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                                                 SEO: {selectedPost.seoScore}%
                                             </span>
                                         )}
+                                        {selectedPost.wordCount && (
+                                            <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+                                                {selectedPost.wordCount} words
+                                            </span>
+                                        )}
+                                        <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+                                            {Math.ceil((selectedPost.wordCount || selectedPost.content.split(/\s+/).length) / 200)} min read
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1">
@@ -236,9 +276,9 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                                 </div>
                             </div>
 
-                            {/* Post Content */}
-                            <div className="p-6 max-h-[500px] overflow-y-auto">
-                                <div className="prose prose-sm max-w-none">
+                            {/* Post Content - Full Height */}
+                            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+                                <div className="prose prose-lg max-w-none prose-headings:text-slate-900 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-p:text-slate-700 prose-p:leading-relaxed prose-li:text-slate-700 prose-strong:text-slate-800 prose-blockquote:border-brand-500 prose-blockquote:bg-brand-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-lg">
                                     <ReactMarkdown>{selectedPost.content}</ReactMarkdown>
                                 </div>
                             </div>
@@ -247,19 +287,25 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                             <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2">
                                 <button
                                     onClick={() => navigator.clipboard.writeText(selectedPost.content)}
-                                    className="flex-1 py-2 border border-slate-300 rounded-lg hover:bg-white flex items-center justify-center gap-2 text-sm"
+                                    className="flex-1 py-2.5 border border-slate-300 rounded-lg hover:bg-white flex items-center justify-center gap-2 text-sm font-medium"
                                 >
                                     <Copy size={16} /> Copy Content
                                 </button>
                                 <button
+                                    onClick={() => navigator.clipboard.writeText(`# ${selectedPost.title}\n\n${selectedPost.content}`)}
+                                    className="flex-1 py-2.5 border border-slate-300 rounded-lg hover:bg-white flex items-center justify-center gap-2 text-sm font-medium"
+                                >
+                                    <FileText size={16} /> Copy with Title
+                                </button>
+                                <button
                                     onClick={() => handleSchedule(selectedPost)}
-                                    className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm"
+                                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm font-medium"
                                 >
                                     <Calendar size={16} /> Schedule
                                 </button>
                                 <button
                                     onClick={() => handlePublish(selectedPost)}
-                                    className="flex-1 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center justify-center gap-2 text-sm"
+                                    className="flex-1 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center justify-center gap-2 text-sm font-medium"
                                 >
                                     <ExternalLink size={16} /> Publish
                                 </button>
