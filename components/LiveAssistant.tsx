@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle, Play, Square, Settings } from 'lucide-react';
+import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle, Play, Square, Settings, User, Users } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
@@ -8,6 +8,8 @@ interface LiveAssistantProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+type VoicePreference = 'female' | 'male';
 
 export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -25,6 +27,12 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [speechReady, setSpeechReady] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
+  const [voicePreference, setVoicePreference] = useState<VoicePreference>(() => {
+    const saved = localStorage.getItem('voice_preference');
+    return (saved as VoicePreference) || 'female';
+  });
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -59,12 +67,16 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       const loadVoices = () => {
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
+          // Filter for English voices only
+          const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+          setAvailableVoices(englishVoices.length > 0 ? englishVoices : voices);
           setSpeechReady(true);
-          addDiagnostic(`Loaded ${voices.length} voices`);
+          addDiagnostic(`Loaded ${englishVoices.length} English voices`);
         }
       };
       loadVoices();
       window.speechSynthesis.onvoiceschanged = loadVoices;
+      setTimeout(loadVoices, 100);
       setTimeout(loadVoices, 500);
     } else {
       addDiagnostic('speechSynthesis not available');
@@ -316,25 +328,60 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
       addDiagnostic('Starting speech...');
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-      utterance.pitch = 1.0;
+
+      // Natural speech settings - slower and more human-like
+      utterance.rate = 0.9;  // Slightly slower for clarity
+      utterance.pitch = voicePreference === 'female' ? 1.1 : 0.9; // Adjust pitch based on preference
       utterance.volume = 1.0;
 
-      // Get voice
-      const voices = window.speechSynthesis.getVoices();
-      addDiagnostic(`Available voices: ${voices.length}`);
+      // Select the best voice based on preference
+      const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+      addDiagnostic(`Selecting from ${voices.length} voices (${voicePreference})`);
 
       if (voices.length > 0) {
-        // Prefer natural English voices
-        const preferred = voices.find(v =>
-          v.name.includes('Google') ||
-          v.name.includes('Microsoft') ||
-          v.name.includes('Samantha')
-        ) || voices.find(v => v.lang.startsWith('en'));
+        let selectedVoice: SpeechSynthesisVoice | null = null;
 
-        if (preferred) {
-          utterance.voice = preferred;
-          addDiagnostic(`Using voice: ${preferred.name}`);
+        // Define preferred voices for natural sound (ordered by quality)
+        const femaleNames = ['Samantha', 'Google US English', 'Microsoft Zira', 'Google UK English Female', 'Karen', 'Moira', 'Fiona', 'Victoria', 'Tessa'];
+        const maleNames = ['Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'Fred', 'Thomas', 'Gordon', 'Lee'];
+
+        const preferredNames = voicePreference === 'female' ? femaleNames : maleNames;
+
+        // Try to find a preferred voice
+        for (const name of preferredNames) {
+          const found = voices.find(v => v.name.includes(name));
+          if (found) {
+            selectedVoice = found;
+            break;
+          }
+        }
+
+        // Fallback: Try to find any voice with gender hint
+        if (!selectedVoice) {
+          if (voicePreference === 'female') {
+            selectedVoice = voices.find(v =>
+              v.name.toLowerCase().includes('female') ||
+              v.name.toLowerCase().includes('woman') ||
+              v.name.includes('Zira') ||
+              v.name.includes('Samantha')
+            ) || null;
+          } else {
+            selectedVoice = voices.find(v =>
+              v.name.toLowerCase().includes('male') ||
+              v.name.toLowerCase().includes('david') ||
+              v.name.includes('Daniel')
+            ) || null;
+          }
+        }
+
+        // Final fallback: just pick first English voice
+        if (!selectedVoice) {
+          selectedVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+        }
+
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+          addDiagnostic(`Using: ${selectedVoice.name} (${selectedVoice.lang})`);
         }
       }
 
@@ -380,8 +427,17 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
     });
   };
 
+  const handleVoiceChange = (pref: VoicePreference) => {
+    setVoicePreference(pref);
+    localStorage.setItem('voice_preference', pref);
+    addDiagnostic(`Voice changed to: ${pref}`);
+  };
+
   const testSpeech = () => {
-    speak("Hello! I'm your voice assistant. If you can hear me, the speech is working correctly.");
+    const testText = voicePreference === 'female'
+      ? "Hi there! I'm your friendly marketing assistant. How can I help you today?"
+      : "Hello! I'm your marketing assistant. What would you like to know?";
+    speak(testText);
   };
 
   const handleTextSubmit = () => {
@@ -436,14 +492,14 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
               onTouchEnd={stopRecording}
               disabled={!micReady || isThinking || isSpeaking}
               className={`relative w-32 h-32 rounded-full transition-all transform ${isRecording
-                  ? 'bg-red-500 scale-110 shadow-lg shadow-red-500/50'
-                  : isSpeaking
-                    ? 'bg-blue-500 animate-pulse'
-                    : isThinking
-                      ? 'bg-amber-500'
-                      : micReady
-                        ? 'bg-brand-600 hover:bg-brand-700 hover:scale-105'
-                        : 'bg-slate-300'
+                ? 'bg-red-500 scale-110 shadow-lg shadow-red-500/50'
+                : isSpeaking
+                  ? 'bg-blue-500 animate-pulse'
+                  : isThinking
+                    ? 'bg-amber-500'
+                    : micReady
+                      ? 'bg-brand-600 hover:bg-brand-700 hover:scale-105'
+                      : 'bg-slate-300'
                 } text-white disabled:opacity-50`}
             >
               {/* Audio level ring */}
@@ -534,14 +590,34 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
             </button>
           </div>
 
-          {/* Test & Help buttons */}
-          <div className="flex justify-center gap-2 mb-2">
+          {/* Voice selection & Test */}
+          <div className="flex justify-center items-center gap-2 mb-3">
+            <div className="flex bg-slate-100 rounded-lg p-1">
+              <button
+                onClick={() => handleVoiceChange('female')}
+                className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1 transition-all ${voicePreference === 'female'
+                    ? 'bg-pink-500 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+              >
+                <User size={12} /> Female
+              </button>
+              <button
+                onClick={() => handleVoiceChange('male')}
+                className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1 transition-all ${voicePreference === 'male'
+                    ? 'bg-blue-500 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+              >
+                <Users size={12} /> Male
+              </button>
+            </div>
             <button
               onClick={testSpeech}
               disabled={!speechReady || isSpeaking}
-              className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50"
+              className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 flex items-center gap-1"
             >
-              <Play size={12} className="inline mr-1" /> Test Speaker
+              <Play size={12} /> Test Voice
             </button>
           </div>
 
