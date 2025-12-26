@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
@@ -24,6 +24,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [textInput, setTextInput] = useState('');
   const [useTextMode, setUseTextMode] = useState(false);
   const [micStatus, setMicStatus] = useState<'checking' | 'ok' | 'error'>('checking');
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -31,6 +32,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isProcessingRef = useRef(false);
+  const retryCountRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -38,6 +40,26 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
     }
     return () => cleanup();
   }, [isOpen]);
+
+  // Load voices on mount
+  useEffect(() => {
+    if (window.speechSynthesis) {
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          setVoicesLoaded(true);
+          console.log('[Voice] Loaded', voices.length, 'voices');
+        }
+      };
+
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+
+      // Force load on some browsers
+      setTimeout(loadVoices, 100);
+      setTimeout(loadVoices, 500);
+    }
+  }, []);
 
   const cleanup = useCallback(() => {
     if (recognitionRef.current) {
@@ -59,11 +81,12 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
     setIsConnected(false);
     setIsListening(false);
     setAudioLevel(0);
+    retryCountRef.current = 0;
   }, []);
 
   const setupAudioVisualization = async (): Promise<boolean> => {
     try {
-      setDebugInfo('Requesting microphone access...');
+      setDebugInfo('Requesting microphone...');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -86,25 +109,22 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
       updateLevel();
       setMicStatus('ok');
-      setDebugInfo('Microphone connected!');
+      setDebugInfo('Microphone ready!');
       return true;
     } catch (err: any) {
       console.error('Mic error:', err);
       setMicStatus('error');
-      if (err.name === 'NotAllowedError') {
-        setError('Microphone blocked. Allow permission and reload page.');
-      } else {
-        setError(`Mic error: ${err.message}. Use text mode instead.`);
-      }
+      setError('Microphone not available. Use text mode below.');
       return false;
     }
   };
 
   const startSession = useCallback(async () => {
     setError(null);
+    retryCountRef.current = 0;
 
     if (!hasFreeLLMConfigured()) {
-      setError('Configure VITE_GROQ_API_KEY in Netlify Environment Variables.');
+      setError('Configure VITE_GROQ_API_KEY in Netlify.');
       setUseTextMode(true);
       setIsConnected(true);
       return;
@@ -113,8 +133,8 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setDebugInfo('Voice not supported in this browser');
-      setError('Speech recognition not supported. Use Chrome or Edge.');
+      setDebugInfo('Speech recognition not available');
+      setError('Voice not supported. Use text input below.');
       setUseTextMode(true);
       setIsConnected(true);
       return;
@@ -126,6 +146,13 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       setIsConnected(true);
       return;
     }
+
+    startRecognition();
+  }, []);
+
+  const startRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
 
     try {
       const recognition = new SpeechRecognition();
@@ -140,10 +167,11 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         setIsListening(true);
         setDebugInfo('🎤 Listening... speak now!');
         finalText = '';
+        retryCountRef.current = 0;
       };
 
       recognition.onspeechstart = () => {
-        setDebugInfo('🗣️ Speech detected!');
+        setDebugInfo('🗣️ Hearing you...');
       };
 
       recognition.onresult = (event: any) => {
@@ -168,23 +196,41 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
               handleUserInput(finalText.trim());
               finalText = '';
             }
-          }, 2500);
+          }, 2000);
         }
       };
 
       recognition.onerror = (event: any) => {
         console.log('[Voice] Error:', event.error);
-        if (event.error === 'no-speech') {
-          setDebugInfo('No speech heard. Try speaking louder.');
+        setIsListening(false);
+
+        if (event.error === 'network') {
+          // Network error - common, just retry
+          retryCountRef.current++;
+          if (retryCountRef.current < 3) {
+            setDebugInfo('Connection issue, retrying...');
+            setTimeout(() => {
+              if (!isProcessingRef.current && !isMuted) {
+                startRecognition();
+              }
+            }, 1000);
+          } else {
+            setDebugInfo('Network issues. Try text input.');
+            setUseTextMode(true);
+          }
+        } else if (event.error === 'no-speech') {
+          setDebugInfo('No speech detected. Try again.');
           setTimeout(() => {
             if (!isProcessingRef.current && !isMuted) {
               try { recognition.start(); } catch (e) { }
             }
-          }, 1000);
+          }, 500);
+        } else if (event.error === 'not-allowed') {
+          setError('Microphone blocked. Allow permission.');
+          setUseTextMode(true);
         } else if (event.error !== 'aborted') {
-          setDebugInfo(`Error: ${event.error}`);
+          setDebugInfo(`Issue: ${event.error}. Try text input.`);
         }
-        setIsListening(false);
       };
 
       recognition.onend = () => {
@@ -195,7 +241,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
               recognition.start();
               setDebugInfo('🎤 Listening...');
             } catch (e) { }
-          }, 500);
+          }, 300);
         }
       };
 
@@ -204,11 +250,12 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       recognition.start();
 
     } catch (err: any) {
-      setError(`Voice failed: ${err.message}`);
+      console.error('Recognition error:', err);
+      setDebugInfo('Voice error. Use text mode.');
       setUseTextMode(true);
       setIsConnected(true);
     }
-  }, [isMuted]);
+  };
 
   const handleUserInput = async (userText: string) => {
     if (!userText.trim()) return;
@@ -239,7 +286,6 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
       setDebugInfo('💭 Generating response...');
 
-      // Get business context and memory
       const businessContext = getBusinessContext();
       const memoryContext = getRecentConversationContext();
       const profile = getStoredProfile();
@@ -250,19 +296,16 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
       const llmResponse = await callLLM(`
 ${businessContext}
-
 ${memoryContext}
-
 ${history}
 ${researchContext}
 User: ${userText}
 
-Respond in 2-3 short sentences. Be specific to the business context.`, {
+Respond in 2-3 short sentences.`, {
         type: 'fast',
-        systemPrompt: `You are a helpful marketing voice assistant for ${profile?.name || 'a business'}. 
-Keep responses brief (2-3 sentences) since they will be spoken aloud.
-Be specific to their industry (${profile?.industry || 'general'}) and target audience.
-Give actionable advice, not generic tips.`,
+        systemPrompt: `You are a helpful marketing voice assistant${profile ? ` for ${profile.name}` : ''}. 
+Keep responses brief (2-3 sentences max).
+Be specific and actionable.`,
         temperature: 0.8
       });
 
@@ -270,15 +313,17 @@ Give actionable advice, not generic tips.`,
       setResponse(reply);
       setConversationHistory(prev => [...prev, { role: 'user', text: userText }, { role: 'assistant', text: reply }].slice(-10));
 
-      // Store in memory service
       addToConversation('user', userText);
       addToConversation('assistant', reply);
 
       setIsThinking(false);
+
+      // Speak the response
       await speakResponse(reply);
 
     } catch (e: any) {
-      setResponse('Sorry, an error occurred.');
+      console.error('Processing error:', e);
+      setResponse('Sorry, an error occurred. Please try again.');
       setDebugInfo(`Error: ${e.message}`);
       setIsThinking(false);
       isProcessingRef.current = false;
@@ -286,9 +331,17 @@ Give actionable advice, not generic tips.`,
     }
   };
 
-  const speakResponse = (text: string): Promise<void> => {
+  const speakResponse = async (text: string): Promise<void> => {
     return new Promise((resolve) => {
+      // Cancel any ongoing speech first
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+
+      // Check if speech synthesis is available
       if (!window.speechSynthesis) {
+        console.log('[Voice] Speech synthesis not available');
+        setDebugInfo('Speech not supported. See response above.');
         isProcessingRef.current = false;
         restartListening();
         resolve();
@@ -298,36 +351,82 @@ Give actionable advice, not generic tips.`,
       setIsSpeaking(true);
       setDebugInfo('🔊 Speaking...');
 
+      // Create utterance
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
 
+      // Get best available voice
       const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-      if (voice) utterance.voice = voice;
+      console.log('[Voice] Available voices:', voices.length);
 
+      if (voices.length > 0) {
+        // Prefer English voices
+        const englishVoice = voices.find(v =>
+          v.lang === 'en-US' ||
+          v.lang === 'en-GB' ||
+          v.lang.startsWith('en')
+        );
+        if (englishVoice) {
+          utterance.voice = englishVoice;
+          console.log('[Voice] Using voice:', englishVoice.name);
+        }
+      }
+
+      // Handle completion
       utterance.onend = () => {
+        console.log('[Voice] Speech ended');
         setIsSpeaking(false);
         isProcessingRef.current = false;
-        setDebugInfo('🎤 Ready for next question');
+        setDebugInfo('✨ Ready for next question');
         restartListening();
         resolve();
       };
 
-      utterance.onerror = () => {
+      // Handle errors
+      utterance.onerror = (event) => {
+        console.error('[Voice] Speech error:', event);
         setIsSpeaking(false);
         isProcessingRef.current = false;
+        setDebugInfo('Speech failed. See response above.');
         restartListening();
         resolve();
       };
 
-      window.speechSynthesis.speak(utterance);
+      // Start speaking with a small delay (helps on some browsers)
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.speak(utterance);
+
+          // Workaround for Chrome bug where speech stops after ~15 seconds
+          const resumeInterval = setInterval(() => {
+            if (!window.speechSynthesis.speaking) {
+              clearInterval(resumeInterval);
+            } else {
+              window.speechSynthesis.pause();
+              window.speechSynthesis.resume();
+            }
+          }, 10000);
+
+        } catch (err) {
+          console.error('[Voice] Speak error:', err);
+          setIsSpeaking(false);
+          isProcessingRef.current = false;
+          restartListening();
+          resolve();
+        }
+      }, 100);
     });
   };
 
   const restartListening = () => {
-    if (recognitionRef.current && !isMuted) {
+    if (recognitionRef.current && !isMuted && !useTextMode) {
       setTimeout(() => {
-        try { recognitionRef.current.start(); } catch (e) { }
+        try {
+          recognitionRef.current?.start();
+          setDebugInfo('🎤 Listening...');
+        } catch (e) { }
       }, 500);
     }
   };
@@ -349,15 +448,18 @@ Give actionable advice, not generic tips.`,
     }
   };
 
+  const retryVoice = () => {
+    setUseTextMode(false);
+    setError(null);
+    retryCountRef.current = 0;
+    startRecognition();
+  };
+
   useEffect(() => {
     if (isOpen && !isConnected) {
       startSession();
     }
   }, [isOpen, isConnected, startSession]);
-
-  useEffect(() => {
-    window.speechSynthesis?.getVoices();
-  }, []);
 
   if (!isOpen) return null;
 
@@ -371,23 +473,24 @@ Give actionable advice, not generic tips.`,
         <div className="relative z-10">
           {/* Status */}
           <div className="flex justify-center gap-3 mb-3 text-xs">
-            {micStatus === 'ok' && <span className="flex items-center gap-1 text-green-600"><CheckCircle size={12} /> Mic OK</span>}
-            {micStatus === 'error' && <span className="flex items-center gap-1 text-red-600"><AlertCircle size={12} /> Mic Error</span>}
+            {micStatus === 'ok' && <span className="flex items-center gap-1 text-green-600"><CheckCircle size={12} /> Mic</span>}
+            {micStatus === 'error' && <span className="flex items-center gap-1 text-red-600"><AlertCircle size={12} /> Mic</span>}
+            {voicesLoaded && <span className="flex items-center gap-1 text-blue-600"><Volume2 size={12} /> Voice</span>}
             {isWebResearchConfigured() && <span className="flex items-center gap-1 text-brand-500"><Globe size={12} /> Web</span>}
           </div>
 
           {/* Mic visualization */}
           <div className="mb-4 flex justify-center">
             <div className={`relative p-6 rounded-full transition-all ${isListening ? 'bg-green-100 scale-110' :
-              isSpeaking ? 'bg-brand-100 animate-pulse' :
-                isThinking ? 'bg-amber-100' : 'bg-slate-100'
+                isSpeaking ? 'bg-blue-100 animate-pulse' :
+                  isThinking ? 'bg-amber-100' : 'bg-slate-100'
               }`}>
               {isListening && (
                 <div className="absolute inset-0 rounded-full border-4 border-green-400 transition-transform"
                   style={{ transform: `scale(${1 + audioLevel / 150})`, opacity: audioLevel / 100 }} />
               )}
               {isThinking ? <Loader size={40} className="text-amber-600 animate-spin" /> :
-                isSpeaking ? <Volume2 size={40} className="text-brand-600" /> :
+                isSpeaking ? <Volume2 size={40} className="text-blue-600" /> :
                   <Mic size={40} className={isListening ? 'text-green-600' : 'text-slate-400'} />}
             </div>
           </div>
@@ -413,40 +516,44 @@ Give actionable advice, not generic tips.`,
           </p>
 
           {/* Transcript & response */}
-          <div className="min-h-[70px] mb-4 p-3 bg-slate-50 rounded-xl border text-sm">
+          <div className="min-h-[90px] mb-4 p-3 bg-slate-50 rounded-xl border text-sm max-h-[150px] overflow-y-auto">
             {transcript && <div className="mb-2"><span className="text-xs text-slate-400">You:</span><p className="text-slate-700">{transcript}</p></div>}
             {response && <div><span className="text-xs text-brand-500 flex items-center gap-1"><MessageCircle size={10} /> AI:</span><p className="text-slate-700">{response}</p></div>}
-            {!transcript && !response && <p className="text-slate-400 text-center italic">{isListening ? 'Listening...' : 'Ask anything!'}</p>}
+            {!transcript && !response && <p className="text-slate-400 text-center italic">{isListening ? 'Listening...' : useTextMode ? 'Type below or try voice again' : 'Speak or type below'}</p>}
           </div>
 
-          {/* Text fallback */}
-          {(useTextMode || error || micStatus === 'error') && (
-            <div className="mb-4 flex gap-2">
-              <input type="text" value={textInput} onChange={e => setTextInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleTextSubmit()}
-                placeholder="Type your question..."
-                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
-              <button onClick={handleTextSubmit} disabled={!textInput.trim() || isThinking}
-                className="px-4 py-2 bg-brand-600 text-white rounded-lg disabled:opacity-50">
-                <Send size={16} />
-              </button>
-            </div>
-          )}
+          {/* Text input - always show */}
+          <div className="mb-4 flex gap-2">
+            <input type="text" value={textInput} onChange={e => setTextInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleTextSubmit()}
+              placeholder="Type your question..."
+              className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+            <button onClick={handleTextSubmit} disabled={!textInput.trim() || isThinking}
+              className="px-4 py-2 bg-brand-600 text-white rounded-lg disabled:opacity-50 hover:bg-brand-700">
+              <Send size={16} />
+            </button>
+          </div>
 
           {/* Controls */}
-          <div className="flex justify-center gap-3">
-            {micStatus === 'ok' && (
+          <div className="flex justify-center gap-2 flex-wrap">
+            {micStatus === 'ok' && !useTextMode && (
               <button onClick={toggleMute} className={`p-3 rounded-full ${isMuted ? 'bg-red-100 text-red-600' : 'bg-brand-100 text-brand-600'}`}>
                 {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
               </button>
             )}
-            <button onClick={() => setUseTextMode(!useTextMode)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm">
-              {useTextMode ? '🎤 Voice' : '⌨️ Text'}
+
+            {useTextMode && (
+              <button onClick={retryVoice} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm flex items-center gap-1 hover:bg-green-200">
+                <RefreshCw size={14} /> Try Voice
+              </button>
+            )}
+
+            <button onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">
+              Close
             </button>
-            <button onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg">Close</button>
           </div>
 
-          <p className="mt-4 text-xs text-slate-400 text-center">Works best in Chrome/Edge</p>
+          <p className="mt-4 text-xs text-slate-400 text-center">Chrome/Edge recommended for voice</p>
         </div>
       </div>
     </div>
