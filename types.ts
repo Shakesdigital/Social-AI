@@ -30,6 +30,92 @@ export interface SocialPost {
   status: 'Draft' | 'PendingApproval' | 'Scheduled' | 'Published';
 }
 
+// ============================================
+// LEAD GENERATION TYPES
+// ============================================
+
+export interface Lead {
+  id: string;
+  companyName: string;
+  industry: string;
+  location: string;
+  size: string;
+  contactEmail?: string;
+  contactName?: string;
+  website?: string;
+  linkedIn?: string;
+  summary: string;
+  outreachPotential: 'High' | 'Medium' | 'Low';
+  createdAt: Date;
+  notes?: string;
+}
+
+export interface LeadSearchCriteria {
+  industry: string;
+  location: string;
+  companySize: string;
+  keywords: string[];
+}
+
+// ============================================
+// EMAIL MARKETING TYPES
+// ============================================
+
+export interface EmailCampaign {
+  id: string;
+  name: string;
+  status: 'Draft' | 'Scheduled' | 'Active' | 'Completed' | 'Paused';
+  leadIds: string[];
+  emails: EmailTemplate[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmailTemplate {
+  id: string;
+  subject: string;
+  body: string;
+  variant: 'A' | 'B';
+  scheduledDate?: Date;
+  delayDays?: number; // For drip sequences
+  sent: boolean;
+  openCount?: number;
+  clickCount?: number;
+}
+
+// ============================================
+// BLOG CONTENT TYPES
+// ============================================
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  content: string;
+  excerpt?: string;
+  seoKeywords: string[];
+  seoScore?: number;
+  trendingTopic: string;
+  status: 'Draft' | 'Scheduled' | 'Published';
+  scheduledDate?: Date;
+  publishedDate?: Date;
+  wordpressPostId?: string;
+  wordCount: number;
+}
+
+export interface TrendingTopic {
+  id: string;
+  topic: string;
+  category: string;
+  trendScore: number;
+  relatedKeywords: string[];
+  source: string;
+  researchedAt: Date;
+}
+
+// ============================================
+// APP NAVIGATION
+// ============================================
+
 export enum AppView {
   LANDING = 'LANDING',
   ONBOARDING = 'ONBOARDING',
@@ -37,6 +123,9 @@ export enum AppView {
   RESEARCH = 'RESEARCH',
   STRATEGY = 'STRATEGY',
   CALENDAR = 'CALENDAR',
+  LEADS = 'LEADS',
+  EMAIL = 'EMAIL',
+  BLOG = 'BLOG',
 }
 
 export interface ImageGenerationConfig {
@@ -60,4 +149,24 @@ export interface AutoPilotConfig {
     Facebook: number;
   };
   autoApprove: boolean;
+}
+
+// ============================================
+// LLM PROVIDER TYPES
+// ============================================
+
+export type LLMProvider = 'groq' | 'openrouter' | 'huggingface' | 'openai';
+
+export interface LLMQuotaStatus {
+  provider: LLMProvider;
+  used: number;
+  limit: number;
+  remaining: number;
+  resetTime: Date;
+}
+
+export interface LLMResponse {
+  text: string;
+  provider: LLMProvider;
+  tokensUsed?: number;
 }
