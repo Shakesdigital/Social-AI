@@ -1,57 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import OpenAI from 'openai';
-import { Mic, MicOff, Volume2, X } from 'lucide-react';
-
-// Audio Utils
-function createBlob(data: Float32Array): { data: string; mimeType: string } {
-  const l = data.length;
-  const int16 = new Int16Array(l);
-  for (let i = 0; i < l; i++) {
-    int16[i] = data[i] * 32768;
-  }
-  
-  let binary = '';
-  const bytes = new Uint8Array(int16.buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  const base64 = btoa(binary);
-
-  return {
-    data: base64,
-    mimeType: 'audio/pcm;rate=16000',
-  };
-}
-
-function decode(base64: string) {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
+import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle } from 'lucide-react';
+import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
+import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -61,219 +11,391 @@ interface LiveAssistantProps {
 export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState('');
+  const [response, setResponse] = useState('');
+  const [conversationHistory, setConversationHistory] = useState<{ role: 'user' | 'assistant', text: string }[]>([]);
 
-  // Refs for audio handling
-  const nextStartTime = useRef(0);
-  const inputAudioContext = useRef<AudioContext | null>(null);
-  const outputAudioContext = useRef<AudioContext | null>(null);
-  const sessionRef = useRef<Promise<any> | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
-  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const recognitionRef = useRef<any>(null);
+  const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Cleanup function
+  // Cleanup on unmount or close
+  useEffect(() => {
+    if (!isOpen) {
+      stopSession();
+    }
+    return () => stopSession();
+  }, [isOpen]);
+
   const stopSession = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) { }
+      recognitionRef.current = null;
     }
-    if (scriptProcessorRef.current) {
-      scriptProcessorRef.current.disconnect();
-      scriptProcessorRef.current.onaudioprocess = null;
-      scriptProcessorRef.current = null;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
     }
-    if (inputAudioContext.current) {
-      inputAudioContext.current.close();
-      inputAudioContext.current = null;
-    }
-    if (outputAudioContext.current) {
-      outputAudioContext.current.close();
-      outputAudioContext.current = null;
-    }
-    if (sessionRef.current) {
-        sessionRef.current.then(session => {
-            try { session.close(); } catch(e) { console.log("Session close ignored", e); }
-        });
-        sessionRef.current = null;
+    setIsConnected(false);
+    setIsListening(false);
+    setIsThinking(false);
+    setIsSpeaking(false);
+    setTranscript('');
+    setResponse('');
+  };
+
+  const startSession = async () => {
+    setError(null);
+
+    if (!hasFreeLLMConfigured()) {
+      setError('Please configure an LLM API key (Groq recommended) in your environment variables.');
+      return;
     }
 
-    setIsConnected(false);
-    nextStartTime.current = 0;
-    sourcesRef.current.forEach(s => { try { s.stop(); } catch(e) {} });
-    sourcesRef.current.clear();
+    // Check for browser speech recognition support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setError('Speech recognition is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+
+    try {
+      // Request microphone permission
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setTranscript('');
+      };
+
+      recognition.onresult = (event: any) => {
+        const current = event.resultIndex;
+        const result = event.results[current];
+        const transcriptText = result[0].transcript;
+        setTranscript(transcriptText);
+
+        if (result.isFinal) {
+          handleUserInput(transcriptText);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setError('Microphone access denied. Please allow microphone permissions.');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        // Auto-restart if still connected and not processing
+        if (isConnected && !isThinking && !isSpeaking && !isMuted) {
+          setTimeout(() => {
+            if (recognitionRef.current && isConnected) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) { }
+            }
+          }, 500);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      setIsConnected(true);
+      recognition.start();
+
+    } catch (err) {
+      console.error('Failed to start:', err);
+      setError('Failed to access microphone. Please check permissions.');
+    }
+  };
+
+  const handleUserInput = async (userText: string) => {
+    if (!userText.trim() || isMuted) return;
+
+    setIsListening(false);
+    setIsThinking(true);
+    setResponse('');
+
+    try {
+      // Check if we need real-time research
+      let researchContext = '';
+      const needsResearch = /latest|current|trending|news|today|right now|2024|2025|recent/i.test(userText);
+
+      if (needsResearch && isWebResearchConfigured()) {
+        const topic = userText.replace(/what|how|tell me about|give me|the|latest|current|trending/gi, '').trim();
+        if (topic) {
+          const [searchResults, news] = await Promise.all([
+            searchWeb(topic, 2),
+            getLatestNews(topic, 2)
+          ]);
+
+          if (searchResults.length > 0 || news.length > 0) {
+            researchContext = `
+[Current Data from Web Research]
+${news.map(n => `• ${n.title}`).join('\n')}
+${searchResults.map(r => `• ${r.title}`).join('\n')}
+`;
+          }
+        }
+      }
+
+      // Build context from recent conversation
+      const recentHistory = conversationHistory.slice(-4).map(m =>
+        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`
+      ).join('\n');
+
+      const prompt = `
+${recentHistory}
+${researchContext}
+User: ${userText}
+
+Respond as a helpful voice assistant. Keep responses concise (2-3 sentences max) but valuable. Be conversational and energetic.`;
+
+      const llmResponse = await callLLM(prompt, {
+        type: 'fast',
+        systemPrompt: `You are SocialAI Voice Assistant - a brilliant, enthusiastic marketing consultant speaking to the user.
+
+VOICE RESPONSE RULES:
+- Keep responses SHORT (2-3 sentences max) - this will be spoken aloud
+- Be conversational and energetic
+- Give specific, actionable advice
+- Sound natural, not robotic
+- If you have research data, mention key insights briefly
+
+Your expertise: social media, content marketing, email outreach, SEO, lead generation, brand strategy.`,
+        temperature: 0.85
+      });
+
+      const assistantText = llmResponse.text;
+      setResponse(assistantText);
+
+      // Update history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', text: userText },
+        { role: 'assistant', text: assistantText }
+      ].slice(-10));
+
+      // Speak the response
+      await speakResponse(assistantText);
+
+    } catch (e) {
+      console.error('Processing error:', e);
+      const errorMsg = 'Sorry, I encountered an error. Please try again.';
+      setResponse(errorMsg);
+      await speakResponse(errorMsg);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const speakResponse = (text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!window.speechSynthesis) {
+        resolve();
+        return;
+      }
+
+      setIsSpeaking(true);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      // Try to get a female voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v =>
+        v.name.includes('Samantha') ||
+        v.name.includes('Google US English Female') ||
+        v.name.includes('Microsoft Zira') ||
+        (v.lang === 'en-US' && v.name.toLowerCase().includes('female'))
+      ) || voices.find(v => v.lang === 'en-US') || voices[0];
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        // Restart listening after speaking
+        if (recognitionRef.current && isConnected && !isMuted) {
+          setTimeout(() => {
+            try {
+              recognitionRef.current.start();
+            } catch (e) { }
+          }, 300);
+        }
+        resolve();
+      };
+
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        resolve();
+      };
+
+      synthRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    });
+  };
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (!isMuted) {
+      // Muting - stop listening
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) { }
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    } else {
+      // Unmuting - restart listening
+      if (recognitionRef.current && isConnected) {
+        setTimeout(() => {
+          try { recognitionRef.current.start(); } catch (e) { }
+        }, 300);
+      }
+    }
   };
 
   useEffect(() => {
     if (isOpen && !isConnected) {
       startSession();
-    } else if (!isOpen) {
-      stopSession();
     }
-    return () => {
-      stopSession();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  const startSession = async () => {
-    setError(null);
-    try {
-      const ai = new OpenAI({ 
-        apiKey: import.meta.env.VITE_OPENAI_API_KEY || "your-api-key-here",
-        dangerouslyAllowBrowser: true
-      });
-      
-      // Initialize Audio Context for output
-      outputAudioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-
-      // Get Microphone Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      
-      setIsConnected(true);
-      
-      // Use MediaRecorder for capturing audio chunks
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      const audioChunks: Blob[] = [];
-      
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
-      
-      mediaRecorder.onstop = async () => {
-        if (audioChunks.length === 0 || isMuted) return;
-        
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        audioChunks.length = 0; // Clear chunks
-        
-        try {
-          // Transcribe audio using OpenAI Whisper
-          const transcription = await ai.audio.transcriptions.create({
-            file: audioBlob as any,
-            model: 'whisper-1',
-          });
-          
-          const userText = transcription.text;
-          if (!userText.trim()) {
-            // Restart recording
-            if (isConnected && streamRef.current) {
-              mediaRecorder.start();
-              setTimeout(() => {
-                if (mediaRecorder.state === 'recording') {
-                  mediaRecorder.stop();
-                }
-              }, 3000);
-            }
-            return;
-          }
-          
-          // Get response from ChatGPT
-          const chatResponse = await ai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a helpful, energetic social media marketing consultant named SocialAI. Provide quick, spoken advice to the user about their marketing strategy. Keep answers concise and conversational.'
-              },
-              {
-                role: 'user',
-                content: userText
-              }
-            ],
-            temperature: 0.8,
-          });
-          
-          const responseText = chatResponse.choices[0]?.message?.content || "I'm sorry, I didn't catch that.";
-          
-          // Convert response to speech using OpenAI TTS
-          const speechResponse = await ai.audio.speech.create({
-            model: 'tts-1',
-            voice: 'nova',
-            input: responseText,
-          });
-          
-          // Play the audio response
-          const audioArrayBuffer = await speechResponse.arrayBuffer();
-          if (outputAudioContext.current) {
-            const audioBuffer = await outputAudioContext.current.decodeAudioData(audioArrayBuffer);
-            const source = outputAudioContext.current.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(outputAudioContext.current.destination);
-            source.addEventListener('ended', () => {
-              // Restart recording after response finishes
-              if (isConnected && streamRef.current) {
-                mediaRecorder.start();
-                setTimeout(() => {
-                  if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                  }
-                }, 3000);
-              }
-            });
-            source.start();
-          }
-          
-        } catch (error) {
-          console.error('Processing error:', error);
-          // Restart recording on error
-          if (isConnected && streamRef.current) {
-            mediaRecorder.start();
-            setTimeout(() => {
-              if (mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-              }
-            }, 3000);
-          }
-        }
-      };
-      
-      // Start recording in 3-second chunks
-      mediaRecorder.start();
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-        }
-      }, 3000);
-      
-      // Store reference for cleanup
-      sessionRef.current = Promise.resolve({ 
-        close: () => {
-          if (mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-          }
-        }
-      });
-
-    } catch (err) {
-      console.error(err);
-      setError("Failed to initialize session. Please check microphone permissions.");
-    }
-  };
 
   if (!isOpen) return null;
 
+  const getStatusMessage = () => {
+    if (error) return <span className="text-red-400">{error}</span>;
+    if (!isConnected) return 'Connecting...';
+    if (isThinking) return 'Thinking...';
+    if (isSpeaking) return 'Speaking...';
+    if (isListening) return 'Listening... speak now!';
+    if (isMuted) return 'Muted';
+    return 'Ready';
+  };
+
+  const getStatusColor = () => {
+    if (error) return 'bg-red-500';
+    if (isThinking) return 'bg-amber-500';
+    if (isSpeaking) return 'bg-brand-500';
+    if (isListening) return 'bg-green-500';
+    return 'bg-slate-400';
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center relative overflow-hidden">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={24} /></button>
-        <div className="mb-6 flex justify-center">
-            <div className={`p-6 rounded-full transition-all duration-500 ${isConnected ? 'bg-green-100 text-green-600 animate-pulse ring-4 ring-green-50' : 'bg-slate-100 text-slate-400'}`}>
-                 <Volume2 size={48} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md text-center relative overflow-hidden">
+        {/* Decorative background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-white to-indigo-50 opacity-50"></div>
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors z-10"
+        >
+          <X size={24} />
+        </button>
+
+        <div className="relative z-10">
+          {/* Voice visualization */}
+          <div className="mb-6 flex justify-center">
+            <div className={`relative p-8 rounded-full transition-all duration-500 ${isListening ? 'bg-green-100 ring-4 ring-green-200 scale-110' :
+                isSpeaking ? 'bg-brand-100 ring-4 ring-brand-200 animate-pulse' :
+                  isThinking ? 'bg-amber-100 ring-4 ring-amber-200' :
+                    'bg-slate-100'
+              }`}>
+              {isThinking ? (
+                <Loader size={48} className="text-amber-600 animate-spin" />
+              ) : isSpeaking ? (
+                <Volume2 size={48} className="text-brand-600" />
+              ) : (
+                <Mic size={48} className={isListening ? 'text-green-600' : 'text-slate-400'} />
+              )}
+
+              {/* Pulse rings when listening */}
+              {isListening && (
+                <>
+                  <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-25"></span>
+                  <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-25" style={{ animationDelay: '0.5s' }}></span>
+                </>
+              )}
             </div>
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">Live Marketing Consultant</h2>
-        <p className="text-slate-500 mb-8 min-h-[1.5em]">{isConnected ? "Listening... Ask me about your strategy!" : error ? <span className="text-red-500">{error}</span> : "Connecting to voice assistant..."}</p>
-        <div className="mt-6 text-xs text-slate-400">
-           Powered by ChatGPT-4o + Whisper
-        </div>
-        <div className="flex justify-center gap-4">
-            <button onClick={() => setIsMuted(!isMuted)} className={`p-4 rounded-full transition-colors shadow-sm ${isMuted ? 'bg-red-100 text-red-600' : 'bg-brand-100 text-brand-600'}`}>
-                {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+          </div>
+
+          {/* Title */}
+          <h2 className="text-2xl font-bold text-slate-800 mb-1 flex items-center justify-center gap-2">
+            <Sparkles size={20} className="text-brand-500" />
+            Voice Marketing Consultant
+          </h2>
+
+          {/* Status */}
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className={`w-2 h-2 rounded-full ${getStatusColor()} ${(isListening || isSpeaking) ? 'animate-pulse' : ''}`}></span>
+            <p className="text-slate-500 text-sm">{getStatusMessage()}</p>
+            {isWebResearchConfigured() && (
+              <span className="flex items-center gap-1 text-xs text-brand-500">
+                <Globe size={10} /> Live
+              </span>
+            )}
+          </div>
+
+          {/* Transcript / Response display */}
+          <div className="min-h-[80px] mb-6 p-4 bg-white/80 rounded-xl border border-slate-200">
+            {transcript && isListening && (
+              <div className="text-left">
+                <p className="text-xs text-slate-400 mb-1">You:</p>
+                <p className="text-sm text-slate-700">{transcript}</p>
+              </div>
+            )}
+            {response && !isListening && (
+              <div className="text-left">
+                <p className="text-xs text-brand-500 mb-1 flex items-center gap-1">
+                  <MessageCircle size={10} /> Assistant:
+                </p>
+                <p className="text-sm text-slate-700">{response}</p>
+              </div>
+            )}
+            {!transcript && !response && isConnected && (
+              <p className="text-slate-400 text-sm italic">
+                {isListening ? 'Listening for your question...' : 'Ask me anything about marketing!'}
+              </p>
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={toggleMute}
+              className={`p-4 rounded-full transition-all shadow-sm ${isMuted ? 'bg-red-100 text-red-600 ring-2 ring-red-200' : 'bg-brand-100 text-brand-600 hover:bg-brand-200'
+                }`}
+            >
+              {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
             </button>
-            <button onClick={onClose} className="px-6 py-3 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200">End Call</button>
+            <button
+              onClick={onClose}
+              className="px-6 py-3 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors"
+            >
+              End Session
+            </button>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 text-xs text-slate-400">
+            Powered by Free AI + Browser Speech API
+          </div>
         </div>
       </div>
     </div>
