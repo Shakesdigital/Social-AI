@@ -98,14 +98,36 @@ Generate ${count} topics with maximum viral and SEO potential. Return JSON:
 
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are a content marketing genius who understands virality, SEO, and audience psychology. You create content strategies that drive real business results. Think creatively and identify opportunities others miss.`,
+        systemPrompt: `You are a content marketing genius who understands virality, SEO, and audience psychology. You create content strategies that drive real business results. Think creatively and identify opportunities others miss. IMPORTANT: Always respond with valid JSON array format.`,
         temperature: 0.9,
         maxTokens: 2500
     });
 
+    console.log('[Blog] Raw LLM response:', response.text.substring(0, 500) + '...');
+
     const parsed = parseJSONFromLLM<any[]>(response.text);
 
-    if (!parsed || !Array.isArray(parsed)) {
+    if (!parsed) {
+        console.error('[Blog] Failed to parse JSON from response');
+        // Try to extract topics from text as fallback
+        const fallbackTopics = extractTopicsFromText(response.text, count);
+        if (fallbackTopics.length > 0) {
+            console.log('[Blog] Using fallback text extraction:', fallbackTopics.length, 'topics');
+            return fallbackTopics.map((topic, index) => ({
+                id: `topic-${Date.now()}-${index}`,
+                topic,
+                category: 'General',
+                trendScore: 75,
+                relatedKeywords: [niche],
+                source: 'AI Research',
+                researchedAt: new Date()
+            }));
+        }
+        return [];
+    }
+
+    if (!Array.isArray(parsed)) {
+        console.error('[Blog] Parsed result is not an array:', typeof parsed);
         return [];
     }
 
@@ -122,6 +144,35 @@ Generate ${count} topics with maximum viral and SEO potential. Return JSON:
     // Track in memory to avoid duplicates
     topics.forEach(t => addGeneratedTopic(t.topic));
     trackAction(`Researched ${topics.length} blog topics for ${niche}`);
+
+    console.log('[Blog] Successfully parsed', topics.length, 'topics');
+    return topics;
+}
+
+// Fallback: Extract topics from unstructured text
+function extractTopicsFromText(text: string, count: number): string[] {
+    const topics: string[] = [];
+
+    // Try to find numbered list items
+    const numberedMatches = text.match(/\d+[\.\)]\s*["']?([^"'\n]+)["']?/g);
+    if (numberedMatches) {
+        for (const match of numberedMatches.slice(0, count)) {
+            const topic = match.replace(/^\d+[\.\)]\s*["']?/, '').replace(/["']?\s*$/, '').trim();
+            if (topic.length > 10 && topic.length < 200) {
+                topics.push(topic);
+            }
+        }
+    }
+
+    // Try to find quoted strings
+    if (topics.length === 0) {
+        const quotedMatches = text.match(/"([^"]{20,150})"/g);
+        if (quotedMatches) {
+            for (const match of quotedMatches.slice(0, count)) {
+                topics.push(match.replace(/"/g, '').trim());
+            }
+        }
+    }
 
     return topics;
 }
