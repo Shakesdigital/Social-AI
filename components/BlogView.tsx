@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, TrendingUp, Loader, Plus, Calendar, ExternalLink, Copy, BarChart3, Sparkles } from 'lucide-react';
 import { CompanyProfile, BlogPost, TrendingTopic } from '../types';
 import { researchTrendingTopics, generateBlogPost, publishToWordPress } from '../services/blogService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
+import { saveBlogState, loadBlogState } from '../services/stateService';
 import ReactMarkdown from 'react-markdown';
 
 interface BlogViewProps {
@@ -12,13 +13,27 @@ interface BlogViewProps {
 
 export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) => {
     const { quotaWarning, isConfigured } = useFreeLLM();
-    const [topics, setTopics] = useState<TrendingTopic[]>([]);
-    const [posts, setPosts] = useState<BlogPost[]>([]);
-    const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
+
+    // Load saved state on mount
+    const savedState = loadBlogState();
+
+    const [topics, setTopics] = useState<TrendingTopic[]>(savedState?.topics || []);
+    const [posts, setPosts] = useState<BlogPost[]>(savedState?.posts || []);
+    const [selectedPost, setSelectedPost] = useState<BlogPost | null>(savedState?.selectedPost || null);
     const [isLoadingTopics, setIsLoadingTopics] = useState(false);
     const [isLoadingPost, setIsLoadingPost] = useState(false);
-    const [nicheInput, setNicheInput] = useState(profile.industry);
+    const [nicheInput, setNicheInput] = useState(savedState?.nicheInput || profile.industry);
     const [error, setError] = useState<string | null>(null);
+
+    // Save state when it changes
+    useEffect(() => {
+        saveBlogState({
+            topics,
+            posts,
+            selectedPost,
+            nicheInput
+        });
+    }, [topics, posts, selectedPost, nicheInput]);
 
     const handleResearchTopics = async () => {
         setIsLoadingTopics(true);

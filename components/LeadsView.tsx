@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Download, Users, Building, MapPin, Loader, AlertTriangle, Plus, Mail, ExternalLink } from 'lucide-react';
 import { CompanyProfile, Lead, LeadSearchCriteria } from '../types';
 import { generateLeads, downloadCSV, getGDPRDisclaimer } from '../services/leadService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
+import { saveLeadsState, loadLeadsState } from '../services/stateService';
 
 interface LeadsViewProps {
     profile: CompanyProfile;
@@ -11,19 +12,34 @@ interface LeadsViewProps {
 
 export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampaign }) => {
     const { quotaWarning, isConfigured } = useFreeLLM();
-    const [leads, setLeads] = useState<Lead[]>([]);
-    const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+
+    // Load saved state on mount
+    const savedState = loadLeadsState();
+
+    const [leads, setLeads] = useState<Lead[]>(savedState?.leads || []);
+    const [selectedLeads, setSelectedLeads] = useState<Set<string>>(
+        new Set(savedState?.selectedLeads || [])
+    );
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showGDPR, setShowGDPR] = useState(false);
 
-    const [criteria, setCriteria] = useState<LeadSearchCriteria>({
+    const [criteria, setCriteria] = useState<LeadSearchCriteria>(savedState?.criteria || {
         industry: profile.industry,
         location: '',
         companySize: '10-50',
         keywords: []
     });
     const [keywordInput, setKeywordInput] = useState('');
+
+    // Save state when it changes
+    useEffect(() => {
+        saveLeadsState({
+            leads,
+            selectedLeads: Array.from(selectedLeads),
+            criteria
+        });
+    }, [leads, selectedLeads, criteria]);
 
     const handleGenerateLeads = async () => {
         if (!criteria.industry || !criteria.location) {

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Plus, Send, Copy, RefreshCw, Loader, Eye, Users, ChevronRight, X, Sparkles } from 'lucide-react';
 import { CompanyProfile, Lead, EmailCampaign, EmailTemplate } from '../types';
 import { generateLeadEmail, generateEmailVariant, generateDripSequence, createCampaign, previewEmail } from '../services/emailService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
+import { saveEmailState, loadEmailState } from '../services/stateService';
 
 interface EmailViewProps {
     profile: CompanyProfile;
@@ -11,14 +12,27 @@ interface EmailViewProps {
 
 export const EmailView: React.FC<EmailViewProps> = ({ profile, leads }) => {
     const { quotaWarning, isConfigured } = useFreeLLM();
-    const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
-    const [selectedCampaign, setSelectedCampaign] = useState<EmailCampaign | null>(null);
+
+    // Load saved state on mount
+    const savedState = loadEmailState();
+
+    const [campaigns, setCampaigns] = useState<EmailCampaign[]>(savedState?.campaigns || []);
+    const [selectedCampaign, setSelectedCampaign] = useState<EmailCampaign | null>(savedState?.selectedCampaign || null);
     const [isLoading, setIsLoading] = useState(false);
     const [showNewCampaign, setShowNewCampaign] = useState(false);
     const [newCampaignName, setNewCampaignName] = useState('');
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
     const [previewLead, setPreviewLead] = useState<Lead | null>(null);
     const [previewEmail_, setPreviewEmail_] = useState<{ subject: string; body: string } | null>(null);
+
+    // Save state when it changes
+    useEffect(() => {
+        saveEmailState({
+            campaigns,
+            selectedCampaign,
+            draftEmail: null
+        });
+    }, [campaigns, selectedCampaign]);
 
     const handleCreateCampaign = () => {
         if (!newCampaignName.trim() || selectedLeadIds.length === 0) return;
@@ -172,8 +186,8 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads }) => {
                                                 </p>
                                             </div>
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${campaign.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                                    campaign.status === 'Draft' ? 'bg-slate-100 text-slate-600' :
-                                                        'bg-blue-100 text-blue-700'
+                                                campaign.status === 'Draft' ? 'bg-slate-100 text-slate-600' :
+                                                    'bg-blue-100 text-blue-700'
                                                 }`}>
                                                 {campaign.status}
                                             </span>

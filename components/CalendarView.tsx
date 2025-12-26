@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Zap,
     PlusCircle,
@@ -16,6 +16,7 @@ import {
     generatePostImage,
     generateBatchContent
 } from '../services/openaiService';
+import { saveCalendarState, loadCalendarState } from '../services/stateService';
 
 interface CalendarViewProps {
     profile: CompanyProfile;
@@ -41,15 +42,18 @@ interface ConnectedAccount {
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
-    const [posts, setPosts] = useState<SocialPost[]>([]);
-    const [topics, setTopics] = useState<string[]>([]);
+    // Load saved state on mount
+    const savedState = loadCalendarState();
+
+    const [posts, setPosts] = useState<SocialPost[]>(savedState?.posts || []);
+    const [topics, setTopics] = useState<string[]>(savedState?.topics || []);
     const [generatingTopics, setGeneratingTopics] = useState(false);
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
     const [showAutoPilotSettings, setShowAutoPilotSettings] = useState(false);
     const [showConnectAccounts, setShowConnectAccounts] = useState(false);
 
     // Enhanced auto-pilot config with all platforms
-    const [autoPilotConfig, setAutoPilotConfig] = useState<AutoPilotConfig>({
+    const [autoPilotConfig, setAutoPilotConfig] = useState<AutoPilotConfig>(savedState?.autoPilotConfig || {
         enabled: false,
         cadence: 'Weekly',
         postingFrequency: {
@@ -67,13 +71,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
 
     // Connected social accounts
     const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>(() => {
+        if (savedState?.connectedAccounts) return savedState.connectedAccounts;
         const saved = localStorage.getItem('connected_accounts');
         if (saved) return JSON.parse(saved);
         return SOCIAL_PLATFORMS.map(p => ({ platform: p.id, connected: false }));
     });
 
     const [isAutoGenerating, setIsAutoGenerating] = useState(false);
-    const [pendingPosts, setPendingPosts] = useState<SocialPost[]>([]);
+    const [pendingPosts, setPendingPosts] = useState<SocialPost[]>(savedState?.pendingPosts || []);
     const [showReviewDashboard, setShowReviewDashboard] = useState(false);
     const [isCreatorOpen, setIsCreatorOpen] = useState(false);
     const [creatorState, setCreatorState] = useState({
@@ -85,6 +90,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
         generatedImage: '',
         loadingImage: false
     });
+
+    // Save state when it changes
+    useEffect(() => {
+        saveCalendarState({
+            posts,
+            topics,
+            pendingPosts,
+            autoPilotConfig,
+            connectedAccounts
+        });
+    }, [posts, topics, pendingPosts, autoPilotConfig, connectedAccounts]);
 
     const generateTopics = async () => {
         setGeneratingTopics(true);
@@ -624,11 +640,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                         <div className="flex items-center gap-2">
                                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
-                                                    post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
-                                                        post.platform === 'Facebook' ? 'bg-blue-100 text-blue-600' :
-                                                            post.platform === 'TikTok' ? 'bg-slate-900 text-white' :
-                                                                post.platform === 'YouTube' ? 'bg-red-100 text-red-700' :
-                                                                    'bg-slate-200 text-slate-700'
+                                                post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
+                                                    post.platform === 'Facebook' ? 'bg-blue-100 text-blue-600' :
+                                                        post.platform === 'TikTok' ? 'bg-slate-900 text-white' :
+                                                            post.platform === 'YouTube' ? 'bg-red-100 text-red-700' :
+                                                                'bg-slate-200 text-slate-700'
                                                 }`}>{post.platform}</span>
                                             <div className="flex items-center gap-1 text-xs text-slate-600 bg-brand-50 px-2 py-1 rounded-lg">
                                                 <span className="font-bold">
