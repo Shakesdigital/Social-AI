@@ -1,6 +1,7 @@
 import { CompanyProfile, BlogPost, TrendingTopic } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
 import { searchWeb, getLatestNews, getTrendingTopics, getSocialMediaTrends, isWebResearchConfigured } from './webResearchService';
+import { getBusinessContext, getBlogTitlesToAvoid, addGeneratedBlogTitle, addGeneratedTopic, getTopicsToAvoid, incrementGeneratedCount, trackAction } from './contextMemoryService';
 
 /**
  * Research trending topics with real-time web data
@@ -49,9 +50,16 @@ SOCIAL MEDIA PULSE:
         }
     }
 
-    // Step 2: Generate topics with creative AI thinking
+    // Step 2: Get memory context to avoid duplicates
+    const businessContext = getBusinessContext(profile);
+    const topicsToAvoid = getTopicsToAvoid();
+    const blogsToAvoid = getBlogTitlesToAvoid();
+
+    // Step 3: Generate topics with creative AI thinking
     const prompt = `
 You are an elite content strategist and trend analyst. Your mission is to identify ${count} HIGH-IMPACT blog topics that will drive traffic, engagement, and establish thought leadership.
+
+${businessContext}
 
 THINK LIKE A VIRAL CONTENT CREATOR:
 1. What topics are EXPLODING right now that haven't been overdone?
@@ -59,17 +67,13 @@ THINK LIKE A VIRAL CONTENT CREATOR:
 3. What questions are people desperately searching for answers to?
 4. What emerging trends will be important in 6 months?
 
-BRAND CONTEXT:
-━━━━━━━━━━━━━━━━━━━━━━━
-• Company: ${profile.name}
-• Niche Focus: ${niche}
-• Industry: ${profile.industry}
-• Target Audience: ${profile.targetAudience}
-• Brand Voice: ${profile.brandVoice}
+NICHE FOCUS: ${niche}
 
 ${newsContext}
 ${webTrends}
 ${socialTrends}
+${topicsToAvoid}
+${blogsToAvoid}
 
 CONTENT STRATEGY FRAMEWORK:
 Consider these proven blog post formats:
@@ -105,7 +109,7 @@ Generate ${count} topics with maximum viral and SEO potential. Return JSON:
         return [];
     }
 
-    return parsed.map((item, index) => ({
+    const topics = parsed.map((item, index) => ({
         id: `topic-${Date.now()}-${index}`,
         topic: item.topic || 'Untitled Topic',
         category: item.category || 'General',
@@ -114,6 +118,12 @@ Generate ${count} topics with maximum viral and SEO potential. Return JSON:
         source: item.source || item.contentAngle || 'AI Research',
         researchedAt: new Date()
     }));
+
+    // Track in memory to avoid duplicates
+    topics.forEach(t => addGeneratedTopic(t.topic));
+    trackAction(`Researched ${topics.length} blog topics for ${niche}`);
+
+    return topics;
 }
 
 /**
@@ -137,8 +147,13 @@ ${searchResults.map((r, i) => `${i + 1}. ${r.title} (${r.url})
         }
     }
 
+    // Get business context
+    const businessContext = getBusinessContext(profile);
+
     const prompt = `
 You are a world-class content writer who creates blog posts that RANK and CONVERT. Write a comprehensive, engaging blog post that readers will love and Google will reward.
+
+${businessContext}
 
 CONTENT BRIEF:
 ━━━━━━━━━━━━━━━━━━━━━━━
@@ -146,12 +161,6 @@ Topic: ${topic.topic}
 Category: ${topic.category}
 Primary Keywords: ${topic.relatedKeywords.join(', ')}
 Target Word Count: ${wordCount} words
-
-BRAND VOICE GUIDELINES:
-• Company: ${profile.name}
-• Industry: ${profile.industry}
-• Tone: ${profile.brandVoice}
-• Audience: ${profile.targetAudience}
 
 ${researchContext}
 
@@ -216,10 +225,16 @@ Return JSON:
     }>(response.text);
 
     const content = parsed?.content || 'Failed to generate content.';
+    const blogTitle = parsed?.title || topic.topic;
+
+    // Track in memory
+    addGeneratedBlogTitle(blogTitle);
+    incrementGeneratedCount('blogs', 1);
+    trackAction(`Generated blog post: ${blogTitle}`);
 
     return {
         id: `post-${Date.now()}`,
-        title: parsed?.title || topic.topic,
+        title: blogTitle,
         content,
         excerpt: parsed?.excerpt,
         seoKeywords: parsed?.seoKeywords || topic.relatedKeywords,

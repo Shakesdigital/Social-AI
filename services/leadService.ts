@@ -1,6 +1,7 @@
 import { CompanyProfile, Lead, LeadSearchCriteria } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
 import { searchWeb, researchCompetitors, isWebResearchConfigured } from './webResearchService';
+import { getBusinessContext, getLeadsToAvoid, addGeneratedLeads, incrementGeneratedCount, trackAction } from './contextMemoryService';
 
 /**
  * Generate leads with real-time web research enhancement
@@ -39,23 +40,21 @@ ${competitors.map(c => `- ${c.name}: ${c.website}`).join('\n')}
         }
     }
 
-    // Step 2: Generate leads using enhanced AI reasoning
+    // Step 2: Get memory context to avoid duplicates
+    const businessContext = getBusinessContext(profile);
+    const leadsToAvoid = getLeadsToAvoid();
+
+    // Step 3: Generate leads using enhanced AI reasoning
     const prompt = `
 You are an elite B2B lead research specialist with access to current market data. Your task is to generate ${count} highly targeted, REALISTIC business leads.
+
+${businessContext}
 
 THINK CREATIVELY AND STRATEGICALLY:
 1. Consider the business synergies between the sender and potential leads
 2. Identify companies that would genuinely benefit from collaboration
 3. Focus on decision-makers who have authority to engage
 4. Prioritize leads with clear pain points that ${profile.name} can solve
-
-COMPANY SEEKING LEADS:
-━━━━━━━━━━━━━━━━━━━━━━
-• Name: ${profile.name}
-• Industry: ${profile.industry}
-• Value Proposition: ${profile.description}
-• Target Audience: ${profile.targetAudience}
-• Business Goals: ${profile.goals}
 
 SEARCH CRITERIA:
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -66,6 +65,15 @@ SEARCH CRITERIA:
 
 ${webContext}
 ${competitorInsights}
+${leadsToAvoid}
+
+LEAD GENERATION STRATEGY:
+Think about:
+- What types of companies need ${profile.industry} services?
+- Who are the ideal buyers based on company size and location?
+- What signals indicate a company is ready to engage?
+- How can we identify decision-makers (CMOs, Marketing Directors, Founders)?
+
 
 LEAD GENERATION STRATEGY:
 Think about:
@@ -107,7 +115,7 @@ CRITICAL: Make leads feel REAL - use realistic naming conventions, proper email 
         return [];
     }
 
-    return parsed.map((item, index) => ({
+    const leads = parsed.map((item, index) => ({
         id: `lead-${Date.now()}-${index}`,
         companyName: item.companyName || 'Unknown Company',
         industry: item.industry || criteria.industry,
@@ -122,6 +130,13 @@ CRITICAL: Make leads feel REAL - use realistic naming conventions, proper email 
         createdAt: new Date(),
         notes: ''
     }));
+
+    // Track in memory to avoid future duplicates
+    addGeneratedLeads(leads);
+    incrementGeneratedCount('leads', leads.length);
+    trackAction(`Generated ${leads.length} leads for ${criteria.industry}`);
+
+    return leads;
 }
 
 /**

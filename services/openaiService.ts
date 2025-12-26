@@ -1,6 +1,7 @@
 import { CompanyProfile, ImageGenerationConfig, SocialPost, AutoPilotConfig } from "../types";
 import { callLLM, parseJSONFromLLM } from "./freeLLMService";
 import { searchWeb, getLatestNews, getTrendingTopics, getSocialMediaTrends, deepResearch, isWebResearchConfigured } from "./webResearchService";
+import { getBusinessContext, getTopicsToAvoid, addGeneratedTopic, incrementGeneratedCount, trackAction, addToConversation, getRecentConversationContext } from "./contextMemoryService";
 
 // Free Image Generation via Hugging Face
 const HUGGINGFACE_IMAGE_MODEL = 'stabilityai/stable-diffusion-xl-base-1.0';
@@ -63,8 +64,13 @@ ${deep.answer}
     }
   }
 
+  // Get business context from memory
+  const businessContext = getBusinessContext(profile);
+
   const prompt = `
 You are a world-class market research analyst with access to real-time data. Create an EXCEPTIONAL, actionable market research report.
+
+${businessContext}
 
 THINK STRATEGICALLY:
 1. What are the biggest opportunities in this space RIGHT NOW?
@@ -72,14 +78,6 @@ THINK STRATEGICALLY:
 3. What's the competition doing that works (and what doesn't)?
 4. What content is resonating with the target audience?
 5. What are the untapped niches or angles?
-
-COMPANY PROFILE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Company: ${profile.name}
-• Industry: ${profile.industry}
-• Description: ${profile.description}
-• Target Audience: ${profile.targetAudience}
-• Goals: ${profile.goals}
 
 ${newsContext}
 ${webResearchContext}
@@ -123,6 +121,9 @@ Be specific, data-driven, and actionable. No fluff.
       systemPrompt: "You are an elite market research analyst who combines data analysis with creative strategic thinking. Your reports are known for being both comprehensive and actionable. You identify opportunities others miss.",
       maxTokens: 4000
     });
+
+    // Track in memory
+    trackAction(`Generated market research for ${profile.name}`);
 
     return { text: response.text, sources };
   } catch (error) {
@@ -365,16 +366,46 @@ export const generatePostImage = async (prompt: string, config: ImageGenerationC
 };
 
 /**
- * Chat Assistant with Context Awareness
+ * Chat Assistant with Context Awareness and Memory
  */
-export const sendChatMessage = async (history: { role: string, parts: { text: string }[] }[], message: string) => {
-  const combinedPrompt = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.parts[0]?.text}`).join('\n') + `\nUser: ${message}`;
+export const sendChatMessage = async (history: { role: string, parts: { text: string }[] }[], message: string, profile?: CompanyProfile) => {
+  // Get business context if available
+  const businessContext = profile ? getBusinessContext(profile) : getBusinessContext();
+
+  // Get recent conversation from memory for continuity
+  const memoryContext = getRecentConversationContext();
+
+  // Build current conversation
+  const currentConvo = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.parts[0]?.text}`).join('\n');
+
+  const combinedPrompt = `
+${businessContext}
+
+${memoryContext}
+
+${currentConvo}
+User: ${message}
+
+Respond helpfully based on the business context and conversation history. Be specific and actionable.`;
 
   try {
     const response = await callLLM(combinedPrompt, {
       type: 'fast',
-      systemPrompt: "You are SocialAI Assistant, a brilliant marketing consultant who gives practical, creative advice. You're like having a CMO on speed dial. Be helpful, specific, and actionable. Use examples when relevant."
+      systemPrompt: `You are SocialAI Assistant, a brilliant marketing consultant who gives practical, creative advice.
+
+KEY RULES:
+- Always refer to the business profile when giving advice
+- Remember the conversation context and avoid repeating yourself
+- Be specific to their industry and target audience
+- Give actionable recommendations, not generic advice
+- If you don't know something specific about their business, ask
+
+You're like having a CMO on speed dial. Be helpful, specific, and actionable.`
     });
+
+    // Store in memory for future context
+    addToConversation('user', message);
+    addToConversation('assistant', response.text);
 
     return response.text;
   } catch (error) {

@@ -1,6 +1,7 @@
 import { CompanyProfile, Lead, EmailCampaign, EmailTemplate } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from './webResearchService';
+import { getBusinessContext, getEmailSubjectsToAvoid, addGeneratedEmailSubject, incrementGeneratedCount, trackAction } from './contextMemoryService';
 
 /**
  * Generate highly personalized email with real-time research
@@ -36,8 +37,14 @@ ${news.map(n => `• ${n.title} (${n.source})`).join('\n')}
         }
     }
 
+    // Get memory context
+    const businessContext = getBusinessContext(profile);
+    const emailsToAvoid = getEmailSubjectsToAvoid();
+
     const prompt = `
 You are an elite B2B email copywriter who achieves 40%+ open rates and 15%+ response rates. Write a HYPER-PERSONALIZED outreach email.
+
+${businessContext}
 
 PSYCHOLOGY OF EFFECTIVE COLD EMAILS:
 1. Pattern interrupt in subject line - be unexpected
@@ -45,13 +52,6 @@ PSYCHOLOGY OF EFFECTIVE COLD EMAILS:
 3. Make it about THEM, not you
 4. One clear call-to-action
 5. Create genuine curiosity
-
-SENDER PROFILE:
-━━━━━━━━━━━━━━━━━━━━━━━
-• Company: ${profile.name}
-• Industry: ${profile.industry}
-• What We Do: ${profile.description}
-• Brand Voice: ${profile.brandVoice}
 
 TARGET LEAD:
 ━━━━━━━━━━━━━━━━━━━━━━━
@@ -64,6 +64,7 @@ TARGET LEAD:
 
 ${companyContext}
 ${recentNews}
+${emailsToAvoid}
 
 OBJECTIVE: ${objective}
 
@@ -98,9 +99,16 @@ Return JSON:
     const response = await callLLM(prompt, options);
     const parsed = parseJSONFromLLM<{ subject: string; body: string; approachUsed?: string; personalizationPoints?: string[] }>(response.text);
 
+    const emailSubject = parsed?.subject || 'Partnership Opportunity';
+
+    // Track in memory
+    addGeneratedEmailSubject(emailSubject);
+    incrementGeneratedCount('emails', 1);
+    trackAction(`Generated email for ${lead.companyName}`);
+
     return {
         id: `email-${Date.now()}`,
-        subject: parsed?.subject || 'Partnership Opportunity',
+        subject: emailSubject,
         body: parsed?.body || 'Unable to generate email content.',
         variant: 'A',
         sent: false
