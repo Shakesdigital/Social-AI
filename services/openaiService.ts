@@ -1,38 +1,130 @@
 import { CompanyProfile, ImageGenerationConfig, SocialPost, AutoPilotConfig } from "../types";
 import { callLLM, parseJSONFromLLM } from "./freeLLMService";
+import { searchWeb, getLatestNews, getTrendingTopics, getSocialMediaTrends, deepResearch, isWebResearchConfigured } from "./webResearchService";
 
-// Free Image Generation via Hugging Face (Alternative to DALL-E)
+// Free Image Generation via Hugging Face
 const HUGGINGFACE_IMAGE_MODEL = 'stabilityai/stable-diffusion-xl-base-1.0';
 const HUGGINGFACE_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY || '';
 
-// --- API Functions ---
-
 /**
- * 1. Automated Market Research
- * Uses GPT-4o for comprehensive research
+ * Enhanced Market Research with Real-Time Web Data
  */
 export const generateMarketResearch = async (profile: CompanyProfile) => {
+  // Gather real-time intelligence
+  let webResearchContext = '';
+  let newsContext = '';
+  let trendingContext = '';
+  let sources: { uri: string; title: string }[] = [];
+
+  if (isWebResearchConfigured()) {
+    console.log('[Research] Gathering real-time market intelligence...');
+
+    // Get latest industry news
+    const news = await getLatestNews(profile.industry, 5);
+    if (news.length > 0) {
+      newsContext = `
+## BREAKING: Latest Industry News (${new Date().toLocaleDateString()})
+${news.map((n, i) => `${i + 1}. **${n.title}** - *${n.source}*
+   ${n.summary}`).join('\n')}
+`;
+      sources.push(...news.map(n => ({ uri: n.url, title: n.title })));
+    }
+
+    // Search for competitor insights
+    const competitorSearch = await searchWeb(`${profile.industry} top companies ${profile.targetAudience}`, 5);
+    if (competitorSearch.length > 0) {
+      webResearchContext = `
+## Competitor Landscape (Live Data)
+${competitorSearch.map(r => `- **${r.title}**
+  ${r.snippet}`).join('\n')}
+`;
+      sources.push(...competitorSearch.map(r => ({ uri: r.url, title: r.title })));
+    }
+
+    // Get social media trends
+    const socialTrends = await getSocialMediaTrends(profile.industry);
+    if (socialTrends.hashtags.length > 0) {
+      trendingContext = `
+## Social Media Pulse
+- **Trending Hashtags:** ${socialTrends.hashtags.slice(0, 8).join(', ')}
+- **Content Ideas:** ${socialTrends.contentIdeas.slice(0, 3).join(' | ')}
+`;
+    }
+
+    // Deep research if Tavily is available
+    const deep = await deepResearch(`What are the latest trends and challenges in the ${profile.industry} industry for ${profile.targetAudience}?`);
+    if (deep.answer) {
+      webResearchContext += `
+
+## AI-Synthesized Market Analysis
+${deep.answer}
+`;
+      sources.push(...deep.sources.map(s => ({ uri: s.url, title: s.title })));
+    }
+  }
+
   const prompt = `
-    Conduct a comprehensive market research report for a company named "${profile.name}" in the "${profile.industry}" industry.
-    Description: ${profile.description}
-    Target Audience: ${profile.targetAudience}
+You are a world-class market research analyst with access to real-time data. Create an EXCEPTIONAL, actionable market research report.
 
-    Research the following:
-    1. Current industry trends in 2024/2025.
-    2. Competitor analysis (general).
-    3. Popular content formats and hashtags.
-    4. Audience sentiment and pain points.
+THINK STRATEGICALLY:
+1. What are the biggest opportunities in this space RIGHT NOW?
+2. What threats should the company be aware of?
+3. What's the competition doing that works (and what doesn't)?
+4. What content is resonating with the target audience?
+5. What are the untapped niches or angles?
 
-    Provide the output in Markdown format with detailed insights and actionable recommendations.
-  `;
+COMPANY PROFILE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Company: ${profile.name}
+• Industry: ${profile.industry}
+• Description: ${profile.description}
+• Target Audience: ${profile.targetAudience}
+• Goals: ${profile.goals}
+
+${newsContext}
+${webResearchContext}
+${trendingContext}
+
+Generate a comprehensive report in Markdown format with:
+
+# Market Research Report: ${profile.name}
+*Generated: ${new Date().toLocaleDateString()} | Industry: ${profile.industry}*
+
+## Executive Summary
+(2-3 paragraph overview of key findings)
+
+## Industry Trends ${new Date().getFullYear()}
+(5-7 major trends with explanations)
+
+## Competitive Analysis
+(Key players, their strategies, your differentiation opportunities)
+
+## Audience Insights
+(Pain points, desires, content preferences, platforms they use)
+
+## Content Strategy Recommendations
+(What to post, when, where, and why)
+
+## Social Media Landscape
+(Platform-specific insights and hashtag recommendations)
+
+## Opportunities & Threats
+(SWOT-style analysis focused on actionability)
+
+## 30-Day Action Plan
+(Specific, prioritized next steps)
+
+Be specific, data-driven, and actionable. No fluff.
+`;
 
   try {
     const response = await callLLM(prompt, {
       type: 'reasoning',
-      systemPrompt: "You are an expert market research analyst specializing in social media marketing and industry trends."
+      systemPrompt: "You are an elite market research analyst who combines data analysis with creative strategic thinking. Your reports are known for being both comprehensive and actionable. You identify opportunities others miss.",
+      maxTokens: 4000
     });
 
-    return { text: response.text, sources: [] };
+    return { text: response.text, sources };
   } catch (error) {
     console.error("Market Research Error:", error);
     throw error;
@@ -40,33 +132,89 @@ export const generateMarketResearch = async (profile: CompanyProfile) => {
 };
 
 /**
- * 2. Intelligent Marketing Plan
- * Uses GPT-4o for deep strategic thinking
+ * Enhanced Marketing Strategy with Creative Thinking
  */
 export const generateMarketingStrategy = async (profile: CompanyProfile, researchSummary: string) => {
+  // Get trending content ideas for inspiration
+  let trendingInspo = '';
+  if (isWebResearchConfigured()) {
+    const trends = await getSocialMediaTrends(profile.industry);
+    trendingInspo = `
+CURRENT SOCIAL TRENDS:
+• Hot Hashtags: ${trends.hashtags.slice(0, 5).join(', ')}
+• Best Posting Times: ${trends.bestTimes.join(', ')}
+`;
+  }
+
   const prompt = `
-    Based on the following company profile and market research, create a detailed social media marketing strategy.
+You are a visionary marketing strategist who creates campaigns that go viral and strategies that transform businesses. Think BIG.
 
-    Company Profile:
-    ${JSON.stringify(profile, null, 2)}
+CREATIVE BRIEF:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${JSON.stringify(profile, null, 2)}
 
-    Market Research Summary:
-    ${researchSummary.slice(0, 4000)}... (truncated for context)
+MARKET RESEARCH INSIGHTS:
+${researchSummary.slice(0, 3000)}
 
-    The strategy should include:
-    1. Core Content Pillars.
-    2. Key Messaging.
-    3. Platform-specific strategies (Instagram, LinkedIn, Twitter, etc.).
-    4. A weekly posting cadence.
-    5. Measurable KPIs.
+${trendingInspo}
 
-    Be strategic, insightful, and practical. Provide actionable recommendations.
-  `;
+Create a BREAKTHROUGH marketing strategy that includes:
+
+# 🚀 Marketing Strategy: ${profile.name}
+
+## Brand Positioning Statement
+(One powerful sentence that defines your unique position)
+
+## The Big Idea
+(A creative concept that ties everything together)
+
+## Content Pillars (3-5)
+For each pillar:
+- Theme name
+- Why it matters to the audience
+- Example content ideas (5-10 specific posts)
+- Hashtag strategy
+
+## Platform-Specific Strategies
+
+### Instagram
+- Content mix (Reels vs Stories vs Posts %)
+- Aesthetic guidelines
+- Engagement tactics
+- Growth hacks
+
+### LinkedIn
+- Thought leadership angles
+- Post formats that work
+- Engagement strategy
+- B2B specific tactics
+
+### Twitter/X
+- Voice and tone
+- Tweet templates
+- Thread ideas
+- Community engagement
+
+## Weekly Content Calendar Template
+(Day-by-day breakdown with content types)
+
+## KPIs & Success Metrics
+(Specific, measurable goals with timeframes)
+
+## Quick Wins (First 7 Days)
+(Immediately actionable items)
+
+## Long-Term Vision (6-12 Months)
+(Where this strategy leads)
+
+Be creative, specific, and inspiring. This should be a strategy someone would pay $10,000 for.
+`;
 
   try {
     const response = await callLLM(prompt, {
       type: 'reasoning',
-      systemPrompt: "You are a strategic social media marketing consultant with deep expertise in creating comprehensive marketing plans. Think deeply about the brand positioning and provide innovative yet practical strategies."
+      systemPrompt: "You are a marketing genius who combines creativity with data-driven strategy. You think like Gary Vee, write like Seth Godin, and execute like a Silicon Valley growth hacker. Your strategies are both visionary and practical.",
+      maxTokens: 4000
     });
 
     return response.text;
@@ -77,23 +225,56 @@ export const generateMarketingStrategy = async (profile: CompanyProfile, researc
 };
 
 /**
- * 3. Content Topic Generation
- * Uses GPT-4o-mini for Speed
+ * Content Topic Generation with Trend Integration
  */
 export const generateContentTopics = async (profile: CompanyProfile, count: number = 5) => {
-  const prompt = `
-    Generate ${count} specific, engaging social media post ideas for ${profile.name} (${profile.industry}).
-    Focus on: ${profile.goals}.
-    Audience: ${profile.targetAudience}.
+  // Get real trending topics
+  let trendContext = '';
+  if (isWebResearchConfigured()) {
+    const news = await getLatestNews(profile.industry, 3);
+    const trends = await getSocialMediaTrends(profile.industry);
 
-    Return ONLY a JSON array of strings, where each string is a topic summary.
-    Example: ["Behind the scenes of our new product", "Customer testimonial video", "Industry tip #1"]
-  `;
+    if (news.length > 0 || trends.hashtags.length > 0) {
+      trendContext = `
+TRENDING NOW:
+• News: ${news.map(n => n.title).join('; ')}
+• Hashtags: ${trends.hashtags.slice(0, 5).join(', ')}
+`;
+    }
+  }
+
+  const prompt = `
+Generate ${count} VIRAL-WORTHY social media post ideas for ${profile.name} (${profile.industry}).
+
+${trendContext}
+
+BRAND CONTEXT:
+• Voice: ${profile.brandVoice}
+• Audience: ${profile.targetAudience}
+• Goals: ${profile.goals}
+
+Create posts that:
+1. Stop the scroll
+2. Generate engagement (comments, shares)
+3. Build brand authority
+4. Are timely and relevant
+
+Mix of formats:
+- Educational (teach something valuable)
+- Entertaining (make them smile/laugh)
+- Inspiring (motivate action)
+- Behind-the-scenes (build connection)
+- User engagement (questions, polls)
+
+Return ONLY a JSON array of strings, each being a specific, compelling post idea.
+Example: ["5 signs your marketing strategy needs a refresh (save this!) 🔄", "POV: When your competitor launches the campaign you were planning 😅"]
+`;
 
   try {
     const response = await callLLM(prompt, {
       type: 'fast',
-      systemPrompt: "You are a creative social media content strategist. Generate engaging, specific post ideas that resonate with the target audience. Return ONLY valid JSON."
+      systemPrompt: "You are a social media content creator who understands virality. You create content that people can't help but engage with. Think hook-first.",
+      temperature: 0.9
     });
 
     const parsed = parseJSONFromLLM<any>(response.text);
@@ -111,24 +292,38 @@ export const generateContentTopics = async (profile: CompanyProfile, count: numb
 };
 
 /**
- * 4. Post Caption Generation
- * Uses GPT-4o for creativity
+ * Post Caption Generation with Platform Optimization
  */
 export const generatePostCaption = async (profile: CompanyProfile, topic: string, platform: string) => {
-  const prompt = `
-    Write a social media caption for ${platform}.
-    Topic: ${topic}
-    Company: ${profile.name}
-    Voice: ${profile.brandVoice}
+  const platformGuidelines: Record<string, string> = {
+    Instagram: "Use emojis strategically, include 5-10 relevant hashtags at the end, write in a visual/aesthetic tone, max 2200 chars but hook in first line",
+    LinkedIn: "Professional but personable, use line breaks for readability, storytelling format, no hashtags in the middle of text, call-to-action at end",
+    Twitter: "Punchy and concise (under 280 chars), controversial or thought-provoking angles work well, 1-2 hashtags max",
+    Facebook: "Conversational, encourage discussion, questions work well, can be longer form, minimal hashtags"
+  };
 
-    Include relevant emojis and 3-5 hashtags appropriate for ${platform}.
-    Return just the caption text, ready to post.
-  `;
+  const prompt = `
+Write a scroll-stopping ${platform} caption for this topic: "${topic}"
+
+BRAND: ${profile.name}
+VOICE: ${profile.brandVoice}
+AUDIENCE: ${profile.targetAudience}
+
+PLATFORM RULES: ${platformGuidelines[platform] || platformGuidelines.Instagram}
+
+CAPTION FORMULA:
+1. HOOK: First line must stop the scroll
+2. VALUE: Deliver on the hook's promise
+3. CTA: Tell them what to do (like, comment, share, save)
+
+Write only the caption, ready to copy-paste. No explanations.
+`;
 
   try {
     const response = await callLLM(prompt, {
       type: 'reasoning',
-      systemPrompt: `You are an expert social media copywriter specializing in ${platform}. Write engaging, platform-optimized captions that drive engagement.`
+      systemPrompt: `You are an expert ${platform} content creator. Your captions consistently get high engagement because you understand the platform's algorithm and audience psychology.`,
+      temperature: 0.85
     });
 
     return response.text;
@@ -139,13 +334,11 @@ export const generatePostCaption = async (profile: CompanyProfile, topic: string
 };
 
 /**
- * 5. Image Generation
- * Uses DALL-E 3
+ * Image Generation via HuggingFace
  */
 export const generatePostImage = async (prompt: string, config: ImageGenerationConfig) => {
   if (!HUGGINGFACE_API_KEY) {
-    console.warn("Hugging Face API key missing for image generation. Please add VITE_HUGGINGFACE_API_KEY.");
-    // Return a nice placeholder gradient based on prompt
+    console.warn("Hugging Face API key missing for image generation.");
     return `https://via.placeholder.com/1024/6366f1/ffffff?text=${encodeURIComponent(prompt.slice(0, 30))}...`;
   }
 
@@ -172,7 +365,7 @@ export const generatePostImage = async (prompt: string, config: ImageGenerationC
 };
 
 /**
- * 6. Chat Assistant
+ * Chat Assistant with Context Awareness
  */
 export const sendChatMessage = async (history: { role: string, parts: { text: string }[] }[], message: string) => {
   const combinedPrompt = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.parts[0]?.text}`).join('\n') + `\nUser: ${message}`;
@@ -180,7 +373,7 @@ export const sendChatMessage = async (history: { role: string, parts: { text: st
   try {
     const response = await callLLM(combinedPrompt, {
       type: 'fast',
-      systemPrompt: "You are SocialAI Assistant, a helpful and knowledgeable social media marketing consultant. Provide practical advice, creative ideas, and strategic insights for social media marketing."
+      systemPrompt: "You are SocialAI Assistant, a brilliant marketing consultant who gives practical, creative advice. You're like having a CMO on speed dial. Be helpful, specific, and actionable. Use examples when relevant."
     });
 
     return response.text;
@@ -191,7 +384,7 @@ export const sendChatMessage = async (history: { role: string, parts: { text: st
 };
 
 /**
- * 7. Auto-Pilot Batch Generation
+ * Auto-Pilot Batch Generation with Trend Integration
  */
 export const generateBatchContent = async (profile: CompanyProfile, config: AutoPilotConfig) => {
   const platforms = Object.entries(config.postingFrequency)
@@ -202,28 +395,67 @@ export const generateBatchContent = async (profile: CompanyProfile, config: Auto
 
   const totalPosts = platforms.reduce((acc, curr) => acc + curr.count, 0);
 
+  // Get real-time trends for content inspiration
+  let trendContext = '';
+  if (isWebResearchConfigured()) {
+    const news = await getLatestNews(profile.industry, 3);
+    const trends = await getSocialMediaTrends(profile.industry);
+
+    trendContext = `
+TRENDING CONTENT TO LEVERAGE:
+• Latest News: ${news.map(n => n.title).slice(0, 3).join('; ')}
+• Hot Hashtags: ${trends.hashtags.slice(0, 8).join(', ')}
+• Content Ideas: ${trends.contentIdeas.join('; ')}
+`;
+  }
+
   const planPrompt = `
-    Create a content plan for ${profile.name} (${profile.industry}).
-    Cadence: ${config.cadence}
-    Total Posts Needed: ${totalPosts}
-    Distribution per platform: ${JSON.stringify(platforms)}
-    Goals: ${profile.goals}
-    Target Audience: ${profile.targetAudience}
-    Brand Voice: ${profile.brandVoice}
-    
-    For each post, provide:
-    1. Platform
-    2. Topic (specific idea)
-    3. Suggested Caption (optimized for platform, engaging, with emojis/hashtags)
-    4. Image Prompt (detailed visual description for AI generation)
-    
-    Return a JSON object with a "posts" array containing objects with keys: "platform", "topic", "caption", "imagePrompt".
-  `;
+Create a viral content calendar for ${profile.name} (${profile.industry}).
+
+REQUIREMENTS:
+• Cadence: ${config.cadence}
+• Total Posts: ${totalPosts}
+• Platform Distribution: ${JSON.stringify(platforms)}
+
+BRAND CONTEXT:
+• Goals: ${profile.goals}
+• Audience: ${profile.targetAudience}
+• Voice: ${profile.brandVoice}
+
+${trendContext}
+
+For each post, provide:
+1. Platform (optimized for that platform's algorithm)
+2. Topic (specific, compelling idea)
+3. Caption (ready to post, with hashtags/emojis as appropriate)
+4. Image Prompt (detailed description for AI image generation)
+5. Best Time (suggested posting time)
+
+CONTENT MIX GUIDELINES:
+• 40% Educational/Value
+• 30% Engaging/Interactive
+• 20% Behind-the-scenes/Personal
+• 10% Promotional
+
+Return JSON:
+{
+  "posts": [
+    {
+      "platform": "Instagram",
+      "topic": "Specific topic",
+      "caption": "Full caption with hashtags",
+      "imagePrompt": "Detailed image description",
+      "bestTime": "9:00 AM"
+    }
+  ]
+}
+`;
 
   try {
     const response = await callLLM(planPrompt, {
       type: 'reasoning',
-      systemPrompt: "You are an expert social media content planner. Create comprehensive, engaging content calendars with platform-optimized posts. Return ONLY valid JSON."
+      systemPrompt: "You are a content strategist who creates content calendars that drive real engagement and growth. Every post should have a purpose and be optimized for its platform.",
+      maxTokens: 3000
     });
 
     const parsed = parseJSONFromLLM<any>(response.text);

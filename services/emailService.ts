@@ -1,50 +1,102 @@
 import { CompanyProfile, Lead, EmailCampaign, EmailTemplate } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
+import { searchWeb, getLatestNews, isWebResearchConfigured } from './webResearchService';
 
-// Generate personalized email for a lead
+/**
+ * Generate highly personalized email with real-time research
+ */
 export async function generateLeadEmail(
     lead: Lead,
     profile: CompanyProfile,
     objective: string = 'collaboration'
 ): Promise<EmailTemplate> {
-    const prompt = `
-You are an expert B2B email copywriter. Write a personalized outreach email for:
+    // Research the lead's company for personalization
+    let companyContext = '';
+    let recentNews = '';
 
-SENDER COMPANY:
-- Name: ${profile.name}
-- Industry: ${profile.industry}
-- Description: ${profile.description}
-- Brand Voice: ${profile.brandVoice}
+    if (isWebResearchConfigured()) {
+        console.log('[Email] Researching lead for personalization...');
+
+        // Search for recent company news/updates
+        const searchResults = await searchWeb(`${lead.companyName} ${lead.industry}`, 3);
+        if (searchResults.length > 0) {
+            companyContext = `
+RECENT INSIGHTS ABOUT ${lead.companyName.toUpperCase()}:
+${searchResults.map(r => `• ${r.title}: ${r.snippet}`).join('\n')}
+`;
+        }
+
+        // Get industry news for relevance
+        const news = await getLatestNews(lead.industry, 2);
+        if (news.length > 0) {
+            recentNews = `
+INDUSTRY NEWS TO REFERENCE:
+${news.map(n => `• ${n.title} (${n.source})`).join('\n')}
+`;
+        }
+    }
+
+    const prompt = `
+You are an elite B2B email copywriter who achieves 40%+ open rates and 15%+ response rates. Write a HYPER-PERSONALIZED outreach email.
+
+PSYCHOLOGY OF EFFECTIVE COLD EMAILS:
+1. Pattern interrupt in subject line - be unexpected
+2. First line must hook them in 3 seconds
+3. Make it about THEM, not you
+4. One clear call-to-action
+5. Create genuine curiosity
+
+SENDER PROFILE:
+━━━━━━━━━━━━━━━━━━━━━━━
+• Company: ${profile.name}
+• Industry: ${profile.industry}
+• What We Do: ${profile.description}
+• Brand Voice: ${profile.brandVoice}
 
 TARGET LEAD:
-- Company: ${lead.companyName}
-- Industry: ${lead.industry}
-- Contact: ${lead.contactName || 'the team'}
-- Summary: ${lead.summary}
+━━━━━━━━━━━━━━━━━━━━━━━
+• Company: ${lead.companyName}
+• Industry: ${lead.industry}
+• Contact: ${lead.contactName || 'Decision Maker'}
+• Company Size: ${lead.size}
+• Why They're a Fit: ${lead.summary}
+• Website: ${lead.website || 'N/A'}
+
+${companyContext}
+${recentNews}
 
 OBJECTIVE: ${objective}
 
-Generate a professional, personalized email that:
-1. Has an attention-grabbing subject line
-2. References something specific about their company
-3. Clearly states the value proposition
-4. Has a clear call-to-action
-5. Is concise (under 200 words)
+CREATIVE CONSTRAINTS:
+• Subject line: 3-7 words, curiosity-driven, NO spam triggers
+• Opening line: Reference something specific about their company
+• Body: Under 100 words, clear value proposition
+• CTA: Single, low-commitment ask (quick call, reply, etc.)
+• Signature: Professional but warm
 
-Return JSON with format:
+APPROACH OPTIONS (pick the best fit):
+A) "I noticed [specific thing]..." - observation-based
+B) "Quick question about..." - curiosity-driven
+C) "Congrats on [achievement]..." - celebration hook
+D) "[Mutual connection/event]..." - warm introduction
+E) "Idea for [their goal]..." - value-first
+
+Return JSON:
 {
-  "subject": "Email subject line",
-  "body": "Full email body with proper formatting"
+  "subject": "Intriguing 3-7 word subject line",
+  "body": "Full email with proper line breaks and formatting",
+  "approachUsed": "Which approach you chose and why",
+  "personalizationPoints": ["specific detail 1", "specific detail 2"]
 }`;
 
     const options: LLMOptions = {
         type: 'reasoning',
-        systemPrompt: 'You are an expert B2B email copywriter. Write compelling, personalized outreach emails.',
-        temperature: 0.8
+        systemPrompt: `You are a cold email expert who understands buyer psychology. Your emails feel personal, not templated. You never use spam phrases like "reaching out" or "I hope this email finds you well." Every word earns its place.`,
+        temperature: 0.85
     };
 
     const response = await callLLM(prompt, options);
-    const parsed = parseJSONFromLLM<{ subject: string; body: string }>(response.text);
+    const parsed = parseJSONFromLLM<{ subject: string; body: string; approachUsed?: string; personalizationPoints?: string[] }>(response.text);
 
     return {
         id: `email-${Date.now()}`,
@@ -55,31 +107,41 @@ Return JSON with format:
     };
 }
 
-// Generate A/B variant of an email
+/**
+ * Generate A/B variant with different psychological approach
+ */
 export async function generateEmailVariant(
     original: EmailTemplate,
     profile: CompanyProfile
 ): Promise<EmailTemplate> {
     const prompt = `
-Create an A/B test variant of this email. Keep the same general message but change:
-- Subject line approach (different hook)
-- Opening line
-- Call-to-action style
+Create an A/B test variant that uses a COMPLETELY DIFFERENT psychological approach:
 
 ORIGINAL EMAIL:
 Subject: ${original.subject}
 Body: ${original.body}
 
-BRAND VOICE: ${profile.brandVoice}
+VARIANT STRATEGY:
+If original uses:
+• Curiosity → Use social proof or urgency
+• Value-first → Use question-based opening
+• Formal tone → Use conversational/casual
+• Long → Make it ultra-short (50 words)
+• Direct ask → Use soft CTA
 
-Return JSON with format:
+Create a variant that tests a fundamentally different hypothesis.
+
+Brand Voice: ${profile.brandVoice}
+
+Return JSON:
 {
-  "subject": "New subject line",
-  "body": "New email body"
+  "subject": "Different approach subject line",
+  "body": "Variant email body",
+  "hypothesisTested": "What this variant tests vs original"
 }`;
 
-    const response = await callLLM(prompt, { type: 'fast', temperature: 0.9 });
-    const parsed = parseJSONFromLLM<{ subject: string; body: string }>(response.text);
+    const response = await callLLM(prompt, { type: 'fast', temperature: 0.95 });
+    const parsed = parseJSONFromLLM<{ subject: string; body: string; hypothesisTested?: string }>(response.text);
 
     return {
         id: `email-${Date.now()}-B`,
@@ -90,39 +152,67 @@ Return JSON with format:
     };
 }
 
-// Create drip sequence
+/**
+ * Create intelligent drip sequence with strategic timing
+ */
 export async function generateDripSequence(
     lead: Lead,
     profile: CompanyProfile,
     emailCount: number = 3
 ): Promise<EmailTemplate[]> {
+    // Research for personalization across the sequence
+    let context = '';
+    if (isWebResearchConfigured()) {
+        const news = await getLatestNews(lead.industry, 3);
+        if (news.length > 0) {
+            context = `
+INDUSTRY CONTEXT FOR RELEVANCE:
+${news.map(n => `• ${n.title}`).join('\n')}
+`;
+        }
+    }
+
     const prompt = `
-Create a ${emailCount}-email drip sequence for B2B outreach:
+Design a ${emailCount}-email drip sequence that tells a STORY and builds trust over time.
+
+SEQUENCE PSYCHOLOGY:
+━━━━━━━━━━━━━━━━━━━━━━━
+Email 1 (Day 0): Pattern interrupt + establish relevance
+Email 2 (Day 3): Provide value without asking for anything  
+Email 3 (Day 7): The "breakup email" - create urgency through scarcity
 
 SENDER: ${profile.name} (${profile.industry})
+• Value Prop: ${profile.description}
+• Voice: ${profile.brandVoice}
+
 TARGET: ${lead.companyName} (${lead.industry})
-CONTACT: ${lead.contactName || 'the team'}
+• Contact: ${lead.contactName || 'Decision Maker'}
+• Why They're a Fit: ${lead.summary}
+• Size: ${lead.size}
 
-EMAIL SEQUENCE:
-1. Initial outreach (Day 0)
-2. Follow-up with value proposition (Day 3)
-3. Final check-in with urgency (Day 7)
+${context}
 
-Each email should:
-- Build on the previous without repeating
-- Be progressively shorter
-- Have unique subject lines
-- Include clear CTAs
+SEQUENCE REQUIREMENTS:
+1. Each email should stand alone but also connect to the narrative
+2. Subject lines should vary in style (question, statement, curiosity)
+3. Progressively shorter emails (150 → 100 → 50 words)
+4. Different CTAs: soft → medium → direct
+5. Final email creates FOMO or urgency
 
 Return JSON array:
 [
-  { "subject": "...", "body": "...", "delayDays": 0 },
-  { "subject": "...", "body": "...", "delayDays": 3 },
-  { "subject": "...", "body": "...", "delayDays": 7 }
+  {
+    "subject": "Email 1 subject",
+    "body": "Email 1 body",
+    "delayDays": 0,
+    "purpose": "What this email achieves",
+    "cta": "What action we're asking for"
+  },
+  ...
 ]`;
 
-    const response = await callLLM(prompt, { type: 'reasoning', temperature: 0.7 });
-    const parsed = parseJSONFromLLM<Array<{ subject: string; body: string; delayDays: number }>>(response.text);
+    const response = await callLLM(prompt, { type: 'reasoning', temperature: 0.8, maxTokens: 2500 });
+    const parsed = parseJSONFromLLM<Array<{ subject: string; body: string; delayDays: number; purpose?: string; cta?: string }>>(response.text);
 
     if (!parsed || !Array.isArray(parsed)) {
         return [];
@@ -136,6 +226,58 @@ Return JSON array:
         delayDays: email.delayDays,
         sent: false
     }));
+}
+
+/**
+ * Generate follow-up email based on previous interaction
+ */
+export async function generateFollowUp(
+    original: EmailTemplate,
+    lead: Lead,
+    interaction: 'opened' | 'clicked' | 'no_response',
+    profile: CompanyProfile
+): Promise<EmailTemplate> {
+    const interactionContext = {
+        opened: "They opened but didn't respond - they're interested but not convinced",
+        clicked: "They clicked a link - highly engaged, ready for the next step",
+        no_response: "No engagement yet - try a completely different angle"
+    };
+
+    const prompt = `
+Generate a strategic follow-up based on recipient behavior:
+
+PREVIOUS EMAIL:
+Subject: ${original.subject}
+Body: ${original.body}
+
+BEHAVIOR: ${interaction}
+INSIGHT: ${interactionContext[interaction]}
+
+LEAD: ${lead.contactName} at ${lead.companyName}
+
+FOLLOW-UP STRATEGY:
+• If opened: Acknowledge their interest, provide more value
+• If clicked: Be more direct, they're warm
+• If no response: Try pattern interrupt, new angle, or shorter format
+
+Return JSON:
+{
+  "subject": "Follow-up subject (consider reply threading)",
+  "body": "Follow-up email body",
+  "strategyUsed": "Why this approach for this behavior"
+}`;
+
+    const response = await callLLM(prompt, { type: 'fast', temperature: 0.8 });
+    const parsed = parseJSONFromLLM<{ subject: string; body: string }>(response.text);
+
+    return {
+        id: `email-${Date.now()}-followup`,
+        subject: parsed?.subject || `Re: ${original.subject}`,
+        body: parsed?.body || 'Quick follow-up on my previous note.',
+        variant: 'A',
+        delayDays: interaction === 'clicked' ? 1 : 3,
+        sent: false
+    };
 }
 
 // Create new campaign
@@ -179,7 +321,6 @@ export async function sendEmail(
     lead: Lead,
     profile: CompanyProfile
 ): Promise<{ success: boolean; error?: string }> {
-    // In production, integrate with SendGrid API
     const SENDGRID_API_KEY = import.meta.env.VITE_SENDGRID_API_KEY;
 
     if (!SENDGRID_API_KEY) {
@@ -187,14 +328,10 @@ export async function sendEmail(
         console.log('[Email] To:', lead.contactEmail);
         console.log('[Email] Subject:', template.subject);
 
-        // Simulate send delay
         await new Promise(resolve => setTimeout(resolve, 500));
         return { success: true };
     }
 
     // TODO: Implement actual SendGrid API call
-    // const { subject, body } = previewEmail(template, lead, profile);
-    // const response = await fetch('https://api.sendgrid.com/v3/mail/send', {...});
-
     return { success: true };
 }
