@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, StopCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 
@@ -18,329 +18,283 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const [conversationHistory, setConversationHistory] = useState<{ role: 'user' | 'assistant', text: string }[]>([]);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [debugInfo, setDebugInfo] = useState('Initializing...');
+  const [textInput, setTextInput] = useState('');
+  const [useTextMode, setUseTextMode] = useState(false);
+  const [micStatus, setMicStatus] = useState<'checking' | 'ok' | 'error'>('checking');
 
-  // Use refs to track current state for callbacks (avoids stale closures)
-  const isConnectedRef = useRef(false);
-  const isMutedRef = useRef(false);
-  const isThinkingRef = useRef(false);
-  const isSpeakingRef = useRef(false);
-  const shouldRestartRef = useRef(true);
   const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const isProcessingRef = useRef(false);
 
-  // Keep refs in sync with state
-  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
-  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
-  useEffect(() => { isThinkingRef.current = isThinking; }, [isThinking]);
-  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
-
-  // Cleanup on unmount or close
   useEffect(() => {
     if (!isOpen) {
-      stopSession();
+      cleanup();
     }
-    return () => stopSession();
+    return () => cleanup();
   }, [isOpen]);
 
-  const stopSession = useCallback(() => {
-    shouldRestartRef.current = false;
-
+  const cleanup = useCallback(() => {
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch (e) { }
+      try { recognitionRef.current.abort(); } catch (e) { }
       recognitionRef.current = null;
     }
-
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch (e) { }
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
-
     setIsConnected(false);
     setIsListening(false);
-    setIsThinking(false);
-    setIsSpeaking(false);
-    setTranscript('');
-    setResponse('');
+    setAudioLevel(0);
   }, []);
 
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && isConnectedRef.current && !isMutedRef.current && !isThinkingRef.current && !isSpeakingRef.current) {
-      try {
-        recognitionRef.current.start();
-        console.log('[Voice] Started listening');
-      } catch (e: any) {
-        // Already started, ignore
-        if (e.message !== 'Failed to execute \'start\' on \'SpeechRecognition\': recognition has already started.') {
-          console.error('[Voice] Start error:', e);
-        }
+  const setupAudioVisualization = async (): Promise<boolean> => {
+    try {
+      setDebugInfo('Requesting microphone access...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+
+      const updateLevel = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        setAudioLevel(Math.min(100, avg * 2));
+        animationFrameRef.current = requestAnimationFrame(updateLevel);
+      };
+
+      updateLevel();
+      setMicStatus('ok');
+      setDebugInfo('Microphone connected!');
+      return true;
+    } catch (err: any) {
+      console.error('Mic error:', err);
+      setMicStatus('error');
+      if (err.name === 'NotAllowedError') {
+        setError('Microphone blocked. Allow permission and reload page.');
+      } else {
+        setError(`Mic error: ${err.message}. Use text mode instead.`);
       }
+      return false;
     }
-  }, []);
+  };
 
   const startSession = useCallback(async () => {
     setError(null);
-    shouldRestartRef.current = true;
 
     if (!hasFreeLLMConfigured()) {
-      setError('Please configure an LLM API key (Groq recommended) in your environment variables.');
+      setError('Configure VITE_GROQ_API_KEY in Netlify Environment Variables.');
+      setUseTextMode(true);
+      setIsConnected(true);
       return;
     }
 
-    // Check for browser speech recognition support
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setError('Speech recognition is not supported in this browser. Try Chrome or Edge.');
+      setDebugInfo('Voice not supported in this browser');
+      setError('Speech recognition not supported. Use Chrome or Edge.');
+      setUseTextMode(true);
+      setIsConnected(true);
+      return;
+    }
+
+    const micOk = await setupAudioVisualization();
+    if (!micOk) {
+      setUseTextMode(true);
+      setIsConnected(true);
       return;
     }
 
     try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-
       const recognition = new SpeechRecognition();
-
-      // KEY FIX: Enable continuous mode so it doesn't stop after one phrase
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
-      recognition.maxAlternatives = 1;
 
-      let finalTranscript = '';
-      let silenceTimer: NodeJS.Timeout | null = null;
+      let finalText = '';
+      let processTimer: ReturnType<typeof setTimeout> | null = null;
 
       recognition.onstart = () => {
-        console.log('[Voice] Recognition started');
         setIsListening(true);
-        setTranscript('');
-        finalTranscript = '';
+        setDebugInfo('🎤 Listening... speak now!');
+        finalText = '';
+      };
+
+      recognition.onspeechstart = () => {
+        setDebugInfo('🗣️ Speech detected!');
       };
 
       recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-
+        let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           if (result.isFinal) {
-            finalTranscript += result[0].transcript + ' ';
+            finalText += result[0].transcript + ' ';
           } else {
-            interimTranscript += result[0].transcript;
+            interim += result[0].transcript;
           }
         }
+        setTranscript((finalText + interim).trim());
 
-        // Show what they're saying in real-time
-        setTranscript(finalTranscript + interimTranscript);
+        if (processTimer) clearTimeout(processTimer);
 
-        // Reset silence timer on any speech
-        if (silenceTimer) {
-          clearTimeout(silenceTimer);
-        }
-
-        // Wait for 2 seconds of silence after final result before processing
-        if (finalTranscript.trim()) {
-          silenceTimer = setTimeout(() => {
-            if (finalTranscript.trim() && shouldRestartRef.current) {
-              console.log('[Voice] Processing after silence:', finalTranscript.trim());
-              // Stop listening while we process
-              try {
-                recognition.stop();
-              } catch (e) { }
-              handleUserInput(finalTranscript.trim());
-              finalTranscript = '';
+        if (finalText.trim()) {
+          processTimer = setTimeout(() => {
+            if (finalText.trim() && !isProcessingRef.current) {
+              isProcessingRef.current = true;
+              try { recognition.stop(); } catch (e) { }
+              handleUserInput(finalText.trim());
+              finalText = '';
             }
-          }, 2000); // 2 seconds of silence = user is done speaking
+          }, 2500);
         }
       };
 
       recognition.onerror = (event: any) => {
-        console.error('[Voice] Recognition error:', event.error);
-
-        if (event.error === 'not-allowed') {
-          setError('Microphone access denied. Please allow microphone permissions.');
-          shouldRestartRef.current = false;
-        } else if (event.error === 'no-speech') {
-          // No speech detected - this is normal, just restart
-          console.log('[Voice] No speech detected, will restart');
-        } else if (event.error === 'aborted') {
-          // Manually aborted, don't restart
-          console.log('[Voice] Recognition aborted');
+        console.log('[Voice] Error:', event.error);
+        if (event.error === 'no-speech') {
+          setDebugInfo('No speech heard. Try speaking louder.');
+          setTimeout(() => {
+            if (!isProcessingRef.current && !isMuted) {
+              try { recognition.start(); } catch (e) { }
+            }
+          }, 1000);
+        } else if (event.error !== 'aborted') {
+          setDebugInfo(`Error: ${event.error}`);
         }
-
         setIsListening(false);
       };
 
       recognition.onend = () => {
-        console.log('[Voice] Recognition ended');
         setIsListening(false);
-
-        // Auto-restart if we should
-        if (shouldRestartRef.current && isConnectedRef.current && !isMutedRef.current && !isThinkingRef.current && !isSpeakingRef.current) {
-          console.log('[Voice] Auto-restarting...');
+        if (!isProcessingRef.current && !isMuted && isConnected) {
           setTimeout(() => {
-            if (shouldRestartRef.current) {
-              startListening();
-            }
-          }, 300);
+            try {
+              recognition.start();
+              setDebugInfo('🎤 Listening...');
+            } catch (e) { }
+          }, 500);
         }
       };
 
       recognitionRef.current = recognition;
       setIsConnected(true);
-      isConnectedRef.current = true;
-
-      // Start listening
       recognition.start();
 
-    } catch (err) {
-      console.error('Failed to start:', err);
-      setError('Failed to access microphone. Please check permissions.');
+    } catch (err: any) {
+      setError(`Voice failed: ${err.message}`);
+      setUseTextMode(true);
+      setIsConnected(true);
     }
-  }, [startListening]);
+  }, [isMuted]);
 
   const handleUserInput = async (userText: string) => {
-    if (!userText.trim() || isMutedRef.current) return;
+    if (!userText.trim()) return;
 
-    console.log('[Voice] Processing input:', userText);
-
+    setTranscript(userText);
     setIsListening(false);
     setIsThinking(true);
-    isThinkingRef.current = true;
+    setDebugInfo('🤔 Thinking...');
     setResponse('');
 
     try {
-      // Check if we need real-time research
       let researchContext = '';
-      const needsResearch = /latest|current|trending|news|today|right now|2024|2025|recent/i.test(userText);
-
-      if (needsResearch && isWebResearchConfigured()) {
-        const topic = userText.replace(/what|how|tell me about|give me|the|latest|current|trending/gi, '').trim();
+      if (/latest|current|trending|news|2024|2025/i.test(userText) && isWebResearchConfigured()) {
+        setDebugInfo('🔍 Researching...');
+        const topic = userText.replace(/what|how|tell|give|me|about|the|latest|current/gi, '').trim();
         if (topic) {
-          const [searchResults, news] = await Promise.all([
-            searchWeb(topic, 2),
-            getLatestNews(topic, 2)
-          ]);
-
-          if (searchResults.length > 0 || news.length > 0) {
-            researchContext = `
-[Current Data from Web Research]
-${news.map(n => `• ${n.title}`).join('\n')}
-${searchResults.map(r => `• ${r.title}`).join('\n')}
-`;
-          }
+          try {
+            const [search, news] = await Promise.all([
+              searchWeb(topic, 2),
+              getLatestNews(topic, 2)
+            ]);
+            if (search.length || news.length) {
+              researchContext = `[Research]\n${news.map(n => n.title).join('\n')}\n${search.map(r => r.title).join('\n')}`;
+            }
+          } catch (e) { }
         }
       }
 
-      // Build context from recent conversation
-      const recentHistory = conversationHistory.slice(-4).map(m =>
-        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`
+      setDebugInfo('💭 Generating response...');
+
+      const history = conversationHistory.slice(-4).map(m =>
+        `${m.role === 'user' ? 'User' : 'AI'}: ${m.text}`
       ).join('\n');
 
-      const prompt = `
-${recentHistory}
-${researchContext}
-User: ${userText}
-
-Respond as a helpful voice assistant. Keep responses concise (2-3 sentences max) but valuable. Be conversational and energetic.`;
-
-      const llmResponse = await callLLM(prompt, {
+      const llmResponse = await callLLM(`${history}\n${researchContext}\nUser: ${userText}\n\nRespond in 2-3 short sentences.`, {
         type: 'fast',
-        systemPrompt: `You are SocialAI Voice Assistant - a brilliant, enthusiastic marketing consultant speaking to the user.
-
-VOICE RESPONSE RULES:
-- Keep responses SHORT (2-3 sentences max) - this will be spoken aloud
-- Be conversational and energetic
-- Give specific, actionable advice
-- Sound natural, not robotic
-- If you have research data, mention key insights briefly
-
-Your expertise: social media, content marketing, email outreach, SEO, lead generation, brand strategy.`,
-        temperature: 0.85
+        systemPrompt: 'You are a helpful marketing assistant. Keep responses brief for voice output.',
+        temperature: 0.8
       });
 
-      const assistantText = llmResponse.text;
-      setResponse(assistantText);
+      const reply = llmResponse.text;
+      setResponse(reply);
+      setConversationHistory(prev => [...prev, { role: 'user', text: userText }, { role: 'assistant', text: reply }].slice(-10));
 
-      // Update history
-      setConversationHistory(prev => [
-        ...prev,
-        { role: 'user', text: userText },
-        { role: 'assistant', text: assistantText }
-      ].slice(-10));
-
-      // Speak the response
       setIsThinking(false);
-      isThinkingRef.current = false;
-      await speakResponse(assistantText);
+      await speakResponse(reply);
 
-    } catch (e) {
-      console.error('Processing error:', e);
-      const errorMsg = 'Sorry, I encountered an error. Please try again.';
-      setResponse(errorMsg);
+    } catch (e: any) {
+      setResponse('Sorry, an error occurred.');
+      setDebugInfo(`Error: ${e.message}`);
       setIsThinking(false);
-      isThinkingRef.current = false;
-      await speakResponse(errorMsg);
+      isProcessingRef.current = false;
+      restartListening();
     }
   };
 
   const speakResponse = (text: string): Promise<void> => {
     return new Promise((resolve) => {
       if (!window.speechSynthesis) {
-        // No speech synthesis, just restart listening
-        setTimeout(() => {
-          if (shouldRestartRef.current) {
-            startListening();
-          }
-        }, 500);
+        isProcessingRef.current = false;
+        restartListening();
         resolve();
         return;
       }
 
       setIsSpeaking(true);
-      isSpeakingRef.current = true;
+      setDebugInfo('🔊 Speaking...');
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
-      utterance.pitch = 1.0;
 
-      // Try to get a good voice
       const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(v =>
-        v.name.includes('Samantha') ||
-        v.name.includes('Google US English Female') ||
-        v.name.includes('Microsoft Zira') ||
-        v.name.includes('Google UK English Female') ||
-        (v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
-      ) || voices.find(v => v.lang.startsWith('en-US')) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
+      const voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+      if (voice) utterance.voice = voice;
 
       utterance.onend = () => {
-        console.log('[Voice] Speech ended, restarting listening');
         setIsSpeaking(false);
-        isSpeakingRef.current = false;
-
-        // Restart listening after speaking
-        if (shouldRestartRef.current && !isMutedRef.current) {
-          setTimeout(() => {
-            startListening();
-          }, 500);
-        }
+        isProcessingRef.current = false;
+        setDebugInfo('🎤 Ready for next question');
+        restartListening();
         resolve();
       };
 
-      utterance.onerror = (e) => {
-        console.error('[Voice] Speech error:', e);
+      utterance.onerror = () => {
         setIsSpeaking(false);
-        isSpeakingRef.current = false;
-
-        // Restart listening even on error
-        if (shouldRestartRef.current && !isMutedRef.current) {
-          setTimeout(() => {
-            startListening();
-          }, 500);
-        }
+        isProcessingRef.current = false;
+        restartListening();
         resolve();
       };
 
@@ -348,38 +302,28 @@ Your expertise: social media, content marketing, email outreach, SEO, lead gener
     });
   };
 
-  const toggleMute = () => {
-    const newMuted = !isMuted;
-    setIsMuted(newMuted);
-    isMutedRef.current = newMuted;
-
-    if (newMuted) {
-      // Muting - stop listening and speaking
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) { }
-      }
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      setIsListening(false);
-      setIsSpeaking(false);
-    } else {
-      // Unmuting - restart listening
+  const restartListening = () => {
+    if (recognitionRef.current && !isMuted) {
       setTimeout(() => {
-        startListening();
-      }, 300);
+        try { recognitionRef.current.start(); } catch (e) { }
+      }, 500);
     }
   };
 
-  const handleManualStop = () => {
-    // User manually wants to stop and process what they said
-    if (transcript.trim() && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) { }
-      handleUserInput(transcript.trim());
+  const handleTextSubmit = () => {
+    if (textInput.trim() && !isThinking) {
+      handleUserInput(textInput.trim());
+      setTextInput('');
+    }
+  };
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (!isMuted && recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) { }
+      setIsListening(false);
+    } else {
+      restartListening();
     }
   };
 
@@ -389,154 +333,98 @@ Your expertise: social media, content marketing, email outreach, SEO, lead gener
     }
   }, [isOpen, isConnected, startSession]);
 
-  // Load voices when component mounts
   useEffect(() => {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.getVoices();
-      };
-    }
+    window.speechSynthesis?.getVoices();
   }, []);
 
   if (!isOpen) return null;
 
-  const getStatusMessage = () => {
-    if (error) return <span className="text-red-400">{error}</span>;
-    if (!isConnected) return 'Connecting...';
-    if (isThinking) return 'Thinking...';
-    if (isSpeaking) return 'Speaking...';
-    if (isListening) return 'Listening... speak now!';
-    if (isMuted) return 'Muted - tap mic to unmute';
-    return 'Ready';
-  };
-
-  const getStatusColor = () => {
-    if (error) return 'bg-red-500';
-    if (isThinking) return 'bg-amber-500';
-    if (isSpeaking) return 'bg-brand-500';
-    if (isListening) return 'bg-green-500';
-    return 'bg-slate-400';
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md text-center relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-white to-indigo-50 opacity-50"></div>
-
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors z-10"
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 z-10">
           <X size={24} />
         </button>
 
         <div className="relative z-10">
-          {/* Voice visualization */}
-          <div className="mb-6 flex justify-center">
-            <div className={`relative p-8 rounded-full transition-all duration-500 ${isListening ? 'bg-green-100 ring-4 ring-green-200 scale-110' :
-                isSpeaking ? 'bg-brand-100 ring-4 ring-brand-200 animate-pulse' :
-                  isThinking ? 'bg-amber-100 ring-4 ring-amber-200' :
-                    'bg-slate-100'
-              }`}>
-              {isThinking ? (
-                <Loader size={48} className="text-amber-600 animate-spin" />
-              ) : isSpeaking ? (
-                <Volume2 size={48} className="text-brand-600" />
-              ) : (
-                <Mic size={48} className={isListening ? 'text-green-600' : 'text-slate-400'} />
-              )}
+          {/* Status */}
+          <div className="flex justify-center gap-3 mb-3 text-xs">
+            {micStatus === 'ok' && <span className="flex items-center gap-1 text-green-600"><CheckCircle size={12} /> Mic OK</span>}
+            {micStatus === 'error' && <span className="flex items-center gap-1 text-red-600"><AlertCircle size={12} /> Mic Error</span>}
+            {isWebResearchConfigured() && <span className="flex items-center gap-1 text-brand-500"><Globe size={12} /> Web</span>}
+          </div>
 
-              {/* Pulse rings when listening */}
+          {/* Mic visualization */}
+          <div className="mb-4 flex justify-center">
+            <div className={`relative p-6 rounded-full transition-all ${isListening ? 'bg-green-100 scale-110' :
+                isSpeaking ? 'bg-brand-100 animate-pulse' :
+                  isThinking ? 'bg-amber-100' : 'bg-slate-100'
+              }`}>
               {isListening && (
-                <>
-                  <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-25"></span>
-                  <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-25" style={{ animationDelay: '0.5s' }}></span>
-                </>
+                <div className="absolute inset-0 rounded-full border-4 border-green-400 transition-transform"
+                  style={{ transform: `scale(${1 + audioLevel / 150})`, opacity: audioLevel / 100 }} />
               )}
+              {isThinking ? <Loader size={40} className="text-amber-600 animate-spin" /> :
+                isSpeaking ? <Volume2 size={40} className="text-brand-600" /> :
+                  <Mic size={40} className={isListening ? 'text-green-600' : 'text-slate-400'} />}
             </div>
           </div>
 
-          {/* Title */}
-          <h2 className="text-2xl font-bold text-slate-800 mb-1 flex items-center justify-center gap-2">
-            <Sparkles size={20} className="text-brand-500" />
-            Voice Marketing Consultant
-          </h2>
-
-          {/* Status */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <span className={`w-2 h-2 rounded-full ${getStatusColor()} ${(isListening || isSpeaking) ? 'animate-pulse' : ''}`}></span>
-            <p className="text-slate-500 text-sm">{getStatusMessage()}</p>
-            {isWebResearchConfigured() && (
-              <span className="flex items-center gap-1 text-xs text-brand-500">
-                <Globe size={10} /> Live
-              </span>
-            )}
-          </div>
-
-          {/* Transcript / Response display */}
-          <div className="min-h-[100px] mb-6 p-4 bg-white/80 rounded-xl border border-slate-200">
-            {transcript && (
-              <div className="text-left mb-3">
-                <p className="text-xs text-slate-400 mb-1">You said:</p>
-                <p className="text-sm text-slate-700">{transcript}</p>
+          {/* Audio level */}
+          {isListening && (
+            <div className="mb-3 px-6">
+              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 transition-all" style={{ width: `${audioLevel}%` }} />
               </div>
-            )}
-            {response && !isListening && (
-              <div className="text-left">
-                <p className="text-xs text-brand-500 mb-1 flex items-center gap-1">
-                  <MessageCircle size={10} /> Assistant:
-                </p>
-                <p className="text-sm text-slate-700">{response}</p>
-              </div>
-            )}
-            {!transcript && !response && isConnected && !error && (
-              <p className="text-slate-400 text-sm italic">
-                {isListening ? 'Listening... start speaking!' : 'Ask me anything about marketing!'}
+              <p className="text-center text-xs text-slate-500 mt-1">
+                {audioLevel > 15 ? '🎤 Hearing you!' : '🔇 Speak louder'}
               </p>
-            )}
+            </div>
+          )}
+
+          {/* Title & status */}
+          <h2 className="text-lg font-bold text-slate-800 text-center mb-1 flex items-center justify-center gap-2">
+            <Sparkles size={16} className="text-brand-500" /> Voice Assistant
+          </h2>
+          <p className="text-sm text-center text-slate-500 mb-3">
+            {error ? <span className="text-red-500">{error}</span> : debugInfo}
+          </p>
+
+          {/* Transcript & response */}
+          <div className="min-h-[70px] mb-4 p-3 bg-slate-50 rounded-xl border text-sm">
+            {transcript && <div className="mb-2"><span className="text-xs text-slate-400">You:</span><p className="text-slate-700">{transcript}</p></div>}
+            {response && <div><span className="text-xs text-brand-500 flex items-center gap-1"><MessageCircle size={10} /> AI:</span><p className="text-slate-700">{response}</p></div>}
+            {!transcript && !response && <p className="text-slate-400 text-center italic">{isListening ? 'Listening...' : 'Ask anything!'}</p>}
           </div>
+
+          {/* Text fallback */}
+          {(useTextMode || error || micStatus === 'error') && (
+            <div className="mb-4 flex gap-2">
+              <input type="text" value={textInput} onChange={e => setTextInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleTextSubmit()}
+                placeholder="Type your question..."
+                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+              <button onClick={handleTextSubmit} disabled={!textInput.trim() || isThinking}
+                className="px-4 py-2 bg-brand-600 text-white rounded-lg disabled:opacity-50">
+                <Send size={16} />
+              </button>
+            </div>
+          )}
 
           {/* Controls */}
           <div className="flex justify-center gap-3">
-            <button
-              onClick={toggleMute}
-              className={`p-4 rounded-full transition-all shadow-sm ${isMuted ? 'bg-red-100 text-red-600 ring-2 ring-red-200' : 'bg-brand-100 text-brand-600 hover:bg-brand-200'
-                }`}
-              title={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
-            </button>
-
-            {isListening && transcript && (
-              <button
-                onClick={handleManualStop}
-                className="p-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-all shadow-sm"
-                title="Done speaking - process now"
-              >
-                <StopCircle size={24} />
+            {micStatus === 'ok' && (
+              <button onClick={toggleMute} className={`p-3 rounded-full ${isMuted ? 'bg-red-100 text-red-600' : 'bg-brand-100 text-brand-600'}`}>
+                {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
               </button>
             )}
-
-            <button
-              onClick={onClose}
-              className="px-6 py-3 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors"
-            >
-              End Session
+            <button onClick={() => setUseTextMode(!useTextMode)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm">
+              {useTextMode ? '🎤 Voice' : '⌨️ Text'}
             </button>
+            <button onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg">Close</button>
           </div>
 
-          {/* Instructions */}
-          <div className="mt-4 text-xs text-slate-400">
-            <p>💡 Tip: Pause for 2 seconds when done speaking, or tap the stop button</p>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-4 text-xs text-slate-400">
-            Powered by Free AI + Browser Speech API
-          </div>
+          <p className="mt-4 text-xs text-slate-400 text-center">Works best in Chrome/Edge</p>
         </div>
       </div>
     </div>
