@@ -353,6 +353,30 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Generate More Leads Button */}
+                            <div className="mt-6 flex justify-center">
+                                <button
+                                    onClick={handleGenerateLeads}
+                                    disabled={isLoading || !isConfigured}
+                                    className="px-6 py-3 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-xl hover:from-brand-700 hover:to-brand-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-brand-600/25 transition-all hover:scale-105"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader size={18} className="animate-spin" />
+                                            Finding more leads...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus size={18} />
+                                            Generate More Leads
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <p className="text-center text-xs text-slate-500 mt-2">
+                                Current leads: {leads.length} • New leads will be added to this list
+                            </p>
                         </>
                     )}
                 </div>
