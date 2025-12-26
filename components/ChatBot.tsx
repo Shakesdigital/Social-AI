@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
+import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 
 interface Message {
   role: 'user' | 'model';
@@ -59,6 +60,11 @@ export const ChatBot: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Get business context from memory
+      const businessContext = getBusinessContext();
+      const memoryContext = getRecentConversationContext();
+      const profile = getStoredProfile();
+
       // Detect if user is asking about current/real-time data
       const needsResearch = /latest|current|trending|news|today|right now|2024|2025|recent/i.test(messageText);
       let researchContext = '';
@@ -92,19 +98,26 @@ ${searchResults.length > 0 ? `Web Sources:\n${searchResults.map(r => `• ${r.ti
       ).join('\n');
 
       const prompt = `
+${businessContext}
+
+${memoryContext}
+
 ${conversationHistory}
 ${researchContext}
 User: ${messageText}
 
-Provide a helpful, specific, and actionable response. Be conversational but substantive.`;
+Provide a helpful, specific, and actionable response based on the business profile. Be conversational but substantive.`;
 
       const response = await callLLM(prompt, {
         type: 'fast',
-        systemPrompt: `You are SocialAI Assistant - a brilliant, friendly marketing consultant who gives practical advice. 
+        systemPrompt: `You are SocialAI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
+
+${profile ? `You are helping ${profile.name} in the ${profile.industry} industry. Their target audience is ${profile.targetAudience}.` : ''}
 
 Your personality:
 - Enthusiastic but professional
 - Give specific, actionable advice (not generic tips)
+- Reference the user's business when giving recommendations
 - Use examples when helpful
 - Be concise but comprehensive
 - If you have research data, cite it naturally
@@ -116,9 +129,13 @@ Your expertise:
 - Brand building & audience growth
 - Marketing trends & tools
 
-Always aim to HELP the user take action, not just inform them.`,
+Always aim to HELP the user take action, not just inform them. Be specific to their business.`,
         temperature: 0.8
       });
+
+      // Store in memory for future context
+      addToConversation('user', messageText);
+      addToConversation('assistant', response.text);
 
       setMessages(prev => [...prev, { role: 'model', text: response.text }]);
     } catch (e: any) {
@@ -211,8 +228,8 @@ Always aim to HELP the user take action, not just inform them.`,
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm ${m.role === 'user'
-                  ? 'bg-gradient-to-r from-brand-600 to-brand-700 text-white rounded-br-sm'
-                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
+                ? 'bg-gradient-to-r from-brand-600 to-brand-700 text-white rounded-br-sm'
+                : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                 }`}>
                 <div className="whitespace-pre-wrap">{m.text}</div>
               </div>

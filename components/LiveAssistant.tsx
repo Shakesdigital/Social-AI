@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
+import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -238,19 +239,40 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
       setDebugInfo('💭 Generating response...');
 
+      // Get business context and memory
+      const businessContext = getBusinessContext();
+      const memoryContext = getRecentConversationContext();
+      const profile = getStoredProfile();
+
       const history = conversationHistory.slice(-4).map(m =>
         `${m.role === 'user' ? 'User' : 'AI'}: ${m.text}`
       ).join('\n');
 
-      const llmResponse = await callLLM(`${history}\n${researchContext}\nUser: ${userText}\n\nRespond in 2-3 short sentences.`, {
+      const llmResponse = await callLLM(`
+${businessContext}
+
+${memoryContext}
+
+${history}
+${researchContext}
+User: ${userText}
+
+Respond in 2-3 short sentences. Be specific to the business context.`, {
         type: 'fast',
-        systemPrompt: 'You are a helpful marketing assistant. Keep responses brief for voice output.',
+        systemPrompt: `You are a helpful marketing voice assistant for ${profile?.name || 'a business'}. 
+Keep responses brief (2-3 sentences) since they will be spoken aloud.
+Be specific to their industry (${profile?.industry || 'general'}) and target audience.
+Give actionable advice, not generic tips.`,
         temperature: 0.8
       });
 
       const reply = llmResponse.text;
       setResponse(reply);
       setConversationHistory(prev => [...prev, { role: 'user', text: userText }, { role: 'assistant', text: reply }].slice(-10));
+
+      // Store in memory service
+      addToConversation('user', userText);
+      addToConversation('assistant', reply);
 
       setIsThinking(false);
       await speakResponse(reply);
@@ -357,8 +379,8 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
           {/* Mic visualization */}
           <div className="mb-4 flex justify-center">
             <div className={`relative p-6 rounded-full transition-all ${isListening ? 'bg-green-100 scale-110' :
-                isSpeaking ? 'bg-brand-100 animate-pulse' :
-                  isThinking ? 'bg-amber-100' : 'bg-slate-100'
+              isSpeaking ? 'bg-brand-100 animate-pulse' :
+                isThinking ? 'bg-amber-100' : 'bg-slate-100'
               }`}>
               {isListening && (
                 <div className="absolute inset-0 rounded-full border-4 border-green-400 transition-transform"

@@ -136,6 +136,9 @@ Be specific, data-driven, and actionable. No fluff.
  * Enhanced Marketing Strategy with Creative Thinking
  */
 export const generateMarketingStrategy = async (profile: CompanyProfile, researchSummary: string) => {
+  // Get business context from memory
+  const businessContext = getBusinessContext(profile);
+
   // Get trending content ideas for inspiration
   let trendingInspo = '';
   if (isWebResearchConfigured()) {
@@ -150,9 +153,7 @@ CURRENT SOCIAL TRENDS:
   const prompt = `
 You are a visionary marketing strategist who creates campaigns that go viral and strategies that transform businesses. Think BIG.
 
-CREATIVE BRIEF:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${JSON.stringify(profile, null, 2)}
+${businessContext}
 
 MARKET RESEARCH INSIGHTS:
 ${researchSummary.slice(0, 3000)}
@@ -218,6 +219,9 @@ Be creative, specific, and inspiring. This should be a strategy someone would pa
       maxTokens: 4000
     });
 
+    // Track in memory
+    trackAction(`Generated marketing strategy for ${profile.name}`);
+
     return response.text;
   } catch (error) {
     console.error("Strategy Generation Error:", error);
@@ -226,9 +230,13 @@ Be creative, specific, and inspiring. This should be a strategy someone would pa
 };
 
 /**
- * Content Topic Generation with Trend Integration
+ * Content Topic Generation with Trend Integration and Memory
  */
 export const generateContentTopics = async (profile: CompanyProfile, count: number = 5) => {
+  // Get business context and topics to avoid
+  const businessContext = getBusinessContext(profile);
+  const topicsToAvoid = getTopicsToAvoid();
+
   // Get real trending topics
   let trendContext = '';
   if (isWebResearchConfigured()) {
@@ -245,14 +253,13 @@ TRENDING NOW:
   }
 
   const prompt = `
-Generate ${count} VIRAL-WORTHY social media post ideas for ${profile.name} (${profile.industry}).
+Generate ${count} VIRAL-WORTHY social media post ideas.
+
+${businessContext}
 
 ${trendContext}
 
-BRAND CONTEXT:
-• Voice: ${profile.brandVoice}
-• Audience: ${profile.targetAudience}
-• Goals: ${profile.goals}
+${topicsToAvoid}
 
 Create posts that:
 1. Stop the scroll
@@ -274,18 +281,24 @@ Example: ["5 signs your marketing strategy needs a refresh (save this!) 🔄", "
   try {
     const response = await callLLM(prompt, {
       type: 'fast',
-      systemPrompt: "You are a social media content creator who understands virality. You create content that people can't help but engage with. Think hook-first.",
+      systemPrompt: "You are a social media content creator who understands virality. You create content that people can't help but engage with. Think hook-first. Generate FRESH ideas that haven't been done before.",
       temperature: 0.9
     });
 
     const parsed = parseJSONFromLLM<any>(response.text);
     if (!parsed) return [];
 
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed.topics && Array.isArray(parsed.topics)) return parsed.topics;
-    if (parsed.ideas && Array.isArray(parsed.ideas)) return parsed.ideas;
+    let topics: string[] = [];
+    if (Array.isArray(parsed)) topics = parsed;
+    else if (parsed.topics && Array.isArray(parsed.topics)) topics = parsed.topics;
+    else if (parsed.ideas && Array.isArray(parsed.ideas)) topics = parsed.ideas;
 
-    return [];
+    // Track in memory to avoid duplicates
+    topics.forEach(t => addGeneratedTopic(t));
+    incrementGeneratedCount('posts', topics.length);
+    trackAction(`Generated ${topics.length} social media post ideas`);
+
+    return topics;
   } catch (error) {
     console.error("Topic Generation Error:", error);
     return [];
@@ -293,9 +306,12 @@ Example: ["5 signs your marketing strategy needs a refresh (save this!) 🔄", "
 };
 
 /**
- * Post Caption Generation with Platform Optimization
+ * Post Caption Generation with Platform Optimization and Memory
  */
 export const generatePostCaption = async (profile: CompanyProfile, topic: string, platform: string) => {
+  // Get business context from memory
+  const businessContext = getBusinessContext(profile);
+
   const platformGuidelines: Record<string, string> = {
     Instagram: "Use emojis strategically, include 5-10 relevant hashtags at the end, write in a visual/aesthetic tone, max 2200 chars but hook in first line",
     LinkedIn: "Professional but personable, use line breaks for readability, storytelling format, no hashtags in the middle of text, call-to-action at end",
@@ -306,9 +322,7 @@ export const generatePostCaption = async (profile: CompanyProfile, topic: string
   const prompt = `
 Write a scroll-stopping ${platform} caption for this topic: "${topic}"
 
-BRAND: ${profile.name}
-VOICE: ${profile.brandVoice}
-AUDIENCE: ${profile.targetAudience}
+${businessContext}
 
 PLATFORM RULES: ${platformGuidelines[platform] || platformGuidelines.Instagram}
 
@@ -323,9 +337,12 @@ Write only the caption, ready to copy-paste. No explanations.
   try {
     const response = await callLLM(prompt, {
       type: 'reasoning',
-      systemPrompt: `You are an expert ${platform} content creator. Your captions consistently get high engagement because you understand the platform's algorithm and audience psychology.`,
+      systemPrompt: `You are an expert ${platform} content creator. Your captions consistently get high engagement because you understand the platform's algorithm and audience psychology. Always stay true to the brand voice and speak directly to the target audience.`,
       temperature: 0.85
     });
+
+    // Track the caption generation
+    trackAction(`Generated ${platform} caption for: ${topic.slice(0, 50)}`);
 
     return response.text;
   } catch (error) {
@@ -415,7 +432,7 @@ You're like having a CMO on speed dial. Be helpful, specific, and actionable.`
 };
 
 /**
- * Auto-Pilot Batch Generation with Trend Integration
+ * Auto-Pilot Batch Generation with Trend Integration and Memory
  */
 export const generateBatchContent = async (profile: CompanyProfile, config: AutoPilotConfig) => {
   const platforms = Object.entries(config.postingFrequency)
@@ -425,6 +442,10 @@ export const generateBatchContent = async (profile: CompanyProfile, config: Auto
   if (platforms.length === 0) return [];
 
   const totalPosts = platforms.reduce((acc, curr) => acc + curr.count, 0);
+
+  // Get business context and topics to avoid
+  const businessContext = getBusinessContext(profile);
+  const topicsToAvoid = getTopicsToAvoid();
 
   // Get real-time trends for content inspiration
   let trendContext = '';
@@ -441,23 +462,22 @@ TRENDING CONTENT TO LEVERAGE:
   }
 
   const planPrompt = `
-Create a viral content calendar for ${profile.name} (${profile.industry}).
+Create a viral content calendar.
+
+${businessContext}
 
 REQUIREMENTS:
 • Cadence: ${config.cadence}
 • Total Posts: ${totalPosts}
 • Platform Distribution: ${JSON.stringify(platforms)}
 
-BRAND CONTEXT:
-• Goals: ${profile.goals}
-• Audience: ${profile.targetAudience}
-• Voice: ${profile.brandVoice}
-
 ${trendContext}
+
+${topicsToAvoid}
 
 For each post, provide:
 1. Platform (optimized for that platform's algorithm)
-2. Topic (specific, compelling idea)
+2. Topic (specific, compelling idea - FRESH, not repeated)
 3. Caption (ready to post, with hashtags/emojis as appropriate)
 4. Image Prompt (detailed description for AI image generation)
 5. Best Time (suggested posting time)
@@ -485,7 +505,7 @@ Return JSON:
   try {
     const response = await callLLM(planPrompt, {
       type: 'reasoning',
-      systemPrompt: "You are a content strategist who creates content calendars that drive real engagement and growth. Every post should have a purpose and be optimized for its platform.",
+      systemPrompt: "You are a content strategist who creates content calendars that drive real engagement and growth. Every post should have a purpose and be optimized for its platform. Generate FRESH content that hasn't been done before.",
       maxTokens: 3000
     });
 
@@ -512,7 +532,14 @@ Return JSON:
         imagePrompt: item.imagePrompt,
         status: 'PendingApproval'
       });
+
+      // Track each topic in memory
+      addGeneratedTopic(item.topic);
     });
+
+    // Track the batch generation
+    incrementGeneratedCount('posts', posts.length);
+    trackAction(`Generated content calendar with ${posts.length} posts`);
 
     return posts;
   } catch (error) {
