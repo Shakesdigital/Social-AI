@@ -6,7 +6,8 @@ import {
     X,
     XCircle,
     CheckCircle,
-    Image as LucideImage
+    Image as LucideImage,
+    Sparkles
 } from 'lucide-react';
 import { CompanyProfile, SocialPost, AutoPilotConfig } from '../types';
 import {
@@ -50,7 +51,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
         setGeneratingTopics(true);
         try {
             const newTopics = await generateContentTopics(profile);
-            setTopics(newTopics);
+            // Append new topics to existing ones (avoid duplicates)
+            setTopics(prev => {
+                const combined = [...newTopics, ...prev];
+                return [...new Set(combined)]; // Remove duplicates
+            });
         } catch (e: any) { alert(`Failed: ${e.message}`); }
         setGeneratingTopics(false);
     };
@@ -192,6 +197,32 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                             </button>
                         </div>
                     ))}
+
+                    {/* Generate More Ideas Button */}
+                    {topics.length > 0 && (
+                        <div className="mt-2 pt-4 border-t border-slate-100">
+                            <button
+                                onClick={generateTopics}
+                                disabled={generatingTopics}
+                                className="w-full py-3 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-xl hover:from-brand-700 hover:to-brand-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-brand-600/25 transition-all hover:scale-[1.02]"
+                            >
+                                {generatingTopics ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <PlusCircle size={18} />
+                                        Generate More Ideas
+                                    </>
+                                )}
+                            </button>
+                            <p className="text-center text-xs text-slate-400 mt-2">
+                                New ideas will be added to this list
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Column - Schedule */}
@@ -230,8 +261,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex gap-2">
                                             <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
-                                                    post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-slate-200 text-slate-700'
+                                                post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
+                                                    'bg-slate-200 text-slate-700'
                                                 }`}>
                                                 {post.platform}
                                             </span>
@@ -350,8 +381,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                                 <div key={post.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden group hover:shadow-md transition-all">
                                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider">
                                         <span className={`px-2 py-0.5 rounded-full ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
-                                                post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-slate-200 text-slate-700'
+                                            post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
+                                                'bg-slate-200 text-slate-700'
                                             }`}>{post.platform}</span>
                                         <div className="flex gap-1.5">
                                             <button onClick={() => handleRejectSingle(post.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><XCircle size={18} /></button>
