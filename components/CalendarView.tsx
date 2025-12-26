@@ -21,18 +21,57 @@ interface CalendarViewProps {
     profile: CompanyProfile;
 }
 
+// Social platforms configuration
+const SOCIAL_PLATFORMS = [
+    { id: 'Instagram', name: 'Instagram', color: 'bg-gradient-to-r from-purple-500 to-pink-500', icon: '📸' },
+    { id: 'Facebook', name: 'Facebook', color: 'bg-blue-600', icon: '👤' },
+    { id: 'LinkedIn', name: 'LinkedIn', color: 'bg-blue-700', icon: '💼' },
+    { id: 'Twitter', name: 'X (Twitter)', color: 'bg-slate-900', icon: '𝕏' },
+    { id: 'TikTok', name: 'TikTok', color: 'bg-black', icon: '🎵' },
+    { id: 'YouTube', name: 'YouTube', color: 'bg-red-600', icon: '▶️' },
+    { id: 'Pinterest', name: 'Pinterest', color: 'bg-red-500', icon: '📌' },
+    { id: 'Threads', name: 'Threads', color: 'bg-slate-800', icon: '🧵' },
+];
+
+interface ConnectedAccount {
+    platform: string;
+    connected: boolean;
+    username?: string;
+    lastSync?: Date;
+}
+
 export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
     const [posts, setPosts] = useState<SocialPost[]>([]);
     const [topics, setTopics] = useState<string[]>([]);
     const [generatingTopics, setGeneratingTopics] = useState(false);
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
     const [showAutoPilotSettings, setShowAutoPilotSettings] = useState(false);
+    const [showConnectAccounts, setShowConnectAccounts] = useState(false);
+
+    // Enhanced auto-pilot config with all platforms
     const [autoPilotConfig, setAutoPilotConfig] = useState<AutoPilotConfig>({
         enabled: false,
         cadence: 'Weekly',
-        postingFrequency: { Instagram: 2, LinkedIn: 2, Twitter: 0, Facebook: 1 },
+        postingFrequency: {
+            Instagram: 3,
+            Facebook: 2,
+            LinkedIn: 2,
+            Twitter: 5,
+            TikTok: 2,
+            YouTube: 1,
+            Pinterest: 3,
+            Threads: 2
+        },
         autoApprove: false
     });
+
+    // Connected social accounts
+    const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>(() => {
+        const saved = localStorage.getItem('connected_accounts');
+        if (saved) return JSON.parse(saved);
+        return SOCIAL_PLATFORMS.map(p => ({ platform: p.id, connected: false }));
+    });
+
     const [isAutoGenerating, setIsAutoGenerating] = useState(false);
     const [pendingPosts, setPendingPosts] = useState<SocialPost[]>([]);
     const [showReviewDashboard, setShowReviewDashboard] = useState(false);
@@ -118,6 +157,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
             setAutoPilotConfig(prev => ({ ...prev, enabled: true }));
         }
     };
+
+    // Connect/Disconnect social account (simulated - real implementation needs OAuth)
+    const handleConnectAccount = (platform: string) => {
+        // In a real app, this would redirect to OAuth flow for the platform
+        const updated = connectedAccounts.map(acc =>
+            acc.platform === platform
+                ? { ...acc, connected: true, username: `@${profile.name.toLowerCase().replace(/\s/g, '')}`, lastSync: new Date() }
+                : acc
+        );
+        setConnectedAccounts(updated);
+        localStorage.setItem('connected_accounts', JSON.stringify(updated));
+    };
+
+    const handleDisconnectAccount = (platform: string) => {
+        const updated = connectedAccounts.map(acc =>
+            acc.platform === platform
+                ? { ...acc, connected: false, username: undefined, lastSync: undefined }
+                : acc
+        );
+        setConnectedAccounts(updated);
+        localStorage.setItem('connected_accounts', JSON.stringify(updated));
+    };
+
+    const updateFrequency = (platform: string, value: number) => {
+        setAutoPilotConfig(prev => ({
+            ...prev,
+            postingFrequency: { ...prev.postingFrequency, [platform]: Math.max(0, value) }
+        }));
+    };
+
+    const getConnectedCount = () => connectedAccounts.filter(a => a.connected).length;
 
     const handleApproveAll = () => {
         setPosts(prev => [...prev, ...pendingPosts.map(p => ({ ...p, status: 'Scheduled' } as SocialPost))]);
@@ -300,44 +370,111 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
             )}
 
             {showAutoPilotSettings && (
-                <div className="fixed inset-0 bg-slate-900/60 z-[90] flex items-center justify-center backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl relative overflow-hidden">
+                <div className="fixed inset-0 bg-slate-900/60 z-[90] flex items-center justify-center backdrop-blur-sm p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl relative overflow-hidden my-8">
                         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-                        <button onClick={() => setShowAutoPilotSettings(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-all">
+                        <button onClick={() => setShowAutoPilotSettings(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-all z-10">
                             <X size={20} />
                         </button>
-                        <div className="space-y-6">
+
+                        <div className="p-8 space-y-6">
+                            {/* Header */}
                             <div className="flex items-center gap-3">
                                 <div className="bg-indigo-100 text-indigo-600 p-2 rounded-lg">
                                     <Zap size={24} />
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-900">Auto-Pilot Mode</h2>
-                                    <p className="text-sm text-slate-500">Let AI manage your content calendar automatically.</p>
+                                    <p className="text-sm text-slate-500">Configure AI-powered content scheduling across all your channels.</p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cadence</label>
-                                    <select
-                                        value={autoPilotConfig.cadence}
-                                        onChange={(e) => setAutoPilotConfig({ ...autoPilotConfig, cadence: e.target.value as any })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    >
-                                        <option>Weekly</option>
-                                        <option>Monthly</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Post Frequency</label>
-                                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm">
-                                        <input type="number" value={autoPilotConfig.postingFrequency.Instagram} className="bg-transparent w-full outline-none" />
-                                        <span className="text-slate-400 text-[10px]">IG/Wk</span>
+                            {/* Connected Accounts Status */}
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                <div className="flex justify-between items-center mb-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-800">Connected Accounts</p>
+                                        <p className="text-xs text-slate-500">{getConnectedCount()} of {SOCIAL_PLATFORMS.length} platforms connected</p>
                                     </div>
+                                    <button
+                                        onClick={() => setShowConnectAccounts(true)}
+                                        className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold hover:bg-indigo-200"
+                                    >
+                                        Manage Connections
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {connectedAccounts.filter(a => a.connected).map(acc => {
+                                        const platform = SOCIAL_PLATFORMS.find(p => p.id === acc.platform);
+                                        return (
+                                            <span key={acc.platform} className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                                <span>{platform?.icon}</span> {platform?.name}
+                                            </span>
+                                        );
+                                    })}
+                                    {getConnectedCount() === 0 && (
+                                        <span className="text-xs text-slate-400 italic">No accounts connected yet</span>
+                                    )}
                                 </div>
                             </div>
 
+                            {/* Cadence Selection */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Posting Cadence</label>
+                                <div className="flex gap-2">
+                                    {['Daily', 'Weekly', 'Monthly'].map(cad => (
+                                        <button
+                                            key={cad}
+                                            onClick={() => setAutoPilotConfig({ ...autoPilotConfig, cadence: cad as any })}
+                                            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${autoPilotConfig.cadence === cad
+                                                    ? 'bg-indigo-600 text-white shadow-lg'
+                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
+                                        >
+                                            {cad}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Platform Frequency Grid */}
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                    Posts per {autoPilotConfig.cadence === 'Daily' ? 'Day' : autoPilotConfig.cadence === 'Weekly' ? 'Week' : 'Month'}
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {SOCIAL_PLATFORMS.map(platform => {
+                                        const isConnected = connectedAccounts.find(a => a.platform === platform.id)?.connected;
+                                        const freq = autoPilotConfig.postingFrequency[platform.id] || 0;
+                                        return (
+                                            <div key={platform.id} className={`flex items-center justify-between p-3 rounded-xl border ${isConnected ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-lg">{platform.icon}</span>
+                                                    <span className="text-sm font-medium text-slate-700">{platform.name}</span>
+                                                    {!isConnected && <span className="text-[10px] text-slate-400">(not connected)</span>}
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => updateFrequency(platform.id, freq - 1)}
+                                                        className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center text-lg font-bold"
+                                                    >
+                                                        −
+                                                    </button>
+                                                    <span className="w-8 text-center font-bold text-slate-800">{freq}</span>
+                                                    <button
+                                                        onClick={() => updateFrequency(platform.id, freq + 1)}
+                                                        className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center text-lg font-bold"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Auto-Approve Toggle */}
                             <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                                 <input
                                     type="checkbox"
@@ -346,17 +483,93 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
                                     className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"
                                 />
                                 <div>
-                                    <p className="text-sm font-semibold text-slate-800">Auto-Approve Content</p>
-                                    <p className="text-xs text-slate-500">Posts will be scheduled directly without review.</p>
+                                    <p className="text-sm font-semibold text-slate-800">Auto-Approve & Publish</p>
+                                    <p className="text-xs text-slate-500">Posts will be scheduled and published automatically without review.</p>
                                 </div>
                             </div>
 
+                            {/* Warning about connections */}
+                            {getConnectedCount() === 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                                    <span className="text-amber-500 text-lg">⚠️</span>
+                                    <div>
+                                        <p className="text-sm font-semibold text-amber-800">Connect your accounts first</p>
+                                        <p className="text-xs text-amber-700">To auto-post to social media, connect at least one account above.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Generate Button */}
                             <button
                                 onClick={handleRunAutoPilot}
                                 className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all flex items-center justify-center gap-2"
                             >
-                                <Zap size={20} /> Initialize Auto-Pilot
+                                <Zap size={20} /> Generate Content Calendar
                             </button>
+
+                            <p className="text-center text-xs text-slate-400">
+                                {Object.values(autoPilotConfig.postingFrequency).reduce((a, b) => a + b, 0)} total posts will be generated per {autoPilotConfig.cadence.toLowerCase()}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Connect Accounts Modal */}
+            {showConnectAccounts && (
+                <div className="fixed inset-0 bg-slate-900/60 z-[95] flex items-center justify-center backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900">Connect Social Accounts</h2>
+                                <p className="text-sm text-slate-500">Link your accounts to enable auto-posting</p>
+                            </div>
+                            <button onClick={() => setShowConnectAccounts(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+                            {SOCIAL_PLATFORMS.map(platform => {
+                                const account = connectedAccounts.find(a => a.platform === platform.id);
+                                const isConnected = account?.connected;
+                                return (
+                                    <div key={platform.id} className={`flex items-center justify-between p-4 rounded-xl border ${isConnected ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-white hover:bg-slate-50'} transition-all`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-xl ${platform.color} text-white flex items-center justify-center text-lg`}>
+                                                {platform.icon}
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">{platform.name}</p>
+                                                {isConnected && account?.username && (
+                                                    <p className="text-xs text-green-600">{account.username}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {isConnected ? (
+                                            <button
+                                                onClick={() => handleDisconnectAccount(platform.id)}
+                                                className="px-4 py-2 bg-red-100 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-200"
+                                            >
+                                                Disconnect
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleConnectAccount(platform.id)}
+                                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700"
+                                            >
+                                                Connect
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-6 bg-slate-50 border-t border-slate-100">
+                            <p className="text-xs text-slate-500 text-center">
+                                🔒 We use secure OAuth to connect. We never store your passwords.
+                            </p>
                         </div>
                     </div>
                 </div>

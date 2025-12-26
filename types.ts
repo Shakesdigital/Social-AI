@@ -141,12 +141,17 @@ export interface LiveSessionState {
 
 export interface AutoPilotConfig {
   enabled: boolean;
-  cadence: 'Weekly' | 'Monthly';
+  cadence: 'Daily' | 'Weekly' | 'Monthly';
   postingFrequency: {
     Instagram: number;
     LinkedIn: number;
     Twitter: number;
     Facebook: number;
+    TikTok: number;
+    YouTube: number;
+    Pinterest: number;
+    Threads: number;
+    [key: string]: number; // Allow dynamic platform access
   };
   autoApprove: boolean;
 }
