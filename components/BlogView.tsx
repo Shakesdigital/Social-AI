@@ -18,19 +18,30 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
     const [isLoadingTopics, setIsLoadingTopics] = useState(false);
     const [isLoadingPost, setIsLoadingPost] = useState(false);
     const [nicheInput, setNicheInput] = useState(profile.industry);
+    const [error, setError] = useState<string | null>(null);
 
     const handleResearchTopics = async () => {
         setIsLoadingTopics(true);
+        setError(null);
         try {
+            console.log('[BlogView] Starting research for:', nicheInput);
             const newTopics = await researchTrendingTopics(nicheInput, profile, 5);
+            console.log('[BlogView] Received topics:', newTopics?.length || 0);
+
+            if (!newTopics || newTopics.length === 0) {
+                setError('No topics found. Please try again or use a different niche.');
+                return;
+            }
+
             // Append new topics, avoiding duplicates
             setTopics(prev => {
                 const existingIds = new Set(prev.map(t => t.topic.toLowerCase()));
                 const uniqueNew = newTopics.filter(t => !existingIds.has(t.topic.toLowerCase()));
                 return [...uniqueNew, ...prev];
             });
-        } catch (e) {
-            console.error('Failed to research topics:', e);
+        } catch (e: any) {
+            console.error('[BlogView] Failed to research topics:', e);
+            setError(`Failed to research topics: ${e.message || 'Unknown error'}`);
         } finally {
             setIsLoadingTopics(false);
         }
@@ -110,19 +121,19 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                             <input
                                 type="text"
                                 value={nicheInput}
-                                onChange={e => setNicheInput(e.target.value)}
+                                onChange={e => { setNicheInput(e.target.value); setError(null); }}
                                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                                placeholder="Enter your niche..."
+                                placeholder="Enter your niche (e.g., Digital Marketing, AI, Fitness)..."
                             />
                             <button
                                 onClick={handleResearchTopics}
-                                disabled={isLoadingTopics || !isConfigured}
+                                disabled={isLoadingTopics || !isConfigured || !nicheInput.trim()}
                                 className="w-full py-2.5 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {isLoadingTopics ? (
                                     <>
                                         <Loader size={16} className="animate-spin" />
-                                        Researching...
+                                        Researching... (this may take 10-20 seconds)
                                     </>
                                 ) : (
                                     <>
@@ -131,6 +142,14 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
                                     </>
                                 )}
                             </button>
+
+                            {/* Error Display */}
+                            {error && (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                                    <p className="font-medium">⚠️ {error}</p>
+                                    <p className="text-xs mt-1 text-red-600">Check browser console (F12) for more details.</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2 max-h-80 overflow-y-auto">

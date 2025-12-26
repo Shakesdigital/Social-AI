@@ -164,15 +164,45 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
 
 // Helper to parse JSON from LLM response
 export function parseJSONFromLLM<T>(text: string): T | null {
-    try {
-        const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/\{[\s\S]*\}/) || text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            const jsonStr = jsonMatch[1] || jsonMatch[0];
-            return JSON.parse(jsonStr);
+    if (!text || typeof text !== 'string') {
+        console.warn('[parseJSON] No text provided');
+        return null;
+    }
+
+    console.log('[parseJSON] Attempting to parse response of length:', text.length);
+
+    // Try multiple patterns to find JSON
+    const patterns = [
+        /```json\s*([\s\S]*?)\s*```/,       // ```json ... ```
+        /```\s*([\s\S]*?)\s*```/,            // ``` ... ```
+        /\[\s*\{[\s\S]*\}\s*\]/,             // Array of objects
+        /\{[\s\S]*"topic"[\s\S]*\}/,         // Object with topic key
+        /\{[\s\S]*\}/,                        // Any object
+        /\[[\s\S]*\]/                         // Any array
+    ];
+
+    for (const pattern of patterns) {
+        try {
+            const match = text.match(pattern);
+            if (match) {
+                const jsonStr = (match[1] || match[0]).trim();
+                console.log('[parseJSON] Trying pattern match:', pattern.source.substring(0, 30) + '...');
+                const parsed = JSON.parse(jsonStr);
+                console.log('[parseJSON] Success! Parsed type:', typeof parsed, Array.isArray(parsed) ? `Array(${parsed.length})` : '');
+                return parsed;
+            }
+        } catch (e) {
+            // Continue to next pattern
         }
-        return JSON.parse(text);
+    }
+
+    // Last resort: try parsing the whole text
+    try {
+        const parsed = JSON.parse(text);
+        console.log('[parseJSON] Parsed whole text successfully');
+        return parsed;
     } catch (e) {
-        console.warn('Failed to parse JSON from LLM response:', e);
+        console.warn('[parseJSON] All patterns failed. First 500 chars of text:', text.substring(0, 500));
         return null;
     }
 }
