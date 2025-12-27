@@ -31,7 +31,17 @@ const SERP_CONFIG = {
     // Fallback: Self-hosted SearxNG instance
     searxngUrl: import.meta.env.VITE_SEARXNG_URL || '',
 
-    // Optional: Fallback to Serper.dev if self-hosted fails
+    // FREE PUBLIC SearXNG instances (no setup required!)
+    // These are community-run instances that anyone can use
+    publicSearxngInstances: [
+        'https://search.bus-hit.me',
+        'https://searx.be',
+        'https://search.sapti.me',
+        'https://searx.tiekoetter.com',
+        'https://search.ononoki.org',
+    ],
+
+    // Optional: Fallback to Serper.dev if all else fails
     serperApiKey: import.meta.env.VITE_SERPER_API_KEY || '',
 
     // Cache settings
@@ -39,7 +49,7 @@ const SERP_CONFIG = {
     cacheTTLMinutes: 60, // Cache results for 1 hour
 
     // Rate limiting
-    minRequestDelayMs: 1000, // Minimum 1 second between requests
+    minRequestDelayMs: 1500, // 1.5 seconds between requests (be nice to public instances)
     maxRetries: 2,
     retryDelayMs: 3000,
 };
@@ -264,6 +274,89 @@ async function searchSearxNG(options: SerpOptions): Promise<SerpResponse | null>
 }
 
 // ============================================
+// PUBLIC SEARXNG INSTANCES (FREE, NO SETUP!)
+// ============================================
+
+async function searchPublicSearxNG(options: SerpOptions): Promise<SerpResponse | null> {
+    const instances = SERP_CONFIG.publicSearxngInstances;
+
+    if (!instances || instances.length === 0) {
+        return null;
+    }
+
+    console.log('[SERP] Trying public SearXNG instances (free, no API key needed)');
+
+    // Shuffle instances to distribute load
+    const shuffled = [...instances].sort(() => Math.random() - 0.5);
+
+    for (const instanceUrl of shuffled) {
+        await waitForRateLimit('public-searxng');
+
+        try {
+            console.log(`[SERP] Trying public instance: ${instanceUrl}`);
+
+            const params = new URLSearchParams({
+                q: options.query,
+                format: 'json',
+                pageno: '1',
+                language: options.language || 'en',
+            });
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+            const response = await fetch(`${instanceUrl}/search?${params}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                console.log(`[SERP] Instance ${instanceUrl} returned ${response.status}, trying next...`);
+                continue;
+            }
+
+            const data = await response.json();
+
+            if (!data.results || data.results.length === 0) {
+                console.log(`[SERP] Instance ${instanceUrl} returned no results, trying next...`);
+                continue;
+            }
+
+            console.log(`[SERP] ✅ Success with public instance: ${instanceUrl}`);
+
+            return {
+                query: options.query,
+                organic: (data.results || []).slice(0, options.count || 10).map((item: any, index: number) => ({
+                    title: item.title,
+                    url: item.url,
+                    snippet: item.content || item.snippet || '',
+                    position: index + 1,
+                    date: item.publishedDate,
+                    domain: extractDomain(item.url),
+                })),
+                relatedSearches: data.suggestions || [],
+                provider: 'searxng',
+            };
+        } catch (error: any) {
+            if (error.name === 'AbortError') {
+                console.log(`[SERP] Instance ${instanceUrl} timed out, trying next...`);
+            } else {
+                console.log(`[SERP] Instance ${instanceUrl} failed: ${error.message}, trying next...`);
+            }
+            continue;
+        }
+    }
+
+    console.log('[SERP] All public SearXNG instances failed');
+    return null;
+}
+
+// ============================================
 // SERPER PROVIDER (Paid Fallback)
 // ============================================
 
@@ -403,7 +496,9 @@ async function searchVercelProxy(options: SerpOptions): Promise<SerpResponse | n
 
 /**
  * Search the web using self-hosted SERP scrapers
- * Tries providers in order: Cache → Vercel Proxy → Novexity → SearxNG → Serper → Mock
+ * Tries providers in order: 
+ *   Cache → Vercel Proxy → Novexity → SearxNG → 
+ *   PUBLIC SearXNG (FREE!) → Serper → Mock
  */
 export async function searchSERP(options: SerpOptions): Promise<SerpResponse> {
     console.log('[SERP] Searching:', options.query);
@@ -426,8 +521,15 @@ export async function searchSERP(options: SerpOptions): Promise<SerpResponse> {
         return result;
     }
 
-    // Try SearxNG (secondary self-hosted)
+    // Try SearxNG (self-hosted)
     result = await searchSearxNG(options);
+    if (result && result.organic.length > 0) {
+        saveToCache(options, result);
+        return result;
+    }
+
+    // 🆓 Try PUBLIC SearXNG instances (FREE, NO SETUP!)
+    result = await searchPublicSearxNG(options);
     if (result && result.organic.length > 0) {
         saveToCache(options, result);
         return result;
@@ -491,13 +593,11 @@ function extractDomain(url: string): string {
 
 /**
  * Check if any SERP provider is configured
+ * Returns TRUE by default because public SearXNG instances are always available!
  */
 export function isSerpConfigured(): boolean {
-    return !!(
-        SERP_CONFIG.novexityUrl ||
-        SERP_CONFIG.searxngUrl ||
-        SERP_CONFIG.serperApiKey
-    );
+    // Public instances are always available, so this is always true
+    return true;
 }
 
 /**
