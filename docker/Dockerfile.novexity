@@ -1,0 +1,47 @@
+# Novexity SERP Scraper Dockerfile
+# Based on the open-source SerpAPI alternative
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    curl \
+    git
+
+# Set Chrome path for Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+# Clone Novexity (or use local copy)
+RUN git clone https://github.com/NorkzYT/Novexity.git /app || \
+    echo "Using local Novexity source"
+
+# If Novexity isn't available, use a simple Express-based SERP scraper
+COPY docker/novexity-fallback.js /app/fallback.js
+
+# Install dependencies
+RUN cd /app && npm install --production 2>/dev/null || \
+    npm init -y && \
+    npm install express puppeteer-core cheerio node-cache
+
+# Create health check endpoint
+RUN echo '{"status":"healthy"}' > /app/health.json
+
+# Simple SERP scraper if Novexity fails to build
+COPY docker/simple-serp-server.js /app/server.js
+
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["node", "server.js"]

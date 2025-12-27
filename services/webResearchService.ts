@@ -1,9 +1,18 @@
 /**
  * Web Research Service
  * Provides real-time web scraping and search capabilities for marketing insights
+ * 
+ * Priority: Self-hosted SERP → Serper API → Tavily → Mock
  */
 
-// API Configuration
+import {
+    searchSERP,
+    searchNews as serpSearchNews,
+    isSerpConfigured,
+    SerpResult
+} from './serpScraperService';
+
+// API Configuration (fallback to paid services if self-hosted not available)
 const SERPER_API_KEY = import.meta.env.VITE_SERPER_API_KEY || '';
 const TAVILY_API_KEY = import.meta.env.VITE_TAVILY_API_KEY || '';
 
@@ -37,41 +46,63 @@ export interface CompetitorInsight {
 }
 
 /**
- * Search the web using Serper API (Google Search)
- * Free tier: 2,500 queries/month
+ * Search the web using self-hosted SERP scraper (primary) or Serper API (fallback)
+ * Self-hosted: Unlimited, free
+ * Serper: 2,500 queries/month (free tier)
  */
 export async function searchWeb(query: string, count: number = 10): Promise<SearchResult[]> {
-    if (!SERPER_API_KEY) {
-        console.log('[WebResearch] Serper API key not configured, using fallback');
-        return generateMockSearchResults(query, count);
+    // Try self-hosted SERP scraper first (unlimited, free)
+    if (isSerpConfigured()) {
+        try {
+            console.log('[WebResearch] Using self-hosted SERP scraper');
+            const result = await searchSERP({ query, count });
+
+            if (result.organic.length > 0 && result.provider !== 'mock') {
+                return result.organic.map(item => ({
+                    title: item.title,
+                    url: item.url,
+                    snippet: item.snippet,
+                    date: item.date,
+                }));
+            }
+        } catch (error) {
+            console.error('[WebResearch] Self-hosted SERP failed:', error);
+        }
     }
 
-    try {
-        const response = await fetch('https://google.serper.dev/search', {
-            method: 'POST',
-            headers: {
-                'X-API-KEY': SERPER_API_KEY,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                q: query,
-                num: count
-            })
-        });
+    // Fallback to Serper API
+    if (SERPER_API_KEY) {
+        console.log('[WebResearch] Falling back to Serper API');
+        try {
+            const response = await fetch('https://google.serper.dev/search', {
+                method: 'POST',
+                headers: {
+                    'X-API-KEY': SERPER_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    q: query,
+                    num: count
+                })
+            });
 
-        if (!response.ok) throw new Error(`Serper API error: ${response.status}`);
-
-        const data = await response.json();
-        return (data.organic || []).map((item: any) => ({
-            title: item.title,
-            url: item.link,
-            snippet: item.snippet,
-            date: item.date
-        }));
-    } catch (error) {
-        console.error('[WebResearch] Search failed:', error);
-        return generateMockSearchResults(query, count);
+            if (response.ok) {
+                const data = await response.json();
+                return (data.organic || []).map((item: any) => ({
+                    title: item.title,
+                    url: item.link,
+                    snippet: item.snippet,
+                    date: item.date
+                }));
+            }
+        } catch (error) {
+            console.error('[WebResearch] Serper API failed:', error);
+        }
     }
+
+    // Last resort: mock results
+    console.log('[WebResearch] Using mock results');
+    return generateMockSearchResults(query, count);
 }
 
 /**
@@ -226,10 +257,10 @@ export async function getSocialMediaTrends(topic: string, platform: string = 'al
 }
 
 /**
- * Check if web research is available
+ * Check if web research is available (self-hosted or paid APIs)
  */
 export function isWebResearchConfigured(): boolean {
-    return !!SERPER_API_KEY || !!TAVILY_API_KEY;
+    return isSerpConfigured() || !!SERPER_API_KEY || !!TAVILY_API_KEY;
 }
 
 // --- Helper Functions ---

@@ -1,0 +1,72 @@
+# SearxNG Configuration
+# Place this file in config/searxng/settings.yml
+
+general:
+  debug: false
+  instance_name: "SocialAI Search"
+  contact_url: false
+  
+search:
+  safe_search: 0
+  autocomplete: "google"
+  default_lang: "en"
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "your-secret-key-change-this"
+  base_url: false
+  image_proxy: true
+  http_protocol_version: "1.0"
+  
+ui:
+  static_use_hash: true
+  default_locale: "en"
+  query_in_title: true
+  infinite_scroll: false
+  center_alignment: false
+  default_theme: simple
+  theme_args:
+    simple_style: auto
+    
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 15.0
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20
+  
+# Enable JSON output for API access
+formats:
+  - html
+  - json
+
+# Search engines configuration
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+    
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+    
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+    
+  - name: google news
+    engine: google_news
+    shortcut: gn
+    disabled: false
+
+# Rate limiting
+limiter:
+  - name: global
+    interval: 60
+    limit: 100
