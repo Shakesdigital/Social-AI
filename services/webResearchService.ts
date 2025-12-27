@@ -3,6 +3,7 @@
  * Provides real-time web scraping and search capabilities for marketing insights
  * 
  * Priority: Self-hosted SERP → Serper API → Tavily → Mock
+ * Features: URL validation, contact extraction, active link filtering
  */
 
 import {
@@ -11,6 +12,13 @@ import {
     isSerpConfigured,
     SerpResult
 } from './serpScraperService';
+
+import {
+    enrichSearchResults,
+    findOutreachLeads,
+    extractContactsFromText,
+    ContactInfo,
+} from './urlValidationService';
 
 // API Configuration (fallback to paid services if self-hosted not available)
 const SERPER_API_KEY = import.meta.env.VITE_SERPER_API_KEY || '';
@@ -21,6 +29,9 @@ export interface SearchResult {
     url: string;
     snippet: string;
     date?: string;
+    domain?: string;
+    isActive?: boolean;
+    contacts?: ContactInfo;
 }
 
 export interface TrendingData {
@@ -41,8 +52,10 @@ export interface NewsArticle {
 export interface CompetitorInsight {
     name: string;
     website: string;
+    isActive?: boolean;
     recentActivities: string[];
     socialPresence: string[];
+    contactInfo?: ContactInfo;
 }
 
 /**
@@ -103,6 +116,60 @@ export async function searchWeb(query: string, count: number = 10): Promise<Sear
     // Last resort: mock results
     console.log('[WebResearch] Using mock results');
     return generateMockSearchResults(query, count);
+}
+
+/**
+ * Search the web with URL validation and contact extraction
+ * Ensures all returned URLs are active and includes contact information
+ */
+export async function searchWebValidated(
+    query: string,
+    count: number = 10,
+    options: {
+        validateUrls?: boolean;
+        extractContacts?: boolean;
+        filterInactive?: boolean;
+    } = {}
+): Promise<SearchResult[]> {
+    // Get raw search results
+    const rawResults = await searchWeb(query, count);
+
+    // Enrich with validation and contacts
+    const enriched = await enrichSearchResults(rawResults, {
+        validateUrls: options.validateUrls ?? true,
+        extractContacts: options.extractContacts ?? true,
+        filterInactive: options.filterInactive ?? false,
+    });
+
+    return enriched.map(r => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.snippet,
+        domain: r.domain,
+        isActive: r.isActive,
+        contacts: r.contacts,
+    }));
+}
+
+/**
+ * Search specifically for outreach leads with active contact information
+ * Returns only results that have at least one contact method
+ */
+export async function searchForOutreach(
+    query: string,
+    count: number = 20
+): Promise<Array<{
+    name: string;
+    website: string;
+    domain: string;
+    contactInfo: ContactInfo;
+    confidence: 'high' | 'medium' | 'low';
+}>> {
+    // Get raw search results
+    const rawResults = await searchWeb(query, count);
+
+    // Find leads with contact information
+    return findOutreachLeads(query, rawResults);
 }
 
 /**
@@ -216,6 +283,7 @@ export async function getTrendingTopics(industry: string): Promise<TrendingData[
 
 /**
  * Research competitors in an industry
+ * Returns only competitors with active websites and contact information
  */
 export async function researchCompetitors(
     companyName: string,
@@ -223,7 +291,13 @@ export async function researchCompetitors(
     location: string
 ): Promise<CompetitorInsight[]> {
     const query = `${industry} companies ${location} competitors like ${companyName}`;
-    const results = await searchWeb(query, 10);
+
+    // Use validated search to get only active URLs with contacts
+    const results = await searchWebValidated(query, 15, {
+        validateUrls: true,
+        extractContacts: true,
+        filterInactive: true, // Only return active websites
+    });
 
     // Deep research for more context if Tavily is available
     let deepContext = '';
@@ -308,11 +382,22 @@ function extractCompetitorsFromResults(results: SearchResult[], deepContext: str
             const domain = new URL(result.url).hostname.replace('www.', '');
             if (!seen.has(domain) && !domain.includes('google') && !domain.includes('bing')) {
                 seen.add(domain);
+
+                // Extract social presence from contacts
+                const socialPresence: string[] = [];
+                if (result.contacts?.socialLinks) {
+                    Object.entries(result.contacts.socialLinks).forEach(([platform, url]) => {
+                        if (url) socialPresence.push(`${platform}: ${url}`);
+                    });
+                }
+
                 competitors.push({
                     name: result.title.split(' - ')[0].split(' | ')[0].trim(),
                     website: result.url,
+                    isActive: result.isActive ?? true,
                     recentActivities: [result.snippet.slice(0, 100)],
-                    socialPresence: []
+                    socialPresence,
+                    contactInfo: result.contacts,
                 });
             }
         } catch (e) {
