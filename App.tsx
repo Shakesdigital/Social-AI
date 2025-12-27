@@ -339,9 +339,16 @@ export default function App() {
 
   const [view, setView] = useState<AppView>(() => {
     try {
-      // Critical Fix: Only go to Dashboard if profile actually exists
+      // Check if user has a profile and is not logged out
       const hasProfile = !!localStorage.getItem('socialai_profile');
-      return hasProfile ? AppView.DASHBOARD : AppView.LANDING;
+      const isLoggedOut = localStorage.getItem('socialai_logged_out') === 'true';
+
+      // If logged out or no profile, go to landing
+      if (isLoggedOut || !hasProfile) {
+        return AppView.LANDING;
+      }
+
+      return AppView.DASHBOARD;
     } catch (e) { return AppView.LANDING; }
   });
 
@@ -379,11 +386,14 @@ export default function App() {
   const handleOnboardingComplete = (p: CompanyProfile) => {
     setProfile(p);
     localStorage.setItem('socialai_profile', JSON.stringify(p));
+    localStorage.removeItem('socialai_logged_out'); // Clear logged out flag
     setView(AppView.DASHBOARD);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('socialai_profile');
+    // Don't delete data - just log out (preserve session for returning users)
+    // Set a flag indicating the user has a profile but is logged out
+    localStorage.setItem('socialai_logged_out', 'true');
     setProfile(null);
     setView(AppView.LANDING);
   };
@@ -478,7 +488,18 @@ export default function App() {
   }, [strategyState]);
 
   const renderContent = () => {
-    if (view === AppView.LANDING) return <LandingPage onGetStarted={() => setView(AppView.ONBOARDING)} />;
+    if (view === AppView.LANDING) {
+      return (
+        <LandingPage
+          onGetStarted={() => setView(AppView.ONBOARDING)}
+          onContinueAsUser={(p) => {
+            setProfile(p);
+            localStorage.removeItem('socialai_logged_out');
+            setView(AppView.DASHBOARD);
+          }}
+        />
+      );
+    }
     if (!profile && view !== AppView.ONBOARDING) return null;
     switch (view) {
       case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} />;
