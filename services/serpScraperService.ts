@@ -18,6 +18,12 @@
 // ============================================
 
 const SERP_CONFIG = {
+    // Vercel Serverless Function (when deployed on Vercel)
+    // This is auto-detected and routes through /api/serp
+    vercelProxy: typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+        ? '/api/serp'
+        : (import.meta.env.VITE_VERCEL_SERP_URL || ''),
+
     // Primary: Self-hosted Novexity instance
     novexityUrl: import.meta.env.VITE_NOVEXITY_URL || '',
     novexityApiKey: import.meta.env.VITE_NOVEXITY_API_KEY || '',
@@ -346,12 +352,58 @@ function generateMockResults(options: SerpOptions): SerpResponse {
 }
 
 // ============================================
+// VERCEL PROXY (when deployed on Vercel)
+// ============================================
+
+async function searchVercelProxy(options: SerpOptions): Promise<SerpResponse | null> {
+    if (!SERP_CONFIG.vercelProxy) {
+        return null;
+    }
+
+    console.log('[SERP] Using Vercel serverless proxy');
+
+    try {
+        const params = new URLSearchParams({
+            q: options.query,
+            num: String(options.count || 10),
+            gl: options.country || 'us',
+            hl: options.language || 'en',
+            type: options.type || 'web',
+        });
+
+        const response = await fetch(`${SERP_CONFIG.vercelProxy}?${params}`);
+
+        if (!response.ok) {
+            throw new Error(`Vercel proxy error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        return {
+            query: options.query,
+            organic: (data.organic || []).map((item: any) => ({
+                title: item.title,
+                url: item.url,
+                snippet: item.snippet,
+                position: item.position,
+                domain: item.domain,
+            })),
+            relatedSearches: data.relatedSearches || [],
+            provider: data.provider || 'vercel-proxy',
+        };
+    } catch (error) {
+        console.error('[SERP] Vercel proxy failed:', error);
+        return null;
+    }
+}
+
+// ============================================
 // MAIN SEARCH FUNCTION
 // ============================================
 
 /**
  * Search the web using self-hosted SERP scrapers
- * Tries providers in order: Cache → Novexity → SearxNG → Serper → Mock
+ * Tries providers in order: Cache → Vercel Proxy → Novexity → SearxNG → Serper → Mock
  */
 export async function searchSERP(options: SerpOptions): Promise<SerpResponse> {
     console.log('[SERP] Searching:', options.query);
@@ -360,8 +412,15 @@ export async function searchSERP(options: SerpOptions): Promise<SerpResponse> {
     const cached = getFromCache(options);
     if (cached) return cached;
 
+    // Try Vercel serverless proxy (when on Vercel)
+    let result = await searchVercelProxy(options);
+    if (result && result.organic.length > 0) {
+        saveToCache(options, result);
+        return result;
+    }
+
     // Try Novexity (primary self-hosted)
-    let result = await searchNovexity(options);
+    result = await searchNovexity(options);
     if (result && result.organic.length > 0) {
         saveToCache(options, result);
         return result;
