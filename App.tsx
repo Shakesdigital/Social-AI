@@ -168,8 +168,20 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
   );
 };
 
-const ResearchView: React.FC<{ profile: CompanyProfile, report: ResearchReport | null, setReport: any }> = ({ profile, report, setReport }) => {
+const ResearchView: React.FC<{
+  profile: CompanyProfile,
+  savedState?: { report: ResearchReport | null },
+  onStateChange?: (state: { report: ResearchReport | null }) => void
+}> = ({ profile, savedState, onStateChange }) => {
   const [loading, setLoading] = useState(false);
+  const report = savedState?.report || null;
+
+  const setReport = (newReport: ResearchReport | null) => {
+    if (onStateChange) {
+      onStateChange({ report: newReport });
+    }
+  };
+
   const runResearch = async () => {
     setLoading(true);
     try {
@@ -181,9 +193,11 @@ const ResearchView: React.FC<{ profile: CompanyProfile, report: ResearchReport |
       setLoading(false);
     }
   };
+
   useEffect(() => {
     if (!report) runResearch();
   }, []);
+
   if (loading) return <div className="p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse">Analysing market with Google Search...</div></div>;
   return (
     <div className="p-8 h-full overflow-y-auto">
@@ -220,10 +234,26 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: React.Re
   </button>
 );
 
-const StrategyWrapper: React.FC<{ profile: CompanyProfile, researchText: string }> = ({ profile, researchText }) => {
-  const [strategy, setStrategy] = useState<string>('');
+const StrategyWrapper: React.FC<{
+  profile: CompanyProfile,
+  researchText: string,
+  savedState?: { strategy: string },
+  onStateChange?: (state: { strategy: string }) => void
+}> = ({ profile, researchText, savedState, onStateChange }) => {
+  const [strategy, setStrategyLocal] = useState<string>(savedState?.strategy || '');
   const [loading, setLoading] = useState(false);
+
+  const setStrategy = (newStrategy: string) => {
+    setStrategyLocal(newStrategy);
+    if (onStateChange) {
+      onStateChange({ strategy: newStrategy });
+    }
+  };
+
   useEffect(() => {
+    // Only fetch if we don't have a saved strategy
+    if (savedState?.strategy) return;
+
     const fetch = async () => {
       setLoading(true);
       try {
@@ -237,8 +267,28 @@ const StrategyWrapper: React.FC<{ profile: CompanyProfile, researchText: string 
     };
     fetch();
   }, []);
+
+  const handleRegenerate = async () => {
+    setLoading(true);
+    try {
+      const res = await generateMarketingStrategy(profile, researchText || "No prior research.");
+      setStrategy(res);
+    } catch (e: any) {
+      setStrategy(`Failed to generate strategy: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) return <div className="flex flex-col items-center justify-center h-96 text-center"><p>Thinking deeply...</p></div>;
-  return <div className="bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>;
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        <button onClick={handleRegenerate} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate Strategy</button>
+      </div>
+      <div className="bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>
+    </div>
+  );
 };
 
 // --- Main App Component ---
@@ -270,7 +320,6 @@ export default function App() {
     if (!hasLLM) setHasApiKey(false);
   }, []);
 
-  const [report, setReport] = useState<ResearchReport | null>(null);
   const [isLiveOpen, setIsLiveOpen] = useState(false);
   const [leadsForEmail, setLeadsForEmail] = useState<Lead[]>([]);
 
@@ -329,6 +378,22 @@ export default function App() {
     } catch { return null; }
   });
 
+  // Research state
+  const [researchState, setResearchState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('socialai_research_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Strategy state
+  const [strategyState, setStrategyState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('socialai_strategy_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
   // Save states to localStorage when they change
   useEffect(() => {
     if (calendarState) {
@@ -354,14 +419,26 @@ export default function App() {
     }
   }, [emailState]);
 
+  useEffect(() => {
+    if (researchState) {
+      localStorage.setItem('socialai_research_state', JSON.stringify(researchState));
+    }
+  }, [researchState]);
+
+  useEffect(() => {
+    if (strategyState) {
+      localStorage.setItem('socialai_strategy_state', JSON.stringify(strategyState));
+    }
+  }, [strategyState]);
+
   const renderContent = () => {
     if (view === AppView.LANDING) return <LandingPage onGetStarted={() => setView(AppView.ONBOARDING)} />;
     if (!profile && view !== AppView.ONBOARDING) return null;
     switch (view) {
       case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} />;
       case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
-      case AppView.RESEARCH: return <ResearchView profile={profile!} report={report} setReport={setReport} />;
-      case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={report?.rawContent || ''} /></div>;
+      case AppView.RESEARCH: return <ResearchView profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
+      case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
       case AppView.CALENDAR: return <CalendarView profile={profile!} savedState={calendarState} onStateChange={setCalendarState} />;
       case AppView.LEADS: return <LeadsView profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
       case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
