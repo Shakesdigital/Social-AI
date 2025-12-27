@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb } from 'lucide-react';
-import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
+import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 
@@ -140,12 +140,52 @@ Always aim to HELP the user take action, not just inform them. Be specific to th
       setMessages(prev => [...prev, { role: 'model', text: response.text }]);
     } catch (e: any) {
       console.error('Chat error:', e);
-      setMessages(prev => [...prev, {
-        role: 'model',
-        text: hasFreeLLMConfigured()
-          ? "I encountered an error processing your request. Please try again."
-          : "Please configure an LLM API key (Groq recommended) to enable the chat assistant."
-      }]);
+
+      // Handle graceful degradation for all providers failing
+      if (e instanceof AllProvidersFailedError) {
+        // Show friendly retry message
+        setMessages(prev => [...prev, {
+          role: 'model',
+          text: "Taking a quick breather — trying again..."
+        }]);
+
+        // Auto-retry after 3 seconds
+        setTimeout(async () => {
+          try {
+            const retryResponse = await callLLM(prompt, {
+              type: 'fast',
+              systemPrompt: `You are SocialAI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
+${profile ? `You are helping ${profile.name} in the ${profile.industry} industry.` : ''}
+Give specific, actionable advice. Be concise but comprehensive.`,
+              temperature: 0.8
+            });
+
+            addToConversation('assistant', retryResponse.text);
+            // Remove the "breather" message and add the actual response
+            setMessages(prev => [
+              ...prev.slice(0, -1),
+              { role: 'model', text: retryResponse.text }
+            ]);
+          } catch (retryError) {
+            console.error('Retry also failed:', retryError);
+            // Replace "breather" message with apologetic message
+            setMessages(prev => [
+              ...prev.slice(0, -1),
+              { role: 'model', text: "I'm having a bit of trouble connecting right now. Please try again in a moment! 🙏" }
+            ]);
+          }
+        }, 3000);
+      } else if (!hasFreeLLMConfigured()) {
+        setMessages(prev => [...prev, {
+          role: 'model',
+          text: "Please configure an LLM API key (Groq recommended) to enable the chat assistant."
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'model',
+          text: "I encountered a hiccup processing your request. Let me try that again..."
+        }]);
+      }
     } finally {
       setIsLoading(false);
       setIsResearching(false);

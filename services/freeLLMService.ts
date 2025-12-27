@@ -1,23 +1,66 @@
+/**
+ * Free LLM Service with Automatic Provider Fallback
+ * 
+ * This service provides seamless, uninterrupted LLM access by automatically
+ * falling back to alternative providers when the primary provider fails.
+ * 
+ * Features:
+ * - Automatic fallback chain: Groq → OpenRouter → HuggingFace
+ * - Silent switching (no user-visible errors during fallback)
+ * - Smart error detection (rate limits, quota exhaustion, server errors)
+ * - Health tracking with cooldown periods for failed providers
+ * - Console logging for monitoring (never exposed to users)
+ * - Retry logic with exponential backoff
+ * - Graceful degradation with friendly messages when all providers fail
+ */
+
 import { LLMProvider, LLMQuotaStatus, LLMResponse } from '../types';
+import {
+    API_KEYS,
+    PROVIDER_PRIORITY,
+    QUOTA_LIMITS,
+    MODELS,
+    API_ENDPOINTS,
+    ERROR_PATTERNS,
+    RETRY_CONFIG,
+    QUOTA_STORAGE_KEY,
+    HEALTH_STORAGE_KEY,
+    ProviderHealth,
+    hasValidApiKey,
+    getConfiguredProviders,
+    detectErrorType,
+    calculateRetryDelay,
+    sleep,
+} from './llmProviderConfig';
 
-// Configuration
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
-const HUGGINGFACE_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY || '';
+// ============================================
+// TYPES
+// ============================================
 
-const QUOTA_LIMITS: Record<LLMProvider, number> = {
-    groq: 14400, openrouter: 200, huggingface: 1000, openai: 0
-};
+export interface LLMOptions {
+    type?: 'fast' | 'reasoning';
+    systemPrompt?: string;
+    temperature?: number;
+    maxTokens?: number;
+}
 
-const MODELS = {
-    groq: { fast: 'llama-3.3-70b-versatile', reasoning: 'llama-3.3-70b-versatile' },
-    openrouter: { fast: 'meta-llama/llama-3.2-3b-instruct:free', reasoning: 'meta-llama/llama-3.1-8b-instruct:free' },
-    huggingface: { fast: 'HuggingFaceH4/zephyr-7b-beta', reasoning: 'mistralai/Mixtral-8x7B-Instruct-v0.1' }
-};
+interface StoredQuota {
+    date: string;
+    usage: Record<LLMProvider, number>;
+}
 
-const QUOTA_STORAGE_KEY = 'socialai_llm_quota';
+interface ProviderCallResult {
+    success: boolean;
+    text?: string;
+    error?: Error;
+    statusCode?: number;
+    shouldFallback?: boolean;
+    cooldownMs?: number;
+}
 
-interface StoredQuota { date: string; usage: Record<LLMProvider, number>; }
+// ============================================
+// QUOTA MANAGEMENT
+// ============================================
 
 function getStoredQuota(): StoredQuota {
     try {
@@ -26,8 +69,13 @@ function getStoredQuota(): StoredQuota {
             const parsed = JSON.parse(stored);
             if (parsed.date === new Date().toDateString()) return parsed;
         }
-    } catch (e) { console.warn('Quota parse error:', e); }
-    const newQuota: StoredQuota = { date: new Date().toDateString(), usage: { groq: 0, openrouter: 0, huggingface: 0, openai: 0 } };
+    } catch (e) {
+        console.warn('[LLM Quota] Parse error:', e);
+    }
+    const newQuota: StoredQuota = {
+        date: new Date().toDateString(),
+        usage: { groq: 0, openrouter: 0, huggingface: 0, openai: 0 }
+    };
     localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(newQuota));
     return newQuota;
 }
@@ -40,10 +88,19 @@ function incrementQuota(provider: LLMProvider): void {
 
 export function getQuotaStatus(): Record<LLMProvider, LLMQuotaStatus> {
     const quota = getStoredQuota();
-    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 0, 0, 0);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
     return (['groq', 'openrouter', 'huggingface', 'openai'] as LLMProvider[]).reduce((acc, provider) => {
         const used = quota.usage[provider] || 0;
-        acc[provider] = { provider, used, limit: QUOTA_LIMITS[provider], remaining: Math.max(0, QUOTA_LIMITS[provider] - used), resetTime: tomorrow };
+        acc[provider] = {
+            provider,
+            used,
+            limit: QUOTA_LIMITS[provider],
+            remaining: Math.max(0, QUOTA_LIMITS[provider] - used),
+            resetTime: tomorrow
+        };
         return acc;
     }, {} as Record<LLMProvider, LLMQuotaStatus>);
 }
@@ -51,118 +108,456 @@ export function getQuotaStatus(): Record<LLMProvider, LLMQuotaStatus> {
 export function getQuotaWarning(): string | null {
     const status = getQuotaStatus();
     for (const provider of ['groq', 'openrouter', 'huggingface'] as LLMProvider[]) {
-        const pct = status[provider].limit > 0 ? (status[provider].used / status[provider].limit) * 100 : 0;
-        if (pct >= 90) return `Warning: ${provider.toUpperCase()} at ${pct.toFixed(0)}% quota`;
+        const pct = status[provider].limit > 0
+            ? (status[provider].used / status[provider].limit) * 100
+            : 0;
+        if (pct >= 90) {
+            return `Warning: ${provider.toUpperCase()} at ${pct.toFixed(0)}% quota`;
+        }
     }
     return null;
 }
 
-function isProviderAvailable(p: LLMProvider): boolean {
-    const q = getQuotaStatus()[p];
-    if (p === 'groq') return !!GROQ_API_KEY && q.remaining > 0;
-    if (p === 'openrouter') return !!OPENROUTER_API_KEY && q.remaining > 0;
-    if (p === 'huggingface') return !!HUGGINGFACE_API_KEY && q.remaining > 0;
-    return false;
-}
+// ============================================
+// PROVIDER HEALTH TRACKING
+// ============================================
 
-function getAvailableProvider(): LLMProvider | null {
-    for (const p of ['groq', 'openrouter', 'huggingface'] as LLMProvider[]) {
-        if (isProviderAvailable(p)) return p;
+function getProviderHealth(): Record<LLMProvider, ProviderHealth> {
+    try {
+        const stored = localStorage.getItem(HEALTH_STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    } catch (e) {
+        console.warn('[LLM Health] Parse error:', e);
     }
-    return null;
+
+    return PROVIDER_PRIORITY.reduce((acc, provider) => {
+        acc[provider] = {
+            provider,
+            isHealthy: true,
+            consecutiveFailures: 0,
+            successRate: 1,
+        };
+        return acc;
+    }, {} as Record<LLMProvider, ProviderHealth>);
 }
 
-export interface LLMOptions {
-    type?: 'fast' | 'reasoning';
-    systemPrompt?: string;
-    temperature?: number;
-    maxTokens?: number;
+function updateProviderHealth(
+    provider: LLMProvider,
+    success: boolean,
+    error?: string,
+    cooldownMs?: number
+): void {
+    const health = getProviderHealth();
+    const now = Date.now();
+
+    if (!health[provider]) {
+        health[provider] = {
+            provider,
+            isHealthy: true,
+            consecutiveFailures: 0,
+            successRate: 1,
+        };
+    }
+
+    if (success) {
+        health[provider].isHealthy = true;
+        health[provider].consecutiveFailures = 0;
+        health[provider].lastError = undefined;
+        health[provider].lastErrorTime = undefined;
+        // Improve success rate
+        health[provider].successRate = Math.min(1, health[provider].successRate + 0.1);
+    } else {
+        health[provider].consecutiveFailures++;
+        health[provider].lastError = error;
+        health[provider].lastErrorTime = now;
+        // Decrease success rate
+        health[provider].successRate = Math.max(0, health[provider].successRate - 0.2);
+
+        // Mark unhealthy if too many consecutive failures
+        if (health[provider].consecutiveFailures >= 3) {
+            health[provider].isHealthy = false;
+        }
+
+        // Set cooldown if specified
+        if (cooldownMs && cooldownMs > 0) {
+            health[provider].cooldownUntil = now + cooldownMs;
+            console.log(`[LLM Fallback] ${provider} in cooldown for ${cooldownMs / 1000}s`);
+        }
+    }
+
+    localStorage.setItem(HEALTH_STORAGE_KEY, JSON.stringify(health));
 }
 
-async function callGroq(prompt: string, opts: LLMOptions): Promise<string> {
+function isProviderInCooldown(provider: LLMProvider): boolean {
+    const health = getProviderHealth();
+    if (!health[provider]?.cooldownUntil) return false;
+    return Date.now() < health[provider].cooldownUntil;
+}
+
+// ============================================
+// PROVIDER AVAILABILITY
+// ============================================
+
+function isProviderAvailable(provider: LLMProvider): boolean {
+    // Check API key
+    if (!hasValidApiKey(provider)) {
+        return false;
+    }
+
+    // Check quota
+    const quota = getQuotaStatus()[provider];
+    if (quota.remaining <= 0) {
+        return false;
+    }
+
+    // Check cooldown
+    if (isProviderInCooldown(provider)) {
+        return false;
+    }
+
+    return true;
+}
+
+function getAvailableProviders(): LLMProvider[] {
+    return PROVIDER_PRIORITY.filter(isProviderAvailable);
+}
+
+export function hasFreeLLMConfigured(): boolean {
+    return getConfiguredProviders().length > 0;
+}
+
+// ============================================
+// PROVIDER-SPECIFIC API CALLS
+// ============================================
+
+async function callGroq(prompt: string, opts: LLMOptions): Promise<ProviderCallResult> {
     const model = opts.type === 'reasoning' ? MODELS.groq.reasoning : MODELS.groq.fast;
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model,
-            messages: [...(opts.systemPrompt ? [{ role: 'system', content: opts.systemPrompt }] : []), { role: 'user', content: prompt }],
-            temperature: opts.temperature ?? 0.7, max_tokens: opts.maxTokens ?? 2048
-        })
-    });
-    if (!res.ok) throw new Error(`Groq error: ${res.status}`);
-    const data = await res.json();
-    return data.choices[0]?.message?.content || '';
+
+    try {
+        const res = await fetch(API_ENDPOINTS.groq, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${API_KEYS.groq}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    ...(opts.systemPrompt ? [{ role: 'system', content: opts.systemPrompt }] : []),
+                    { role: 'user', content: prompt }
+                ],
+                temperature: opts.temperature ?? 0.7,
+                max_tokens: opts.maxTokens ?? MODELS.groq.maxTokens
+            })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.text();
+            const errorType = detectErrorType({ message: errorBody }, res.status);
+            const pattern = errorType ? ERROR_PATTERNS[errorType] : null;
+
+            return {
+                success: false,
+                error: new Error(`Groq API error ${res.status}: ${errorBody}`),
+                statusCode: res.status,
+                shouldFallback: pattern?.shouldFallback ?? true,
+                cooldownMs: pattern?.cooldownMs,
+            };
+        }
+
+        const data = await res.json();
+        return {
+            success: true,
+            text: data.choices[0]?.message?.content || '',
+        };
+    } catch (e: any) {
+        const errorType = detectErrorType(e);
+        const pattern = errorType ? ERROR_PATTERNS[errorType] : null;
+
+        return {
+            success: false,
+            error: e,
+            shouldFallback: pattern?.shouldFallback ?? true,
+            cooldownMs: pattern?.cooldownMs,
+        };
+    }
 }
 
-async function callOpenRouter(prompt: string, opts: LLMOptions): Promise<string> {
+async function callOpenRouter(prompt: string, opts: LLMOptions): Promise<ProviderCallResult> {
     const model = opts.type === 'reasoning' ? MODELS.openrouter.reasoning : MODELS.openrouter.fast;
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'HTTP-Referer': window.location.origin },
-        body: JSON.stringify({
-            model,
-            messages: [...(opts.systemPrompt ? [{ role: 'system', content: opts.systemPrompt }] : []), { role: 'user', content: prompt }],
-            temperature: opts.temperature ?? 0.7, max_tokens: opts.maxTokens ?? 2048
-        })
-    });
-    if (!res.ok) throw new Error(`OpenRouter error: ${res.status}`);
-    const data = await res.json();
-    return data.choices[0]?.message?.content || '';
+
+    try {
+        const res = await fetch(API_ENDPOINTS.openrouter, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${API_KEYS.openrouter}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://socialai.app',
+                'X-Title': 'SocialAI Marketing Assistant'
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    ...(opts.systemPrompt ? [{ role: 'system', content: opts.systemPrompt }] : []),
+                    { role: 'user', content: prompt }
+                ],
+                temperature: opts.temperature ?? 0.7,
+                max_tokens: opts.maxTokens ?? MODELS.openrouter.maxTokens
+            })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.text();
+            const errorType = detectErrorType({ message: errorBody }, res.status);
+            const pattern = errorType ? ERROR_PATTERNS[errorType] : null;
+
+            return {
+                success: false,
+                error: new Error(`OpenRouter API error ${res.status}: ${errorBody}`),
+                statusCode: res.status,
+                shouldFallback: pattern?.shouldFallback ?? true,
+                cooldownMs: pattern?.cooldownMs,
+            };
+        }
+
+        const data = await res.json();
+        return {
+            success: true,
+            text: data.choices[0]?.message?.content || '',
+        };
+    } catch (e: any) {
+        const errorType = detectErrorType(e);
+        const pattern = errorType ? ERROR_PATTERNS[errorType] : null;
+
+        return {
+            success: false,
+            error: e,
+            shouldFallback: pattern?.shouldFallback ?? true,
+            cooldownMs: pattern?.cooldownMs,
+        };
+    }
 }
 
-async function callHuggingFace(prompt: string, opts: LLMOptions): Promise<string> {
+async function callHuggingFace(prompt: string, opts: LLMOptions): Promise<ProviderCallResult> {
     const model = opts.type === 'reasoning' ? MODELS.huggingface.reasoning : MODELS.huggingface.fast;
+
+    // HuggingFace doesn't support system prompts natively, so we format it manually
     const systemPart = opts.systemPrompt ? `System: ${opts.systemPrompt}\n\n` : '';
     const formatted = `${systemPart}User: ${prompt}\n\nAssistant:`;
 
-    const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            inputs: formatted,
-            parameters: { temperature: opts.temperature ?? 0.7, max_new_tokens: opts.maxTokens ?? 1024, return_full_text: false }
-        })
-    });
-    if (!res.ok) throw new Error(`HuggingFace error: ${res.status}`);
-    const data = await res.json();
-    return Array.isArray(data) ? data[0]?.generated_text || '' : data.generated_text || '';
-}
+    try {
+        const res = await fetch(API_ENDPOINTS.huggingface(model), {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${API_KEYS.huggingface}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                inputs: formatted,
+                parameters: {
+                    temperature: opts.temperature ?? 0.7,
+                    max_new_tokens: opts.maxTokens ?? MODELS.huggingface.maxTokens,
+                    return_full_text: false
+                }
+            })
+        });
 
-// Main unified LLM call with automatic fallback
-export async function callLLM(prompt: string, options: LLMOptions = {}): Promise<LLMResponse> {
-    const providers: LLMProvider[] = ['groq', 'openrouter', 'huggingface'];
-    const errors: string[] = [];
+        if (!res.ok) {
+            const errorBody = await res.text();
+            const errorType = detectErrorType({ message: errorBody }, res.status);
+            const pattern = errorType ? ERROR_PATTERNS[errorType] : null;
 
-    for (const provider of providers) {
-        if (!isProviderAvailable(provider)) {
-            console.log(`[LLM] ${provider} not available, skipping`);
-            continue;
+            return {
+                success: false,
+                error: new Error(`HuggingFace API error ${res.status}: ${errorBody}`),
+                statusCode: res.status,
+                shouldFallback: pattern?.shouldFallback ?? true,
+                cooldownMs: pattern?.cooldownMs,
+            };
         }
 
-        try {
-            console.log(`[LLM] Trying ${provider}...`);
-            let text = '';
+        const data = await res.json();
+        const text = Array.isArray(data) ? data[0]?.generated_text || '' : data.generated_text || '';
 
-            switch (provider) {
-                case 'groq': text = await callGroq(prompt, options); break;
-                case 'openrouter': text = await callOpenRouter(prompt, options); break;
-                case 'huggingface': text = await callHuggingFace(prompt, options); break;
+        return {
+            success: true,
+            text: text.trim(),
+        };
+    } catch (e: any) {
+        const errorType = detectErrorType(e);
+        const pattern = errorType ? ERROR_PATTERNS[errorType] : null;
+
+        return {
+            success: false,
+            error: e,
+            shouldFallback: pattern?.shouldFallback ?? true,
+            cooldownMs: pattern?.cooldownMs,
+        };
+    }
+}
+
+// Provider call dispatcher
+async function callProvider(
+    provider: LLMProvider,
+    prompt: string,
+    opts: LLMOptions
+): Promise<ProviderCallResult> {
+    switch (provider) {
+        case 'groq':
+            return callGroq(prompt, opts);
+        case 'openrouter':
+            return callOpenRouter(prompt, opts);
+        case 'huggingface':
+            return callHuggingFace(prompt, opts);
+        default:
+            return {
+                success: false,
+                error: new Error(`Unknown provider: ${provider}`),
+                shouldFallback: true,
+            };
+    }
+}
+
+// ============================================
+// MAIN LLM CALL WITH AUTOMATIC FALLBACK
+// ============================================
+
+/**
+ * Call LLM with automatic provider fallback
+ * 
+ * This function transparently handles provider failures by automatically
+ * switching to the next available provider. The switch is silent and
+ * invisible to the end user.
+ * 
+ * @param prompt - The user prompt
+ * @param options - LLM options (type, systemPrompt, temperature, maxTokens)
+ * @returns LLMResponse with text and provider used
+ * @throws Error only when ALL providers have failed
+ */
+export async function callLLM(prompt: string, options: LLMOptions = {}): Promise<LLMResponse> {
+    const availableProviders = getAvailableProviders();
+    const errors: Array<{ provider: LLMProvider; error: string }> = [];
+    let totalAttempts = 0;
+
+    // Try each available provider in priority order
+    for (const provider of availableProviders) {
+        if (totalAttempts >= RETRY_CONFIG.maxTotalRetries) {
+            console.warn('[LLM Fallback] Max total retries reached');
+            break;
+        }
+
+        let retries = 0;
+
+        // Retry loop for current provider
+        while (retries < RETRY_CONFIG.maxRetriesPerProvider) {
+            totalAttempts++;
+
+            console.log(`[LLM] Attempting ${provider} (attempt ${retries + 1}/${RETRY_CONFIG.maxRetriesPerProvider})`);
+
+            const result = await callProvider(provider, prompt, options);
+
+            if (result.success && result.text) {
+                // Success! Update health tracking and quota
+                updateProviderHealth(provider, true);
+                incrementQuota(provider);
+
+                // Log the successful provider (for admin monitoring)
+                if (errors.length > 0) {
+                    console.log(`[LLM Fallback] Successfully switched to ${provider} after ${errors.length} failed attempts`);
+                } else {
+                    console.log(`[LLM] Success with primary provider: ${provider}`);
+                }
+
+                return {
+                    text: result.text,
+                    provider,
+                };
             }
 
-            incrementQuota(provider);
-            console.log(`[LLM] Success with ${provider}`);
-            return { text, provider };
-        } catch (e: any) {
-            console.warn(`[LLM] ${provider} failed:`, e.message);
-            errors.push(`${provider}: ${e.message}`);
+            // Handle failure
+            const errorMsg = result.error?.message || 'Unknown error';
+            errors.push({ provider, error: errorMsg });
+
+            // Update health tracking
+            updateProviderHealth(provider, false, errorMsg, result.cooldownMs);
+
+            // Log the switch (admin monitoring only, never shown to users)
+            console.warn(
+                `[LLM Fallback] ${provider} failed (${result.statusCode || 'network'}): ${errorMsg.substring(0, 100)}`
+            );
+
+            // Should we retry on this provider or move to next?
+            if (!result.shouldFallback) {
+                // Error type doesn't warrant fallback, maybe wait and retry
+                const delay = calculateRetryDelay(retries);
+                console.log(`[LLM Fallback] Retrying ${provider} in ${delay}ms...`);
+                await sleep(delay);
+                retries++;
+            } else {
+                // Move to next provider immediately
+                console.log(`[LLM Fallback] Switching from ${provider} to next provider due to: ${detectErrorType(result.error, result.statusCode) || 'error'}`);
+                break;
+            }
         }
     }
 
-    throw new Error(`All LLM providers failed: ${errors.join('; ')}`);
+    // ============================================
+    // ALL PROVIDERS FAILED - GRACEFUL DEGRADATION
+    // ============================================
+
+    // Log detailed failure info for debugging
+    console.error('[LLM Fallback] All providers failed:', errors);
+
+    // Final retry attempt after a short delay
+    console.log('[LLM Fallback] Waiting before final retry attempt...');
+    await sleep(2000);
+
+    // One more attempt on the healthiest available provider
+    const lastChanceProvider = availableProviders[0];
+    if (lastChanceProvider) {
+        console.log(`[LLM Fallback] Final attempt with ${lastChanceProvider}...`);
+        const finalResult = await callProvider(lastChanceProvider, prompt, options);
+
+        if (finalResult.success && finalResult.text) {
+            updateProviderHealth(lastChanceProvider, true);
+            incrementQuota(lastChanceProvider);
+            console.log(`[LLM Fallback] Final retry successful with ${lastChanceProvider}`);
+            return {
+                text: finalResult.text,
+                provider: lastChanceProvider,
+            };
+        }
+    }
+
+    // Throw a user-friendly error that will be caught by the UI
+    throw new AllProvidersFailedError(errors);
 }
 
-// Helper to parse JSON from LLM response
+// ============================================
+// CUSTOM ERROR CLASSES
+// ============================================
+
+export class AllProvidersFailedError extends Error {
+    public readonly errors: Array<{ provider: LLMProvider; error: string }>;
+    public readonly friendlyMessage: string;
+
+    constructor(errors: Array<{ provider: LLMProvider; error: string }>) {
+        super('All LLM providers failed');
+        this.name = 'AllProvidersFailedError';
+        this.errors = errors;
+        this.friendlyMessage = "Taking a quick breather — trying again...";
+    }
+}
+
+// ============================================
+// JSON PARSING UTILITY
+// ============================================
+
+/**
+ * Parse JSON from LLM response with multiple fallback patterns
+ */
 export function parseJSONFromLLM<T>(text: string): T | null {
     if (!text || typeof text !== 'string') {
         console.warn('[parseJSON] No text provided');
@@ -207,7 +602,35 @@ export function parseJSONFromLLM<T>(text: string): T | null {
     }
 }
 
-// Check if any free LLM provider is configured
-export function hasFreeLLMConfigured(): boolean {
-    return !!GROQ_API_KEY || !!OPENROUTER_API_KEY || !!HUGGINGFACE_API_KEY;
+// ============================================
+// ADMIN/DEBUG UTILITIES
+// ============================================
+
+/**
+ * Get current provider health status (for admin dashboard)
+ */
+export function getProviderHealthStatus(): Record<LLMProvider, ProviderHealth> {
+    return getProviderHealth();
+}
+
+/**
+ * Force reset health status for a provider (admin action)
+ */
+export function resetProviderHealth(provider: LLMProvider): void {
+    const health = getProviderHealth();
+    health[provider] = {
+        provider,
+        isHealthy: true,
+        consecutiveFailures: 0,
+        successRate: 1,
+    };
+    localStorage.setItem(HEALTH_STORAGE_KEY, JSON.stringify(health));
+    console.log(`[LLM Admin] Reset health for ${provider}`);
+}
+
+/**
+ * Get list of currently available providers (for debugging)
+ */
+export function getAvailableProvidersList(): LLMProvider[] {
+    return getAvailableProviders();
 }

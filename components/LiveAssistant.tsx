@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle, Play, Square, Settings, User, Users } from 'lucide-react';
-import { callLLM, hasFreeLLMConfigured } from '../services/freeLLMService';
+import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 
@@ -305,7 +305,33 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
 
     } catch (e: any) {
       addDiagnostic(`Error: ${e.message}`);
-      setResponse('Sorry, an error occurred.');
+
+      // Handle graceful degradation for all providers failing
+      if (e instanceof AllProvidersFailedError) {
+        setResponse("Taking a quick breather — trying again...");
+        setStatus('Retrying in a moment...');
+
+        // Auto-retry after short delay
+        setTimeout(async () => {
+          try {
+            const retryResponse = await callLLM(`${userText}\n\nRespond briefly (2-3 sentences).`, {
+              type: 'fast',
+              temperature: 0.8
+            });
+            setResponse(retryResponse.text);
+            setConversationHistory(prev => [...prev, { role: 'assistant', text: retryResponse.text }].slice(-10));
+            addToConversation('assistant', retryResponse.text);
+            await speak(retryResponse.text);
+          } catch (retryError) {
+            setResponse("I'm having trouble connecting right now. Please try again in a moment!");
+            setStatus('Please try again.');
+          }
+          setIsThinking(false);
+        }, 3000);
+        return; // Don't set isThinking to false yet
+      }
+
+      setResponse('Sorry, an error occurred. Please try again.');
       setStatus('Error. Try again.');
       setIsThinking(false);
     }
@@ -596,8 +622,8 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
               <button
                 onClick={() => handleVoiceChange('female')}
                 className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1 transition-all ${voicePreference === 'female'
-                    ? 'bg-pink-500 text-white shadow'
-                    : 'text-slate-600 hover:bg-slate-200'
+                  ? 'bg-pink-500 text-white shadow'
+                  : 'text-slate-600 hover:bg-slate-200'
                   }`}
               >
                 <User size={12} /> Female
@@ -605,8 +631,8 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
               <button
                 onClick={() => handleVoiceChange('male')}
                 className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1 transition-all ${voicePreference === 'male'
-                    ? 'bg-blue-500 text-white shadow'
-                    : 'text-slate-600 hover:bg-slate-200'
+                  ? 'bg-blue-500 text-white shadow'
+                  : 'text-slate-600 hover:bg-slate-200'
                   }`}
               >
                 <Users size={12} /> Male
