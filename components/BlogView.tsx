@@ -3,20 +3,19 @@ import { FileText, TrendingUp, Loader, Plus, Calendar, ExternalLink, Copy, BarCh
 import { CompanyProfile, BlogPost, TrendingTopic } from '../types';
 import { researchTrendingTopics, generateBlogPost, publishToWordPress } from '../services/blogService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
-import { saveBlogState, loadBlogState } from '../services/stateService';
 import ReactMarkdown from 'react-markdown';
 
 interface BlogViewProps {
     profile: CompanyProfile;
     onAddToCalendar?: (post: BlogPost) => void;
+    savedState?: any;
+    onStateChange?: (state: any) => void;
 }
 
-export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) => {
+export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, savedState, onStateChange }) => {
     const { quotaWarning, isConfigured } = useFreeLLM();
 
-    // Load saved state on mount
-    const savedState = loadBlogState();
-
+    // Initialize from savedState prop (passed from App)
     const [topics, setTopics] = useState<TrendingTopic[]>(savedState?.topics || []);
     const [posts, setPosts] = useState<BlogPost[]>(savedState?.posts || []);
     const [selectedPost, setSelectedPost] = useState<BlogPost | null>(savedState?.selectedPost || null);
@@ -25,14 +24,16 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar }) 
     const [nicheInput, setNicheInput] = useState(savedState?.nicheInput || profile.industry);
     const [error, setError] = useState<string | null>(null);
 
-    // Save state when it changes
+    // Notify parent of state changes for persistence
     useEffect(() => {
-        saveBlogState({
-            topics,
-            posts,
-            selectedPost,
-            nicheInput
-        });
+        if (onStateChange) {
+            onStateChange({
+                topics,
+                posts,
+                selectedPost,
+                nicheInput
+            });
+        }
     }, [topics, posts, selectedPost, nicheInput]);
 
     const handleResearchTopics = async () => {

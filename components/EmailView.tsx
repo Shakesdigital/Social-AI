@@ -3,19 +3,18 @@ import { Mail, Plus, Send, Copy, RefreshCw, Loader, Eye, Users, ChevronRight, X,
 import { CompanyProfile, Lead, EmailCampaign, EmailTemplate } from '../types';
 import { generateLeadEmail, generateEmailVariant, generateDripSequence, createCampaign, previewEmail } from '../services/emailService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
-import { saveEmailState, loadEmailState } from '../services/stateService';
 
 interface EmailViewProps {
     profile: CompanyProfile;
     leads: Lead[];
+    savedState?: any;
+    onStateChange?: (state: any) => void;
 }
 
-export const EmailView: React.FC<EmailViewProps> = ({ profile, leads }) => {
+export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState, onStateChange }) => {
     const { quotaWarning, isConfigured } = useFreeLLM();
 
-    // Load saved state on mount
-    const savedState = loadEmailState();
-
+    // Initialize from savedState prop (passed from App)
     const [campaigns, setCampaigns] = useState<EmailCampaign[]>(savedState?.campaigns || []);
     const [selectedCampaign, setSelectedCampaign] = useState<EmailCampaign | null>(savedState?.selectedCampaign || null);
     const [isLoading, setIsLoading] = useState(false);
@@ -25,13 +24,15 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads }) => {
     const [previewLead, setPreviewLead] = useState<Lead | null>(null);
     const [previewEmail_, setPreviewEmail_] = useState<{ subject: string; body: string } | null>(null);
 
-    // Save state when it changes
+    // Notify parent of state changes for persistence
     useEffect(() => {
-        saveEmailState({
-            campaigns,
-            selectedCampaign,
-            draftEmail: null
-        });
+        if (onStateChange) {
+            onStateChange({
+                campaigns,
+                selectedCampaign,
+                draftEmail: null
+            });
+        }
     }, [campaigns, selectedCampaign]);
 
     const handleCreateCampaign = () => {

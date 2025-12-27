@@ -3,19 +3,18 @@ import { Search, Download, Users, Building, MapPin, Loader, AlertTriangle, Plus,
 import { CompanyProfile, Lead, LeadSearchCriteria } from '../types';
 import { generateLeads, downloadCSV, getGDPRDisclaimer } from '../services/leadService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
-import { saveLeadsState, loadLeadsState } from '../services/stateService';
 
 interface LeadsViewProps {
     profile: CompanyProfile;
     onAddToEmailCampaign?: (leads: Lead[]) => void;
+    savedState?: any;
+    onStateChange?: (state: any) => void;
 }
 
-export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampaign }) => {
+export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampaign, savedState, onStateChange }) => {
     const { quotaWarning, isConfigured } = useFreeLLM();
 
-    // Load saved state on mount
-    const savedState = loadLeadsState();
-
+    // Initialize from savedState prop (passed from App)
     const [leads, setLeads] = useState<Lead[]>(savedState?.leads || []);
     const [selectedLeads, setSelectedLeads] = useState<Set<string>>(
         new Set(savedState?.selectedLeads || [])
@@ -32,13 +31,15 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
     });
     const [keywordInput, setKeywordInput] = useState('');
 
-    // Save state when it changes
+    // Notify parent of state changes for persistence
     useEffect(() => {
-        saveLeadsState({
-            leads,
-            selectedLeads: Array.from(selectedLeads),
-            criteria
-        });
+        if (onStateChange) {
+            onStateChange({
+                leads,
+                selectedLeads: Array.from(selectedLeads),
+                criteria
+            });
+        }
     }, [leads, selectedLeads, criteria]);
 
     const handleGenerateLeads = async () => {

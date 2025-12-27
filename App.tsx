@@ -293,6 +293,67 @@ export default function App() {
     setView(AppView.LANDING);
   };
 
+  // ========================================
+  // LIFTED STATE FOR COMPONENT PERSISTENCE
+  // ========================================
+
+  // Calendar state
+  const [calendarState, setCalendarState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('socialai_calendar_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Blog state
+  const [blogState, setBlogState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('socialai_blog_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Leads state
+  const [leadsState, setLeadsState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('socialai_leads_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Email state
+  const [emailState, setEmailState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('socialai_email_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Save states to localStorage when they change
+  useEffect(() => {
+    if (calendarState) {
+      localStorage.setItem('socialai_calendar_state', JSON.stringify(calendarState));
+    }
+  }, [calendarState]);
+
+  useEffect(() => {
+    if (blogState) {
+      localStorage.setItem('socialai_blog_state', JSON.stringify(blogState));
+    }
+  }, [blogState]);
+
+  useEffect(() => {
+    if (leadsState) {
+      localStorage.setItem('socialai_leads_state', JSON.stringify(leadsState));
+    }
+  }, [leadsState]);
+
+  useEffect(() => {
+    if (emailState) {
+      localStorage.setItem('socialai_email_state', JSON.stringify(emailState));
+    }
+  }, [emailState]);
+
   const renderContent = () => {
     if (view === AppView.LANDING) return <LandingPage onGetStarted={() => setView(AppView.ONBOARDING)} />;
     if (!profile && view !== AppView.ONBOARDING) return null;
@@ -301,10 +362,10 @@ export default function App() {
       case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
       case AppView.RESEARCH: return <ResearchView profile={profile!} report={report} setReport={setReport} />;
       case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={report?.rawContent || ''} /></div>;
-      case AppView.CALENDAR: return <CalendarView profile={profile!} />;
-      case AppView.LEADS: return <LeadsView profile={profile!} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
-      case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} />;
-      case AppView.BLOG: return <BlogView profile={profile!} />;
+      case AppView.CALENDAR: return <CalendarView profile={profile!} savedState={calendarState} onStateChange={setCalendarState} />;
+      case AppView.LEADS: return <LeadsView profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
+      case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
+      case AppView.BLOG: return <BlogView profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
       default: return <div>Not Implemented</div>;
     }
   };

@@ -16,10 +16,11 @@ import {
     generatePostImage,
     generateBatchContent
 } from '../services/openaiService';
-import { saveCalendarState, loadCalendarState } from '../services/stateService';
 
 interface CalendarViewProps {
     profile: CompanyProfile;
+    savedState?: any;
+    onStateChange?: (state: any) => void;
 }
 
 // Social platforms configuration
@@ -41,10 +42,8 @@ interface ConnectedAccount {
     lastSync?: Date;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
-    // Load saved state on mount
-    const savedState = loadCalendarState();
-
+export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState, onStateChange }) => {
+    // Initialize from savedState prop (passed from App)
     const [posts, setPosts] = useState<SocialPost[]>(savedState?.posts || []);
     const [topics, setTopics] = useState<string[]>(savedState?.topics || []);
     const [generatingTopics, setGeneratingTopics] = useState(false);
@@ -91,15 +90,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile }) => {
         loadingImage: false
     });
 
-    // Save state when it changes
+    // Notify parent of state changes for persistence
     useEffect(() => {
-        saveCalendarState({
-            posts,
-            topics,
-            pendingPosts,
-            autoPilotConfig,
-            connectedAccounts
-        });
+        if (onStateChange) {
+            onStateChange({
+                posts,
+                topics,
+                pendingPosts,
+                autoPilotConfig,
+                connectedAccounts
+            });
+        }
     }, [posts, topics, pendingPosts, autoPilotConfig, connectedAccounts]);
 
     const generateTopics = async () => {
