@@ -112,11 +112,22 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       return;
     }
 
-    // Check Speech Recognition
+    // Check Speech Recognition - enhanced browser detection
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       addDiagnostic('SpeechRecognition not supported');
-      setError('Voice not supported in this browser. Use Chrome or Edge.');
+      // Detect browser for helpful error message
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isSafari = userAgent.includes('safari') && !userAgent.includes('chrome');
+      const isFirefox = userAgent.includes('firefox');
+
+      if (isSafari) {
+        setError('Voice recognition not available in Safari. Please use Chrome, Edge, or the text input below.');
+      } else if (isFirefox) {
+        setError('Voice recognition not available in Firefox. Please use Chrome, Edge, or the text input below.');
+      } else {
+        setError('Voice not supported in this browser. Use Chrome or Edge, or type your message below.');
+      }
       setIsConnected(true);
       return;
     }
@@ -148,7 +159,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
       setMicReady(true);
       setIsConnected(true);
-      setStatus('Ready! Hold the mic button and speak.');
+      setStatus('Ready! Tap the mic to start speaking.');
       addDiagnostic('Setup complete');
 
     } catch (err: any) {
@@ -158,8 +169,15 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
     }
   };
 
-  const startRecording = () => {
-    if (isRecording || isThinking || isSpeaking) return;
+  const toggleRecording = () => {
+    // If already recording, stop it
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+
+    // Don't start if busy
+    if (isThinking || isSpeaking) return;
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -180,7 +198,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         addDiagnostic('Recording started');
         setIsRecording(true);
         setTranscript('');
-        setStatus('🎤 Listening... Release when done');
+        setStatus('🎤 Listening... Tap mic to stop');
         fullTranscript = '';
       };
 
@@ -205,7 +223,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         if (event.error === 'network') {
           setStatus('Network issue. Try again or use text.');
         } else if (event.error === 'no-speech') {
-          setStatus('No speech detected. Hold button and speak.');
+          setStatus('No speech detected. Tap mic and speak.');
         } else if (event.error !== 'aborted') {
           setStatus(`Error: ${event.error}`);
         }
@@ -302,8 +320,17 @@ User: ${userText}
 
 Respond in 2-3 short sentences. Be helpful and specific.`, {
         type: 'fast',
-        systemPrompt: `You are a helpful voice assistant${profile ? ` for ${profile.name}` : ''}. Keep responses brief (2-3 sentences) for voice output. Be specific and actionable.`,
-        temperature: 0.8
+        systemPrompt: `You are a warm, friendly marketing consultant and AI assistant helping a business owner with their marketing strategy. ${profile ? `The user runs "${profile.name}" in the ${profile.industry || 'business'} industry.` : ''}
+
+IMPORTANT PERSONALITY GUIDELINES:
+- You are speaking TO the business owner as their advisor/consultant, NOT as their business
+- Never say "we" as if you are the business. Say "you" and "your business" instead
+- Be conversational, encouraging, and supportive like a knowledgeable friend
+- Give practical, actionable advice tailored to their specific business
+- Keep responses brief (2-3 sentences) for voice output
+- Sound natural and human, like a helpful colleague, not robotic
+- Be enthusiastic but not over-the-top`,
+        temperature: 0.85
       });
 
       const reply = llmResponse.text;
@@ -371,10 +398,17 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
 
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Natural speech settings - slower and more human-like
-      utterance.rate = 0.9;  // Slightly slower for clarity
-      utterance.pitch = voicePreference === 'female' ? 1.1 : 0.9; // Adjust pitch based on preference
+      // Natural speech settings - optimized for human-like delivery
+      utterance.rate = 0.85;  // Slower for more natural pacing
+      utterance.pitch = voicePreference === 'female' ? 1.05 : 0.95; // Subtle pitch adjustment
       utterance.volume = 1.0;
+
+      // Add natural pauses by preprocessing text
+      const naturalText = text
+        .replace(/\. /g, '... ')  // Add pauses after sentences
+        .replace(/! /g, '!... ') // Add pauses after exclamations
+        .replace(/\? /g, '?... '); // Add pauses after questions
+      utterance.text = naturalText;
 
       // Select the best voice based on preference
       const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
@@ -383,9 +417,16 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
       if (voices.length > 0) {
         let selectedVoice: SpeechSynthesisVoice | null = null;
 
-        // Define preferred voices for natural sound (ordered by quality)
-        const femaleNames = ['Samantha', 'Google US English', 'Microsoft Zira', 'Google UK English Female', 'Karen', 'Moira', 'Fiona', 'Victoria', 'Tessa'];
-        const maleNames = ['Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'Fred', 'Thomas', 'Gordon', 'Lee'];
+        // Define preferred voices for natural sound (ordered by quality - premium neural voices first)
+        const femaleNames = [
+          'Microsoft Aria Online', 'Microsoft Jenny Online', 'Google US English Female',
+          'Samantha', 'Karen', 'Moira', 'Fiona', 'Victoria', 'Tessa',
+          'Microsoft Zira', 'Google UK English Female', 'en-US-Wavenet'
+        ];
+        const maleNames = [
+          'Microsoft Guy Online', 'Microsoft Christopher Online', 'Google US English Male',
+          'Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'James', 'Thomas'
+        ];
 
         const preferredNames = voicePreference === 'female' ? femaleNames : maleNames;
 
@@ -434,7 +475,7 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
       utterance.onend = () => {
         addDiagnostic('Speech completed');
         setIsSpeaking(false);
-        setStatus('✨ Ready! Hold mic to speak.');
+        setStatus('✨ Ready! Tap mic to speak.');
         resolve();
       };
 
@@ -527,11 +568,8 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
           {/* Main button */}
           <div className="flex justify-center mb-4">
             <button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onMouseLeave={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
+              onClick={toggleRecording}
+              onTouchEnd={(e) => { e.preventDefault(); toggleRecording(); }}
               disabled={!micReady || isThinking || isSpeaking}
               className={`relative w-32 h-32 rounded-full transition-all transform ${isRecording
                 ? 'bg-red-500 scale-110 shadow-lg shadow-red-500/50'
@@ -566,10 +604,10 @@ Respond in 2-3 short sentences. Be helpful and specific.`, {
 
           {/* Instructions */}
           <p className="text-center text-sm font-medium text-slate-700 mb-2">
-            {isRecording ? '🎤 Recording... Release to send' :
+            {isRecording ? '🎤 Recording... Tap to stop' :
               isSpeaking ? '🔊 Speaking...' :
                 isThinking ? '🤔 Thinking...' :
-                  'Hold the button and speak'}
+                  'Tap mic to speak'}
           </p>
 
           {/* Audio level bar */}
