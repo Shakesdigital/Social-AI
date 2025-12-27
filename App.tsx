@@ -28,6 +28,7 @@ import { LeadsView } from './components/LeadsView';
 import { EmailView } from './components/EmailView';
 import { BlogView } from './components/BlogView';
 import { CalendarView } from './components/CalendarView';
+import { LLMDiagnostics } from './components/LLMDiagnostics';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import ReactMarkdown from 'react-markdown';
@@ -313,11 +314,24 @@ export default function App() {
   });
 
   const [hasApiKey, setHasApiKey] = useState(true);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   useEffect(() => {
     // Check if any LLM provider is configured
     const hasLLM = hasFreeLLMConfigured();
     if (!hasLLM) setHasApiKey(false);
+  }, []);
+
+  // Keyboard shortcut: Ctrl+Shift+D to open diagnostics
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setShowDiagnostics(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const [isLiveOpen, setIsLiveOpen] = useState(false);
@@ -479,6 +493,7 @@ export default function App() {
           </nav>
           <div className="p-4 border-t border-slate-100 space-y-4">
             <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all"><Mic size={20} className="animate-pulse" /> Live Consultant</button>
+            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-1 text-sm"><Settings size={16} /> LLM Diagnostics</button>
             <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-1 text-sm"><LogOut size={16} /> Logout / Reset</button>
           </div>
         </aside>
@@ -486,6 +501,7 @@ export default function App() {
       <main className={`flex-1 overflow-hidden relative ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''} ${!hasApiKey ? 'mt-6' : ''}`}>{renderContent()}</main>
       <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
       {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
+      {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
     </div>
   );
 }
