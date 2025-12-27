@@ -166,16 +166,16 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
     };
 
     return (
-        <div className="p-8 h-full overflow-y-auto">
+        <div className="p-4 sm:p-6 md:p-8 h-full overflow-y-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Email Marketing</h1>
-                    <p className="text-slate-500 text-sm">Create and manage outreach campaigns</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Email Marketing</h1>
+                    <p className="text-slate-500 text-xs sm:text-sm">Create and manage outreach campaigns</p>
                 </div>
                 <button
                     onClick={() => setShowNewCampaign(true)}
-                    className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center gap-2"
+                    className="px-4 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center justify-center gap-2 text-sm active:scale-95 transition-all"
                 >
                     <Plus size={18} />
                     New Campaign
@@ -183,15 +183,15 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
             </div>
 
             {quotaWarning && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs sm:text-sm">
                     {quotaWarning}
                 </div>
             )}
 
             {emailError && (
-                <div className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${emailError.includes('breather')
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-red-50 text-red-700'
+                <div className={`mb-4 p-3 rounded-lg text-xs sm:text-sm flex items-center gap-2 ${emailError.includes('breather')
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-red-50 text-red-700'
                     }`}>
                     {emailError.includes('breather') && (
                         <span className="inline-block w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></span>
@@ -201,45 +201,45 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
             )}
 
             {!isConfigured && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-sm text-red-700">Please configure a free LLM API key to use email generation features.</p>
+                <div className="mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-xs sm:text-sm text-red-700">Please configure a free LLM API key to use email generation features.</p>
                 </div>
             )}
 
             {leads.length === 0 && (
-                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                    <p className="text-sm text-blue-700">Generate some leads first in the Leads tab to create email campaigns.</p>
+                <div className="mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                    <p className="text-xs sm:text-sm text-blue-700">Generate some leads first in the Leads tab to create email campaigns.</p>
                 </div>
             )}
 
-            <div className="flex gap-6">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                 {/* Campaigns List */}
-                <div className="w-80 shrink-0">
+                <div className="w-full lg:w-80 shrink-0">
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50">
-                            <h3 className="font-semibold text-slate-800">Campaigns</h3>
+                        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50">
+                            <h3 className="font-semibold text-slate-800 text-sm sm:text-base">Campaigns</h3>
                         </div>
                         {campaigns.length === 0 ? (
-                            <div className="p-6 text-center text-slate-500 text-sm">
+                            <div className="p-4 sm:p-6 text-center text-slate-500 text-xs sm:text-sm">
                                 No campaigns yet. Create one to get started.
                             </div>
                         ) : (
-                            <div className="divide-y divide-slate-100">
+                            <div className="divide-y divide-slate-100 max-h-48 lg:max-h-none overflow-y-auto">
                                 {campaigns.map(campaign => (
                                     <button
                                         key={campaign.id}
                                         onClick={() => setSelectedCampaign(campaign)}
-                                        className={`w-full p-4 text-left hover:bg-slate-50 transition-colors ${selectedCampaign?.id === campaign.id ? 'bg-brand-50 border-l-2 border-brand-500' : ''
+                                        className={`w-full p-3 sm:p-4 text-left hover:bg-slate-50 transition-colors active:bg-slate-100 ${selectedCampaign?.id === campaign.id ? 'bg-brand-50 border-l-2 border-brand-500' : ''
                                             }`}
                                     >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-medium text-slate-900">{campaign.name}</h4>
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="min-w-0">
+                                                <h4 className="font-medium text-slate-900 text-sm truncate">{campaign.name}</h4>
                                                 <p className="text-xs text-slate-500 mt-1">
                                                     {campaign.leadIds.length} leads • {campaign.emails.length} emails
                                                 </p>
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${campaign.status === 'Active' ? 'bg-green-100 text-green-700' :
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${campaign.status === 'Active' ? 'bg-green-100 text-green-700' :
                                                 campaign.status === 'Draft' ? 'bg-slate-100 text-slate-600' :
                                                     'bg-blue-100 text-blue-700'
                                                 }`}>
@@ -254,45 +254,48 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
                 </div>
 
                 {/* Campaign Detail */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     {selectedCampaign ? (
-                        <div className="bg-white rounded-xl border border-slate-200 p-6">
-                            <div className="flex justify-between items-start mb-6">
+                        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4 sm:mb-6">
                                 <div>
-                                    <h2 className="text-xl font-bold text-slate-900">{selectedCampaign.name}</h2>
-                                    <p className="text-sm text-slate-500">{selectedCampaign.leadIds.length} leads targeted</p>
+                                    <h2 className="text-lg sm:text-xl font-bold text-slate-900">{selectedCampaign.name}</h2>
+                                    <p className="text-xs sm:text-sm text-slate-500">{selectedCampaign.leadIds.length} leads targeted</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handleGenerateEmail}
                                         disabled={isLoading}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+                                        className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 transition-all"
                                     >
                                         {isLoading ? <Loader size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                                        Generate Email
+                                        <span className="hidden sm:inline">Generate Email</span>
+                                        <span className="sm:hidden">Email</span>
                                     </button>
                                     <button
                                         onClick={handleGenerateDrip}
                                         disabled={isLoading}
-                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+                                        className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 transition-all"
                                     >
-                                        Drip Sequence
+                                        <span className="hidden sm:inline">Drip Sequence</span>
+                                        <span className="sm:hidden">Drip</span>
                                     </button>
                                 </div>
                             </div>
 
                             {selectedCampaign.emails.length === 0 ? (
-                                <div className="text-center py-12 text-slate-500">
-                                    <Mail size={48} className="mx-auto mb-4 text-slate-300" />
-                                    <p>No emails yet. Click "Generate Email" to create one.</p>
+                                <div className="text-center py-8 sm:py-12 text-slate-500">
+                                    <Mail size={40} className="mx-auto mb-4 text-slate-300 sm:hidden" />
+                                    <Mail size={48} className="mx-auto mb-4 text-slate-300 hidden sm:block" />
+                                    <p className="text-sm">No emails yet. Click "Generate Email" to create one.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-3 sm:space-y-4">
                                     {selectedCampaign.emails.map((email, index) => (
-                                        <div key={email.id} className="border border-slate-200 rounded-lg p-4">
+                                        <div key={email.id} className="border border-slate-200 rounded-lg p-3 sm:p-4">
                                             <div className="flex justify-between items-start mb-3">
-                                                <div>
-                                                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded mr-2">
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded">
                                                         {email.variant === 'A' ? 'Variant A' : 'Variant B'}
                                                     </span>
                                                     {email.delayDays !== undefined && (
@@ -307,7 +310,7 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
                                                             const lead = leads.find(l => l.id === selectedCampaign.leadIds[0]);
                                                             if (lead) handlePreview(email, lead);
                                                         }}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                                                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded active:scale-95 transition-all"
                                                         title="Preview"
                                                     >
                                                         <Eye size={16} />
@@ -315,32 +318,33 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
                                                     <button
                                                         onClick={() => handleGenerateVariant(email)}
                                                         disabled={isLoading}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                                                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded active:scale-95 transition-all"
                                                         title="Generate A/B Variant"
                                                     >
                                                         <RefreshCw size={16} />
                                                     </button>
                                                     <button
                                                         onClick={() => navigator.clipboard.writeText(`Subject: ${email.subject}\n\n${email.body}`)}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                                                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded active:scale-95 transition-all"
                                                         title="Copy"
                                                     >
                                                         <Copy size={16} />
                                                     </button>
                                                 </div>
                                             </div>
-                                            <h4 className="font-medium text-slate-900 mb-2">{email.subject}</h4>
-                                            <p className="text-sm text-slate-600 whitespace-pre-wrap line-clamp-4">{email.body}</p>
+                                            <h4 className="font-medium text-slate-900 mb-2 text-sm sm:text-base">{email.subject}</h4>
+                                            <p className="text-xs sm:text-sm text-slate-600 whitespace-pre-wrap line-clamp-4">{email.body}</p>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-                            <Mail size={48} className="mx-auto mb-4 text-slate-300" />
-                            <h3 className="text-lg font-semibold text-slate-800 mb-2">Select a Campaign</h3>
-                            <p className="text-slate-500 text-sm">Choose a campaign from the list or create a new one.</p>
+                        <div className="bg-white rounded-xl border border-slate-200 p-8 sm:p-12 text-center">
+                            <Mail size={40} className="mx-auto mb-4 text-slate-300 sm:hidden" />
+                            <Mail size={48} className="mx-auto mb-4 text-slate-300 hidden sm:block" />
+                            <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-2">Select a Campaign</h3>
+                            <p className="text-slate-500 text-xs sm:text-sm">Choose a campaign from the list or create a new one.</p>
                         </div>
                     )}
                 </div>

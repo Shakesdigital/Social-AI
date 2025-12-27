@@ -295,33 +295,37 @@ const ResearchView: React.FC<{
     if (!report) runResearch();
   }, []);
 
-  if (loading) return <div className="p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse">Analysing market with AI...</div></div>;
+  if (loading) return <div className="p-4 sm:p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse text-sm sm:text-base">Analysing market with AI...</div></div>;
   return (
-    <div className="p-8 h-full overflow-y-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Market Research</h1>
-        <button onClick={() => runResearch()} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate</button>
+    <div className="p-4 sm:p-6 md:p-8 h-full overflow-y-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">Market Research</h1>
+        <button onClick={() => runResearch()} className="px-4 py-2.5 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all">
+          <Search size={16} /> Regenerate
+        </button>
       </div>
       {error && (
-        <div className={`mb-4 p-4 rounded-lg ${error.includes('breather') ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+        <div className={`mb-4 p-3 sm:p-4 rounded-lg text-sm ${error.includes('breather') ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
           {error.includes('breather') && <span className="inline-block w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mr-2"></span>}
           {error}
         </div>
       )}
       {report && (
-        <div className="flex gap-8">
-          <div className="flex-1 bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
+          <div className="flex-1 bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-sm prose prose-slate prose-sm sm:prose max-w-none">
             <ReactMarkdown>{report.rawContent}</ReactMarkdown>
           </div>
           {report.sources.length > 0 && (
-            <div className="w-80 space-y-4">
-              <h3 className="font-semibold text-slate-700">Sources</h3>
-              {report.sources.map((s, i) => (
-                <a key={i} href={s.uri} target="_blank" rel="noreferrer" className="block p-4 bg-white rounded-lg border border-slate-200 hover:border-brand-300 transition-colors">
-                  <div className="text-sm font-medium text-brand-600 mb-1 truncate">{s.title}</div>
-                  <div className="text-xs text-slate-400 truncate">{s.uri}</div>
-                </a>
-              ))}
+            <div className="w-full lg:w-72 xl:w-80 space-y-3 sm:space-y-4">
+              <h3 className="font-semibold text-slate-700 text-sm sm:text-base">Sources</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3">
+                {report.sources.map((s, i) => (
+                  <a key={i} href={s.uri} target="_blank" rel="noreferrer" className="block p-3 sm:p-4 bg-white rounded-lg border border-slate-200 hover:border-brand-300 transition-colors active:scale-[0.98]">
+                    <div className="text-xs sm:text-sm font-medium text-brand-600 mb-1 truncate">{s.title}</div>
+                    <div className="text-xs text-slate-400 truncate">{s.uri}</div>
+                  </a>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -387,19 +391,22 @@ const StrategyWrapper: React.FC<{
     fetchStrategy();
   }, []);
 
-  if (loading) return <div className="flex flex-col items-center justify-center h-96 text-center"><p className="animate-pulse">Generating strategy...</p></div>;
+  if (loading) return <div className="flex flex-col items-center justify-center h-96 text-center p-4"><p className="animate-pulse text-sm sm:text-base">Generating strategy...</p></div>;
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        {error && (
-          <div className={`flex-1 mr-4 p-3 rounded-lg text-sm ${error.includes('breather') ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
-            {error.includes('breather') && <span className="inline-block w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mr-2"></span>}
-            {error}
-          </div>
-        )}
-        <button onClick={() => fetchStrategy()} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate Strategy</button>
+    <div className="p-4 sm:p-6 md:p-8 h-full overflow-y-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold">Marketing Strategy</h1>
+        <button onClick={() => fetchStrategy()} className="px-4 py-2.5 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all">
+          <Lightbulb size={16} /> Regenerate
+        </button>
       </div>
-      <div className="bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>
+      {error && (
+        <div className={`mb-4 p-3 rounded-lg text-xs sm:text-sm ${error.includes('breather') ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+          {error.includes('breather') && <span className="inline-block w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mr-2"></span>}
+          {error}
+        </div>
+      )}
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-sm prose prose-slate prose-sm sm:prose max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>
     </div>
   );
 };

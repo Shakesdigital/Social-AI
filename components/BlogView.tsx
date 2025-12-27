@@ -133,33 +133,33 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
     };
 
     return (
-        <div className="p-8 h-full overflow-y-auto">
+        <div className="p-4 sm:p-6 md:p-8 h-full overflow-y-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Blog Content</h1>
-                    <p className="text-slate-500 text-sm">Research trends and generate SEO-optimized blog posts</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Blog Content</h1>
+                    <p className="text-slate-500 text-xs sm:text-sm">Research trends and generate SEO-optimized blog posts</p>
                 </div>
             </div>
 
             {quotaWarning && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs sm:text-sm">
                     {quotaWarning}
                 </div>
             )}
 
             {!isConfigured && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-sm text-red-700">Please configure a free LLM API key to use blog generation features.</p>
+                <div className="mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-xs sm:text-sm text-red-700">Please configure a free LLM API key to use blog generation features.</p>
                 </div>
             )}
 
-            <div className="flex gap-6">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                 {/* Left Panel - Topics & Research */}
-                <div className="w-96 shrink-0 space-y-6">
+                <div className="w-full lg:w-96 shrink-0 space-y-4 sm:space-y-6">
                     {/* Topic Research */}
-                    <div className="bg-white rounded-xl border border-slate-200 p-5">
-                        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2 text-sm sm:text-base">
                             <TrendingUp size={18} />
                             Trending Topics
                         </h3>
@@ -169,18 +169,19 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                                 type="text"
                                 value={nicheInput}
                                 onChange={e => { setNicheInput(e.target.value); setError(null); }}
-                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                className="w-full border border-slate-300 rounded-lg p-2.5 sm:p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                                 placeholder="Enter your niche (e.g., Digital Marketing, AI, Fitness)..."
                             />
                             <button
                                 onClick={handleResearchTopics}
                                 disabled={isLoadingTopics || !isConfigured || !nicheInput.trim()}
-                                className="w-full py-2.5 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full py-2.5 sm:py-3 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm active:scale-95 transition-all"
                             >
                                 {isLoadingTopics ? (
                                     <>
                                         <Loader size={16} className="animate-spin" />
-                                        Researching... (this may take 10-20 seconds)
+                                        <span className="hidden sm:inline">Researching... (10-20 seconds)</span>
+                                        <span className="sm:hidden">Researching...</span>
                                     </>
                                 ) : (
                                     <>
@@ -193,8 +194,8 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                             {/* Error/Status Display */}
                             {error && (
                                 <div className={`p-3 rounded-lg text-sm ${error.includes('breather') || error.includes('trying again')
-                                        ? 'bg-amber-50 border border-amber-200 text-amber-700'
-                                        : 'bg-red-50 border border-red-200 text-red-700'
+                                    ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                                    : 'bg-red-50 border border-red-200 text-red-700'
                                     }`}>
                                     <p className="font-medium flex items-center gap-2">
                                         {error.includes('breather') || error.includes('trying again') ? (
