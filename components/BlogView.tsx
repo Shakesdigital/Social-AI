@@ -57,9 +57,40 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
             });
         } catch (e: any) {
             console.error('[BlogView] Failed to research topics:', e);
-            setError(`Failed to research topics: ${e.message || 'Unknown error'}`);
+
+            // Check if all providers failed - show friendly message and auto-retry
+            if (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError') {
+                setError('Taking a quick breather — trying again...');
+
+                // Auto-retry after 3 seconds
+                setTimeout(async () => {
+                    try {
+                        const retryTopics = await researchTrendingTopics(nicheInput, profile, 5);
+                        if (retryTopics && retryTopics.length > 0) {
+                            setTopics(prev => {
+                                const existingIds = new Set(prev.map(t => t.topic.toLowerCase()));
+                                const uniqueNew = retryTopics.filter(t => !existingIds.has(t.topic.toLowerCase()));
+                                return [...uniqueNew, ...prev];
+                            });
+                            setError(null);
+                        } else {
+                            setError('Still having trouble. Please try again in a moment.');
+                        }
+                    } catch (retryError) {
+                        console.error('[BlogView] Retry also failed:', retryError);
+                        setError('Our AI is taking a short break. Please try again in a minute! 🙏');
+                    }
+                    setIsLoadingTopics(false);
+                }, 3000);
+                return; // Don't set isLoadingTopics to false yet
+            }
+
+            // Generic error message for other errors
+            setError('Something went wrong. Please try again.');
         } finally {
-            setIsLoadingTopics(false);
+            if (!error?.includes('breather')) {
+                setIsLoadingTopics(false);
+            }
         }
     };
 
@@ -159,11 +190,19 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                                 )}
                             </button>
 
-                            {/* Error Display */}
+                            {/* Error/Status Display */}
                             {error && (
-                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                                    <p className="font-medium">⚠️ {error}</p>
-                                    <p className="text-xs mt-1 text-red-600">Check browser console (F12) for more details.</p>
+                                <div className={`p-3 rounded-lg text-sm ${error.includes('breather') || error.includes('trying again')
+                                        ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                                        : 'bg-red-50 border border-red-200 text-red-700'
+                                    }`}>
+                                    <p className="font-medium flex items-center gap-2">
+                                        {error.includes('breather') || error.includes('trying again') ? (
+                                            <><Loader size={14} className="animate-spin" /> {error}</>
+                                        ) : (
+                                            <>⚠️ {error}</>
+                                        )}
+                                    </p>
                                 </div>
                             )}
                         </div>

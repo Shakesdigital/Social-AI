@@ -55,9 +55,36 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
             const newLeads = await generateLeads(criteria, profile, 10);
             setLeads(prev => [...newLeads, ...prev]);
         } catch (e: any) {
-            setError(e.message || 'Failed to generate leads');
+            console.error('[LeadsView] Failed to generate leads:', e);
+
+            // Check if all providers failed - show friendly message and auto-retry
+            if (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError') {
+                setError('Taking a quick breather — trying again...');
+
+                // Auto-retry after 3 seconds
+                setTimeout(async () => {
+                    try {
+                        const retryLeads = await generateLeads(criteria, profile, 10);
+                        if (retryLeads && retryLeads.length > 0) {
+                            setLeads(prev => [...retryLeads, ...prev]);
+                            setError(null);
+                        } else {
+                            setError('Still having trouble. Please try again in a moment.');
+                        }
+                    } catch (retryError) {
+                        console.error('[LeadsView] Retry also failed:', retryError);
+                        setError('Our AI is taking a short break. Please try again in a minute! 🙏');
+                    }
+                    setIsLoading(false);
+                }, 3000);
+                return; // Don't set isLoading to false yet
+            }
+
+            setError('Something went wrong. Please try again.');
         } finally {
-            setIsLoading(false);
+            if (!error?.includes('breather')) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -243,8 +270,15 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
                             </div>
 
                             {error && (
-                                <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">
-                                    {error}
+                                <div className={`p-3 text-sm rounded-lg flex items-center gap-2 ${error.includes('breather') || error.includes('trying again')
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-red-50 text-red-700'
+                                    }`}>
+                                    {error.includes('breather') || error.includes('trying again') ? (
+                                        <><Loader size={14} className="animate-spin" /> {error}</>
+                                    ) : (
+                                        <>{error}</>
+                                    )}
                                 </div>
                             )}
 
