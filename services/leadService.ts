@@ -1,41 +1,62 @@
 import { CompanyProfile, Lead, LeadSearchCriteria } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
-import { searchWeb, researchCompetitors, isWebResearchConfigured } from './webResearchService';
+import { searchWeb, searchWebValidated, searchForOutreach, researchCompetitors, isWebResearchConfigured } from './webResearchService';
 import { getBusinessContext, getLeadsToAvoid, addGeneratedLeads, incrementGeneratedCount, trackAction } from './contextMemoryService';
 
 /**
  * Generate leads with real-time web research enhancement
+ * Now includes URL validation and real contact extraction
  */
 export async function generateLeads(
     criteria: LeadSearchCriteria,
     profile: CompanyProfile,
     count: number = 10
 ): Promise<Lead[]> {
-    // Step 1: Gather real-time market intelligence
+    // Step 1: Gather real-time market intelligence with verified contacts
     let webContext = '';
     let competitorInsights = '';
+    let verifiedLeads = '';
 
     if (isWebResearchConfigured()) {
-        console.log('[Leads] Enriching with web research...');
+        console.log('[Leads] Enriching with validated web research...');
 
-        // Search for real companies in the target industry/location
+        // Search for real companies with verified contact info
         const searchQuery = `${criteria.industry} companies ${criteria.location} ${criteria.companySize} employees`;
-        const searchResults = await searchWeb(searchQuery, 10);
+        const outreachLeads = await searchForOutreach(searchQuery, 8);
 
-        if (searchResults.length > 0) {
-            webContext = `
-REAL-TIME WEB RESEARCH RESULTS (use these as inspiration for realistic leads):
-${searchResults.map((r, i) => `${i + 1}. ${r.title} - ${r.url}
-   ${r.snippet}`).join('\n')}
+        if (outreachLeads.length > 0) {
+            verifiedLeads = `
+VERIFIED LEADS FROM WEB RESEARCH (with active contact info):
+${outreachLeads.map((l, i) => `${i + 1}. ${l.name}
+   Website: ${l.website} (Verified Active ✓)
+   ${l.contactInfo.emails?.length ? `Emails: ${l.contactInfo.emails.join(', ')}` : ''}
+   ${l.contactInfo.phones?.length ? `Phones: ${l.contactInfo.phones.join(', ')}` : ''}
+   ${Object.keys(l.contactInfo.socialLinks || {}).length ? `Social: ${Object.entries(l.contactInfo.socialLinks).filter(([_, v]) => v).map(([k, v]) => `${k}`).join(', ')}` : ''}
+   Confidence: ${l.confidence}`).join('\n')}
 `;
         }
 
-        // Get competitor insights
+        // Also get general search results with validation
+        const searchResults = await searchWebValidated(searchQuery, 10, {
+            validateUrls: true,
+            extractContacts: true,
+            filterInactive: true, // Only active websites
+        });
+
+        if (searchResults.length > 0) {
+            webContext = `
+WEB RESEARCH RESULTS (Verified Active Sources):
+${searchResults.map((r, i) => `${i + 1}. ${r.title} - ${r.url} [${r.isActive ? 'Active ✓' : 'Unknown'}]
+   ${r.snippet}${r.contacts?.emails?.length ? `\n   Contact: ${r.contacts.emails[0]}` : ''}`).join('\n')}
+`;
+        }
+
+        // Get competitor insights (already uses validated search)
         const competitors = await researchCompetitors(profile.name, criteria.industry, criteria.location);
         if (competitors.length > 0) {
             competitorInsights = `
-COMPETITOR LANDSCAPE:
-${competitors.map(c => `- ${c.name}: ${c.website}`).join('\n')}
+COMPETITOR LANDSCAPE (with contact info):
+${competitors.map(c => `- ${c.name}: ${c.website}${c.isActive ? ' ✓' : ''}${c.contactInfo?.emails?.[0] ? ` - ${c.contactInfo.emails[0]}` : ''}`).join('\n')}
 `;
         }
     }
@@ -63,6 +84,7 @@ SEARCH CRITERIA:
 • Company Size: ${criteria.companySize}
 • Focus Keywords: ${criteria.keywords.length > 0 ? criteria.keywords.join(', ') : 'General'}
 
+${verifiedLeads}
 ${webContext}
 ${competitorInsights}
 ${leadsToAvoid}

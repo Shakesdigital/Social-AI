@@ -1,6 +1,6 @@
 import { CompanyProfile, BlogPost, TrendingTopic } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
-import { searchWeb, getLatestNews, getTrendingTopics, getSocialMediaTrends, isWebResearchConfigured } from './webResearchService';
+import { searchWeb, searchWebValidated, getLatestNews, getTrendingTopics, getSocialMediaTrends, isWebResearchConfigured } from './webResearchService';
 import { getBusinessContext, getBlogTitlesToAvoid, addGeneratedBlogTitle, addGeneratedTopic, getTopicsToAvoid, incrementGeneratedCount, trackAction } from './contextMemoryService';
 
 /**
@@ -29,13 +29,16 @@ ${news.map((n, i) => `${i + 1}. "${n.title}" - ${n.source} (${n.publishedAt})
 `;
         }
 
-        // Search for trending content
-        const searchResults = await searchWeb(`${niche} trending topics blog ideas ${new Date().getFullYear()}`, 8);
+        // Search for trending content with validation
+        const searchResults = await searchWebValidated(`${niche} trending topics blog ideas ${new Date().getFullYear()}`, 8, {
+            validateUrls: true,
+            extractContacts: true,
+        });
         if (searchResults.length > 0) {
             webTrends = `
-CURRENTLY TRENDING CONTENT:
-${searchResults.map((r, i) => `${i + 1}. ${r.title}
-   ${r.snippet}`).join('\n')}
+CURRENTLY TRENDING CONTENT (Verified Active Sources):
+${searchResults.map((r, i) => `${i + 1}. ${r.title} [${r.domain || 'Source'}]
+   ${r.snippet}${r.contacts?.emails?.length ? `\n   Contact: ${r.contacts.emails[0]}` : ''}`).join('\n')}
 `;
         }
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
-import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
+import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 
 interface Message {
@@ -67,26 +67,58 @@ export const ChatBot: React.FC = () => {
 
       // Detect if user is asking about current/real-time data
       const needsResearch = /latest|current|trending|news|today|right now|2024|2025|recent/i.test(messageText);
+      // Detect if user is asking about leads, contacts, outreach
+      const needsOutreach = /leads|contact|outreach|email|partner|collaborate|competitor|agencies|companies|businesses/i.test(messageText);
       let researchContext = '';
 
-      if (needsResearch && isWebResearchConfigured()) {
+      if ((needsResearch || needsOutreach) && isWebResearchConfigured()) {
         setIsResearching(true);
 
         // Extract topic for research
-        const topic = messageText.replace(/what|how|tell me about|give me|the|latest|current|trending/gi, '').trim();
+        const topic = messageText.replace(/what|how|tell me about|give me|the|latest|current|trending|find|search/gi, '').trim();
 
         if (topic) {
-          const [searchResults, news] = await Promise.all([
-            searchWeb(topic, 3),
-            getLatestNews(topic, 2)
-          ]);
+          try {
+            if (needsOutreach) {
+              // Use outreach search to get leads with contact info
+              const [leads, news] = await Promise.all([
+                searchForOutreach(topic, 5),
+                getLatestNews(topic, 2)
+              ]);
 
-          if (searchResults.length > 0 || news.length > 0) {
-            researchContext = `
-[REAL-TIME RESEARCH DATA - Use this to provide accurate, current information]
-${news.length > 0 ? `Latest News:\n${news.map(n => `• ${n.title} (${n.source})`).join('\n')}` : ''}
-${searchResults.length > 0 ? `Web Sources:\n${searchResults.map(r => `• ${r.title}: ${r.snippet}`).join('\n')}` : ''}
+              if (leads.length > 0) {
+                researchContext = `
+[OUTREACH LEADS WITH VERIFIED CONTACT INFO]
+${leads.map(l => `
+• ${l.name}
+  Website: ${l.website} (Active ✓)
+  ${l.contactInfo.emails?.length ? `Emails: ${l.contactInfo.emails.join(', ')}` : ''}
+  ${l.contactInfo.phones?.length ? `Phones: ${l.contactInfo.phones.join(', ')}` : ''}
+  ${Object.keys(l.contactInfo.socialLinks || {}).length ? `Social: ${Object.entries(l.contactInfo.socialLinks).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')}` : ''}
+  Confidence: ${l.confidence}
+`).join('')}
+${news.length > 0 ? `\nLatest News:\n${news.map(n => `• ${n.title} (${n.source})`).join('\n')}` : ''}
 `;
+              }
+            } else {
+              // Use validated search for general research
+              const [searchResults, news] = await Promise.all([
+                searchWebValidated(topic, 5, { validateUrls: true, extractContacts: true }),
+                getLatestNews(topic, 2)
+              ]);
+
+              if (searchResults.length > 0 || news.length > 0) {
+                researchContext = `
+[REAL-TIME RESEARCH DATA - Verified Active Sources]
+${news.length > 0 ? `Latest News:\n${news.map(n => `• ${n.title} (${n.source})`).join('\n')}` : ''}
+${searchResults.length > 0 ? `Web Sources:\n${searchResults.map(r =>
+                  `• ${r.title}: ${r.snippet}${r.contacts?.emails?.length ? ` [Contact: ${r.contacts.emails[0]}]` : ''}`
+                ).join('\n')}` : ''}
+`;
+              }
+            }
+          } catch (e) {
+            console.error('[ChatBot] Research failed:', e);
           }
         }
         setIsResearching(false);

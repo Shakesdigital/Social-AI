@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, AlertCircle, CheckCircle, Play, Square, Settings, User, Users } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
-import { searchWeb, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
+import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 
 interface LiveAssistantProps {
@@ -254,17 +254,33 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
     try {
       // Web research if needed
       let researchContext = '';
-      if (/latest|current|trending|news|2024|2025/i.test(userText) && isWebResearchConfigured()) {
+      const needsResearch = /latest|current|trending|news|2024|2025/i.test(userText);
+      const needsOutreach = /leads|contact|outreach|email|partner|collaborate|competitor|agencies|companies|businesses/i.test(userText);
+
+      if ((needsResearch || needsOutreach) && isWebResearchConfigured()) {
         setStatus('🔍 Researching...');
-        const topic = userText.replace(/what|how|tell|give|me|about|the|latest|current/gi, '').trim();
+        const topic = userText.replace(/what|how|tell|give|me|about|the|latest|current|find|search/gi, '').trim();
         if (topic) {
           try {
-            const [search, news] = await Promise.all([
-              searchWeb(topic, 2),
-              getLatestNews(topic, 2)
-            ]);
-            if (search.length || news.length) {
-              researchContext = `[Web Research]\n${news.map(n => n.title).join('\n')}\n${search.map(r => r.title).join('\n')}`;
+            if (needsOutreach) {
+              // Get leads with verified contact info
+              const leads = await searchForOutreach(topic, 3);
+              if (leads.length > 0) {
+                researchContext = `[Verified Leads with Contact Info]\n${leads.map(l =>
+                  `• ${l.name}: ${l.website}${l.contactInfo.emails?.length ? ` - Email: ${l.contactInfo.emails[0]}` : ''}${Object.keys(l.contactInfo.socialLinks || {}).length ? ` - Social: ${Object.keys(l.contactInfo.socialLinks).join(', ')}` : ''}`
+                ).join('\n')}`;
+              }
+            } else {
+              // Use validated search with contacts
+              const [search, news] = await Promise.all([
+                searchWebValidated(topic, 3, { validateUrls: true, extractContacts: true }),
+                getLatestNews(topic, 2)
+              ]);
+              if (search.length || news.length) {
+                researchContext = `[Web Research - Verified Sources]\n${news.map(n => n.title).join('\n')}\n${search.map(r =>
+                  `${r.title}${r.contacts?.emails?.length ? ` [Contact: ${r.contacts.emails[0]}]` : ''}`
+                ).join('\n')}`;
+              }
             }
           } catch (e) { }
         }
