@@ -96,15 +96,57 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
 
     const handleGeneratePost = async (topic: TrendingTopic) => {
         setIsLoadingPost(true);
+        setError(null);
         try {
+            console.log('[BlogView] Starting blog generation for:', topic.topic);
             // Generate a full comprehensive blog post (1500+ words)
             const post = await generateBlogPost(topic, profile, 1500);
+
+            // Validate the content was actually generated
+            if (!post.content || post.content === 'Failed to generate content.' || post.wordCount < 100) {
+                throw new Error('Blog content generation incomplete');
+            }
+
+            console.log('[BlogView] Successfully generated blog:', post.title, 'Words:', post.wordCount);
             setPosts(prev => [post, ...prev]);
             setSelectedPost(post);
-        } catch (e) {
-            console.error('Failed to generate post:', e);
+        } catch (e: any) {
+            console.error('[BlogView] Failed to generate post:', e);
+
+            // Check if all providers failed - auto-retry
+            if (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError') {
+                setError('Taking a quick breather — trying again...');
+
+                // Auto-retry after 3 seconds
+                setTimeout(async () => {
+                    try {
+                        const retryPost = await generateBlogPost(topic, profile, 1500);
+                        if (retryPost.content && retryPost.wordCount > 100) {
+                            setPosts(prev => [retryPost, ...prev]);
+                            setSelectedPost(retryPost);
+                            setError(null);
+                        } else {
+                            setError('Blog generation incomplete. Please try again.');
+                        }
+                    } catch (retryError) {
+                        console.error('[BlogView] Retry failed:', retryError);
+                        setError('Our AI is taking a short break. Please try again in a minute! 🙏');
+                    }
+                    setIsLoadingPost(false);
+                }, 3000);
+                return; // Don't setIsLoadingPost(false) yet
+            }
+
+            // More specific error message
+            if (e.message?.includes('incomplete')) {
+                setError('Blog generation was cut short. Please try again for a complete article.');
+            } else {
+                setError('Failed to generate blog post. Please try again.');
+            }
         } finally {
-            setIsLoadingPost(false);
+            if (!error?.includes('breather')) {
+                setIsLoadingPost(false);
+            }
         }
     };
 

@@ -261,12 +261,15 @@ Return JSON:
   "suggestedImages": ["description of hero image", "description of supporting image"]
 }`;
 
+    console.log('[Blog] Calling LLM for blog post generation...');
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are an expert content writer who combines SEO mastery with engaging storytelling. Your posts rank on page 1 and keep readers engaged. Write content that's both search-engine friendly and genuinely valuable to human readers.`,
+        systemPrompt: `You are an expert content writer who combines SEO mastery with engaging storytelling. Your posts rank on page 1 and keep readers engaged. Write content that's both search-engine friendly and genuinely valuable to human readers. IMPORTANT: Always generate COMPLETE, FULL blog posts - never cut content short. The user expects a comprehensive article.`,
         temperature: 0.75,
-        maxTokens: 4000
+        maxTokens: 8000  // Increased for full blog generation
     });
+
+    console.log('[Blog] LLM response received, length:', response.text?.length || 0);
 
     const parsed = parseJSONFromLLM<{
         title: string;
@@ -278,13 +281,71 @@ Return JSON:
         suggestedImages?: string[];
     }>(response.text);
 
-    const content = parsed?.content || 'Failed to generate content.';
-    const blogTitle = parsed?.title || topic.topic;
+    // If JSON parsing failed, try to extract content from raw text
+    let content = parsed?.content || '';
+    let blogTitle = parsed?.title || topic.topic;
+
+    if (!content || content.length < 200) {
+        console.log('[Blog] JSON parsing incomplete, extracting from raw text...');
+        // Try to extract content between markdown headers
+        const rawText = response.text;
+
+        // Look for "content" field in raw response
+        const contentMatch = rawText.match(/"content"\s*:\s*"([\s\S]+?)"\s*[,}]/);
+        if (contentMatch && contentMatch[1]?.length > 200) {
+            content = contentMatch[1]
+                .split('\\n').join('\n')
+                .split('\\"').join('"')
+                .split('\\\\').join('\\');
+        }
+
+        // If still no content, use the raw response but clean it up
+        if (!content || content.length < 200) {
+            // Remove JSON wrapper if present - use simpler string operations
+            const startIdx = rawText.indexOf('"content"');
+            const endIdx = rawText.lastIndexOf('"excerpt"');
+
+            if (startIdx > -1 && endIdx > startIdx) {
+                content = rawText.substring(startIdx + 12, endIdx)
+                    .replace(/^["'\s]+/, '')
+                    .replace(/["'\s,]+$/, '')
+                    .split('\\n').join('\n')
+                    .split('\\"').join('"')
+                    .trim();
+            }
+
+            // If it still looks like JSON, try a different approach - just use all the text
+            if (content.startsWith('{') || content.length < 200) {
+                // Extract anything that looks like blog content (paragraphs)
+                const paragraphs = rawText.match(/[A-Z][^.!?]*[.!?]/g);
+                if (paragraphs && paragraphs.length > 5) {
+                    content = paragraphs.join('\n\n');
+                }
+            }
+        }
+
+        // Try to extract title if not found
+        if (!parsed?.title) {
+            const titleMatch = rawText.match(/"title"\s*:\s*"([^"]+)"/);
+            if (titleMatch) {
+                blogTitle = titleMatch[1];
+            }
+        }
+    }
+
+    // Final validation
+    if (!content || content === 'Failed to generate content.' || content.length < 100) {
+        console.error('[Blog] Failed to generate adequate content');
+        content = `# ${topic.topic}\n\nWe encountered an issue generating this blog post. Please try again.\n\n*Topic: ${topic.topic}*\n*Keywords: ${topic.relatedKeywords.join(', ')}*`;
+    }
 
     // Track in memory
     addGeneratedBlogTitle(blogTitle);
     incrementGeneratedCount('blogs', 1);
     trackAction(`Generated blog post: ${blogTitle}`);
+
+    const actualWordCount = content.split(/\s+/).length;
+    console.log('[Blog] Final blog stats - Title:', blogTitle, 'Words:', actualWordCount);
 
     return {
         id: `post-${Date.now()}`,
@@ -295,7 +356,7 @@ Return JSON:
         seoScore: parsed?.seoScore || 70,
         trendingTopic: topic.topic,
         status: 'Draft',
-        wordCount: content.split(/\s+/).length
+        wordCount: actualWordCount
     };
 }
 
