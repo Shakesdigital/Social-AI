@@ -33,14 +33,14 @@ import { generateMarketResearch, generateMarketingStrategy, generateContentTopic
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import ReactMarkdown from 'react-markdown';
 
-// Custom Shakes Logo (Small version for Sidebar)
-const ShakesLogoSmall = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="6" className="text-brand-600" />
-    <rect x="28" y="35" width="44" height="30" rx="3" stroke="currentColor" strokeWidth="4" className="text-slate-800" fill="transparent" />
-    <line x1="28" y1="45" x2="72" y2="45" stroke="currentColor" strokeWidth="3" className="text-slate-800" />
-    <path d="M46 52 L56 57 L46 62 V52 Z" fill="currentColor" className="text-slate-800" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-  </svg>
+// Logo Component - Uses the Market MI logo image
+const MarketMILogo = ({ className, onClick }: { className?: string; onClick?: () => void }) => (
+  <img
+    src="/market-mi-logo.png"
+    alt="Market MI Logo"
+    className={`${className || ''} ${onClick ? 'cursor-pointer' : ''}`}
+    onClick={onClick}
+  />
 );
 
 // Reusable App Header (matches Landing Page header)
@@ -49,8 +49,8 @@ const AppHeader: React.FC<{ onLogoClick?: () => void }> = ({ onLogoClick }) => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-16 md:h-20">
         <div className="flex items-center gap-2 cursor-pointer" onClick={onLogoClick}>
-          <span className="p-1.5 bg-brand-600 text-white rounded-lg font-bold text-lg">AI</span>
-          <span className="font-bold text-xl text-slate-800">SocialAI</span>
+          <MarketMILogo className="w-10 h-10 object-contain" onClick={onLogoClick} />
+          <span className="font-bold text-xl text-slate-800">Market MI</span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
           <span className="text-brand-600">Dashboard</span>
@@ -66,8 +66,8 @@ const AppFooter: React.FC = () => (
     <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12 md:mb-16">
       <div className="col-span-2 md:col-span-1">
         <div className="flex items-center gap-2 mb-4 md:mb-6">
-          <span className="p-1 bg-brand-600 text-white rounded font-bold text-sm">AI</span>
-          <span className="font-bold text-xl text-white">SocialAI</span>
+          <MarketMILogo className="w-8 h-8 object-contain" />
+          <span className="font-bold text-xl text-white">Market MI</span>
         </div>
         <p className="text-sm leading-relaxed text-slate-400">
           The intelligent marketing assistant that helps businesses research, plan, and automate their social media growth.
@@ -105,7 +105,7 @@ const AppFooter: React.FC = () => (
     </div>
 
     <div className="max-w-7xl mx-auto px-4 border-t border-slate-800 pt-6 md:pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
-      <p>© 2025 SocialAI Inc. All rights reserved.</p>
+      <p>© 2025 Market MI. All rights reserved.</p>
       <div className="flex gap-6 mt-4 md:mt-0">
         <a href="#" className="hover:text-white transition-colors">Twitter</a>
         <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
@@ -140,7 +140,7 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
   return (
     <div className="flex items-center justify-center min-h-[80vh] px-4 py-6 md:py-8">
       <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Welcome to SocialAI</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Welcome to Market MI</h1>
         <p className="text-slate-500 mb-6 md:mb-8 text-sm sm:text-base">Let's set up your business profile to generate tailored strategies.</p>
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -633,7 +633,7 @@ export default function App() {
       {showSidebar && (
         <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-brand-600 font-bold text-lg">
-            <ShakesLogoSmall className="w-7 h-7" /> <span>SocialAI</span>
+            <MarketMILogo className="w-7 h-7 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -664,8 +664,8 @@ export default function App() {
         `}>
           <div className="p-6 border-b border-slate-100">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-brand-600 font-bold text-xl">
-                <ShakesLogoSmall className="w-8 h-8" /> <span>SocialAI</span>
+              <div className="flex items-center gap-2 text-brand-600 font-bold text-xl cursor-pointer" onClick={() => setView(AppView.LANDING)}>
+                <MarketMILogo className="w-8 h-8 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}

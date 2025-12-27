@@ -142,7 +142,7 @@ Provide a helpful, specific, and actionable response based on the business profi
 
       const response = await callLLM(prompt, {
         type: 'fast',
-        systemPrompt: `You are SocialAI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
+        systemPrompt: `You are Market MI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
 
 ${profile ? `You are helping ${profile.name} in the ${profile.industry} industry. Their target audience is ${profile.targetAudience}.` : ''}
 
@@ -186,7 +186,7 @@ Always aim to HELP the user take action, not just inform them. Be specific to th
           try {
             const retryResponse = await callLLM(prompt, {
               type: 'fast',
-              systemPrompt: `You are SocialAI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
+              systemPrompt: `You are Market MI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
 ${profile ? `You are helping ${profile.name} in the ${profile.industry} industry.` : ''}
 Give specific, actionable advice. Be concise but comprehensive.`,
               temperature: 0.8
@@ -254,7 +254,7 @@ Give specific, actionable advice. Be concise but comprehensive.`,
               <Sparkles size={20} />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-sm">SocialAI Assistant</span>
+              <span className="font-bold text-sm">Market MI Assistant</span>
               <span className="text-xs text-brand-100 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
                 {hasFreeLLMConfigured() ? 'Ready to help' : 'API key needed'}

@@ -39,9 +39,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
       <nav className="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-brand-600 text-white rounded-lg font-bold text-lg">AI</span>
-              <span className="font-bold text-xl text-slate-800">SocialAI</span>
+            <div className="flex items-center gap-2 cursor-pointer">
+              <img src="/market-mi-logo.png" alt="Market MI" className="w-10 h-10 object-contain" />
+              <span className="font-bold text-xl text-slate-800">Market MI</span>
             </div>
             <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
               <a href="#features" className="hover:text-brand-600 transition-colors">Features</a>
@@ -83,7 +83,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-700">Manager You Need</span>
           </h1>
           <p className="max-w-2xl mx-auto text-xl text-slate-600 mb-10 leading-relaxed font-light">
-            Automate your entire marketing workflow. From market research and strategy to content creation and scheduling—SocialAI does it all.
+            Automate your entire marketing workflow. From market research and strategy to content creation and scheduling—Market MI does it all.
           </p>
 
           {/* Welcome Back Card for Returning Users */}
@@ -132,7 +132,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
-              <div className="bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-md mx-auto w-1/3 text-center truncate">socialai.app/dashboard</div>
+              <div className="bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-md mx-auto w-1/3 text-center truncate">marketmi.app/dashboard</div>
             </div>
 
             {/* App Interface Mockup */}
@@ -142,7 +142,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
               <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 hidden md:flex">
                 <div className="p-6 border-b border-slate-100">
                   <div className="flex items-center gap-2 text-brand-600 font-bold text-xl">
-                    <span className="p-1 bg-brand-600 text-white rounded">AI</span> SocialAI
+                    <img src="/market-mi-logo.png" alt="Market MI" className="w-6 h-6 object-contain" /> Market MI
                   </div>
                 </div>
                 <div className="flex-1 p-4 space-y-1">
@@ -236,7 +236,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <FeatureCard
               icon={<Zap className="w-6 h-6 text-brand-600" />}
               title="Auto-Pilot Mode"
-              description="Set your cadence and let SocialAI automatically generate, caption, and schedule posts for all your platforms."
+              description="Set your cadence and let Market MI automatically generate, caption, and schedule posts for all your platforms."
               action="Enable Auto-Pilot"
             />
             <FeatureCard
@@ -266,7 +266,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4 text-slate-900">From Zero to Posted in Seconds</h2>
-            <p className="text-slate-500">How SocialAI transforms your workflow.</p>
+            <p className="text-slate-500">How Market MI transforms your workflow.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 text-center">
@@ -293,7 +293,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
       <section className="py-24 bg-slate-900 relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
           <h2 className="text-4xl font-extrabold text-white mb-6">Ready to Scale Your Marketing?</h2>
-          <p className="text-slate-300 text-xl mb-10 max-w-2xl mx-auto">Join thousands of businesses using SocialAI to save time and grow faster.</p>
+          <p className="text-slate-300 text-xl mb-10 max-w-2xl mx-auto">Join thousands of businesses using Market MI to save time and grow faster.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={onGetStarted}
@@ -313,8 +313,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-1">
             <div className="flex items-center gap-2 mb-6">
-              <span className="p-1 bg-brand-600 text-white rounded font-bold text-sm">AI</span>
-              <span className="font-bold text-xl text-white">SocialAI</span>
+              <img src="/market-mi-logo.png" alt="Market MI" className="w-8 h-8 object-contain" />
+              <span className="font-bold text-xl text-white">Market MI</span>
             </div>
             <p className="text-sm leading-relaxed text-slate-400">
               The intelligent marketing assistant that helps businesses research, plan, and automate their social media growth.
@@ -352,7 +352,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
         </div>
 
         <div className="max-w-7xl mx-auto px-4 border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
-          <p>© 2025 SocialAI Inc. All rights reserved.</p>
+          <p>© 2025 Market MI. All rights reserved.</p>
           <div className="flex gap-6 mt-4 md:mt-0">
             <a href="#" className="hover:text-white transition-colors">Twitter</a>
             <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
