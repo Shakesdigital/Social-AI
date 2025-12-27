@@ -462,6 +462,8 @@ TRENDING CONTENT TO LEVERAGE:
   }
 
   const planPrompt = `
+CRITICAL: You MUST respond with ONLY a valid JSON object. No text before or after the JSON. No markdown, no explanations.
+
 Create a viral content calendar.
 
 ${businessContext}
@@ -488,24 +490,14 @@ CONTENT MIX GUIDELINES:
 • 20% Behind-the-scenes/Personal
 • 10% Promotional
 
-Return JSON:
-{
-  "posts": [
-    {
-      "platform": "Instagram",
-      "topic": "Specific topic",
-      "caption": "Full caption with hashtags",
-      "imagePrompt": "Detailed image description",
-      "bestTime": "9:00 AM"
-    }
-  ]
-}
+IMPORTANT: Respond with ONLY this exact JSON structure, nothing else:
+{"posts": [{"platform": "Instagram", "topic": "Your topic here", "caption": "Full caption with hashtags", "imagePrompt": "Detailed image description", "bestTime": "9:00 AM"}]}
 `;
 
   try {
     const response = await callLLM(planPrompt, {
       type: 'reasoning',
-      systemPrompt: "You are a content strategist who creates content calendars that drive real engagement and growth. Every post should have a purpose and be optimized for its platform. Generate FRESH content that hasn't been done before.",
+      systemPrompt: "You are a JSON-only content calendar generator. You MUST respond with ONLY valid JSON. No explanations, no markdown, no text outside the JSON object. Generate fresh, engaging content for each platform.",
       maxTokens: 3000
     });
 

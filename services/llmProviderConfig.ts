@@ -49,9 +49,9 @@ export interface ModelConfig {
 
 export const MODELS: Record<LLMProvider, ModelConfig> = {
     groq: {
-        // Currently active Groq models (as of Dec 2024)
-        fast: 'llama-3.1-70b-versatile',
-        reasoning: 'llama-3.1-70b-versatile',
+        // Groq's current active model (December 2024)
+        fast: 'llama-3.3-70b-versatile',
+        reasoning: 'llama-3.3-70b-versatile',
         maxTokens: 4096,
         supportsSystemPrompt: true,
     },

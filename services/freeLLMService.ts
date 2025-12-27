@@ -584,14 +584,19 @@ export function parseJSONFromLLM<T>(text: string): T | null {
 
     console.log('[parseJSON] Attempting to parse response of length:', text.length);
 
+    // Clean up common issues
+    let cleanText = text
+        .replace(/^[\s\S]*?(\{|\[)/m, '$1')  // Remove text before first { or [
+        .replace(/(\}|\])[\s\S]*$/m, '$1');   // Remove text after last } or ]
+
     // Try multiple patterns to find JSON
     const patterns = [
         /```json\s*([\s\S]*?)\s*```/,       // ```json ... ```
         /```\s*([\s\S]*?)\s*```/,            // ``` ... ```
-        /\[\s*\{[\s\S]*\}\s*\]/,             // Array of objects
-        /\{[\s\S]*"topic"[\s\S]*\}/,         // Object with topic key
-        /\{[\s\S]*\}/,                        // Any object
-        /\[[\s\S]*\]/                         // Any array
+        /(\{"posts"\s*:\s*\[[\s\S]*?\]\s*\})/,  // {"posts": [...]}
+        /(\[\s*\{[\s\S]*?\}\s*\])/,          // Array of objects
+        /(\{[\s\S]*"topic"[\s\S]*\})/,       // Object with topic key
+        /(\{[\s\S]*"posts"[\s\S]*\})/,       // Object with posts key
     ];
 
     for (const pattern of patterns) {
@@ -609,7 +614,16 @@ export function parseJSONFromLLM<T>(text: string): T | null {
         }
     }
 
-    // Last resort: try parsing the whole text
+    // Try parsing the cleaned text
+    try {
+        const parsed = JSON.parse(cleanText);
+        console.log('[parseJSON] Parsed cleaned text successfully');
+        return parsed;
+    } catch (e) {
+        // Continue
+    }
+
+    // Last resort: try parsing the whole original text
     try {
         const parsed = JSON.parse(text);
         console.log('[parseJSON] Parsed whole text successfully');
