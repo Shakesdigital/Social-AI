@@ -138,40 +138,40 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] px-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome to SocialAI</h1>
-        <p className="text-slate-500 mb-8">Let's set up your business profile to generate tailored strategies.</p>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="flex items-center justify-center min-h-[80vh] px-4 py-6 md:py-8">
+      <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Welcome to SocialAI</h1>
+        <p className="text-slate-500 mb-6 md:mb-8 text-sm sm:text-base">Let's set up your business profile to generate tailored strategies.</p>
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-              <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Company Name</label>
+              <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
-              <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">What do you do?</label>
-            <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Describe your products or services..." />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
-              <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business Owners..." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Brand Voice</label>
-              <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Witty, Friendly..." />
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
+              <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Marketing Goals</label>
-            <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">What do you do?</label>
+            <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 h-24 text-base focus:ring-2 focus:ring-brand-500 outline-none resize-none" placeholder="Describe your products or services..." />
           </div>
-          <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-lg hover:bg-brand-700 transition-colors">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Target Audience</label>
+              <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Brand Voice</label>
+              <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Friendly..." />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Marketing Goals</label>
+            <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
+          </div>
+          <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3.5 rounded-lg hover:bg-brand-700 transition-colors text-base">
             Initialize Assistant
           </button>
         </form>
@@ -184,61 +184,62 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Dashboard Content */}
-      <div className="p-6 md:p-8 flex-1">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500">Welcome back, {profile.name}.</p>
+      <div className="p-4 sm:p-6 md:p-8 flex-1">
+        <header className="mb-6 md:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 text-sm sm:text-base">Welcome back, {profile.name}.</p>
         </header>
 
         {/* Social Media Section */}
-        <h2 className="text-lg font-semibold text-slate-700 mb-4">Social Media Marketing</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-          <div onClick={() => onNavigate(AppView.RESEARCH)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
-            <h3 className="text-lg font-semibold mb-1">Market Research</h3>
-            <p className="text-sm text-slate-500">View latest trends and competitor analysis.</p>
+        <h2 className="text-base sm:text-lg font-semibold text-slate-700 mb-3 md:mb-4">Social Media Marketing</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mb-6 md:mb-8">
+          <div onClick={() => onNavigate(AppView.RESEARCH)} className="bg-white p-4 sm:p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4"><Search size={20} className="sm:hidden" /><Search size={24} className="hidden sm:block" /></div>
+            <h3 className="text-base sm:text-lg font-semibold mb-1">Market Research</h3>
+            <p className="text-xs sm:text-sm text-slate-500">View latest trends and competitor analysis.</p>
           </div>
-          <div onClick={() => onNavigate(AppView.STRATEGY)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4"><Lightbulb size={24} /></div>
-            <h3 className="text-lg font-semibold mb-1">Strategic Plan</h3>
-            <p className="text-sm text-slate-500">Deep-dive marketing strategy generation.</p>
+          <div onClick={() => onNavigate(AppView.STRATEGY)} className="bg-white p-4 sm:p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4"><Lightbulb size={20} className="sm:hidden" /><Lightbulb size={24} className="hidden sm:block" /></div>
+            <h3 className="text-base sm:text-lg font-semibold mb-1">Strategic Plan</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Deep-dive marketing strategy generation.</p>
           </div>
-          <div onClick={() => onNavigate(AppView.CALENDAR)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4"><CalendarIcon size={24} /></div>
-            <h3 className="text-lg font-semibold mb-1">Content Calendar</h3>
-            <p className="text-sm text-slate-500">Manage posts and schedule content.</p>
+          <div onClick={() => onNavigate(AppView.CALENDAR)} className="bg-white p-4 sm:p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer sm:col-span-2 lg:col-span-1">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4"><CalendarIcon size={20} className="sm:hidden" /><CalendarIcon size={24} className="hidden sm:block" /></div>
+            <h3 className="text-base sm:text-lg font-semibold mb-1">Content Calendar</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Manage posts and schedule content.</p>
           </div>
         </div>
 
         {/* Digital Marketing Suite Section */}
-        <h2 className="text-lg font-semibold text-slate-700 mb-4">Digital Marketing Suite</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-          <div onClick={() => onNavigate(AppView.LEADS)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-4"><Users size={24} /></div>
-            <h3 className="text-lg font-semibold mb-1">Lead Research</h3>
-            <p className="text-sm text-slate-500">Find and research potential marketing leads.</p>
+        <h2 className="text-base sm:text-lg font-semibold text-slate-700 mb-3 md:mb-4">Digital Marketing Suite</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mb-6 md:mb-8">
+          <div onClick={() => onNavigate(AppView.LEADS)} className="bg-white p-4 sm:p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4"><Users size={20} className="sm:hidden" /><Users size={24} className="hidden sm:block" /></div>
+            <h3 className="text-base sm:text-lg font-semibold mb-1">Lead Research</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Find and research potential marketing leads.</p>
           </div>
-          <div onClick={() => onNavigate(AppView.EMAIL)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-4"><Mail size={24} /></div>
-            <h3 className="text-lg font-semibold mb-1">Email Marketing</h3>
-            <p className="text-sm text-slate-500">Create personalized outreach campaigns.</p>
+          <div onClick={() => onNavigate(AppView.EMAIL)} className="bg-white p-4 sm:p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4"><Mail size={20} className="sm:hidden" /><Mail size={24} className="hidden sm:block" /></div>
+            <h3 className="text-base sm:text-lg font-semibold mb-1">Email Marketing</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Create personalized outreach campaigns.</p>
           </div>
-          <div onClick={() => onNavigate(AppView.BLOG)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-4"><FileText size={24} /></div>
-            <h3 className="text-lg font-semibold mb-1">Blog Content</h3>
-            <p className="text-sm text-slate-500">Generate SEO-optimized blog posts.</p>
+          <div onClick={() => onNavigate(AppView.BLOG)} className="bg-white p-4 sm:p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer sm:col-span-2 lg:col-span-1">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4"><FileText size={20} className="sm:hidden" /><FileText size={24} className="hidden sm:block" /></div>
+            <h3 className="text-base sm:text-lg font-semibold mb-1">Blog Content</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Generate SEO-optimized blog posts.</p>
           </div>
         </div>
 
-        <div className="bg-brand-900 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden">
+        {/* Live Consultant CTA */}
+        <div className="bg-brand-900 rounded-xl sm:rounded-2xl p-5 sm:p-6 md:p-8 text-white relative overflow-hidden">
           <div className="relative z-10">
-            <h2 className="text-xl md:text-2xl font-bold mb-2">Need real-time advice?</h2>
-            <p className="mb-6 opacity-90 max-w-lg text-sm md:text-base">Talk directly to your AI marketing consultant using Gemini Live Native Audio.</p>
-            <button onClick={() => document.getElementById('live-btn')?.click()} className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold hover:bg-slate-100 inline-flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2">Need real-time advice?</h2>
+            <p className="mb-4 sm:mb-6 opacity-90 max-w-lg text-xs sm:text-sm md:text-base">Talk directly to your AI marketing consultant using Gemini Live Audio.</p>
+            <button onClick={() => document.getElementById('live-btn')?.click()} className="bg-white text-brand-900 px-4 sm:px-6 py-2.5 rounded-lg font-semibold hover:bg-slate-100 active:scale-95 transition-all inline-flex items-center gap-2 text-sm sm:text-base">
               <Mic size={18} /> Start Conversation
             </button>
           </div>
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent hidden sm:block"></div>
         </div>
       </div>
 
@@ -603,22 +604,68 @@ export default function App() {
   };
 
   const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu when view changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [view]);
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* API Key Warning Banner */}
       {!hasApiKey && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
           <AlertTriangle size={12} />
-          WARNING: No LLM API Key configured. Please add VITE_GROQ_API_KEY to your Netlify Environment Variables.
+          <span className="hidden sm:inline">WARNING: No LLM API Key configured. Please add VITE_GROQ_API_KEY to your Netlify Environment Variables.</span>
+          <span className="sm:hidden">No API Key configured</span>
         </div>
       )}
 
+      {/* Mobile Header - Only shown on mobile when sidebar should be visible */}
       {showSidebar && (
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-brand-600 font-bold text-lg">
+            <ShakesLogoSmall className="w-7 h-7" /> <span>SocialAI</span>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Overlay */}
+      {showSidebar && mobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Hidden on mobile, slide-out drawer when menu is open */}
+      {showSidebar && (
+        <aside className={`
+          fixed lg:relative inset-y-0 left-0 z-50
+          w-72 lg:w-64 bg-white border-r border-slate-200 
+          flex flex-col shrink-0
+          transform transition-transform duration-300 ease-in-out
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
           <div className="p-6 border-b border-slate-100">
-            <div className="flex items-center gap-2 text-brand-600 font-bold text-xl">
-              <ShakesLogoSmall className="w-8 h-8" /> <span>SocialAI</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-brand-600 font-bold text-xl">
+                <ShakesLogoSmall className="w-8 h-8" /> <span>SocialAI</span>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="lg:hidden p-1 rounded hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
             </div>
           </div>
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -632,14 +679,31 @@ export default function App() {
             <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
             <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
           </nav>
-          <div className="p-4 border-t border-slate-100 space-y-4">
-            <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all"><Mic size={20} className="animate-pulse" /> Live Consultant</button>
-            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-1 text-sm"><Settings size={16} /> LLM Diagnostics</button>
-            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-1 text-sm"><LogOut size={16} /> Logout / Reset</button>
+          <div className="p-4 border-t border-slate-100 space-y-3">
+            <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
+              <Mic size={18} className="animate-pulse" /> Live Consultant
+            </button>
+            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+              <Settings size={16} /> LLM Diagnostics
+            </button>
+            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+              <LogOut size={16} /> Logout / Reset
+            </button>
           </div>
         </aside>
       )}
-      <main className={`flex-1 overflow-hidden relative ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''} ${!hasApiKey ? 'mt-6' : ''}`}>{renderContent()}</main>
+
+      {/* Main Content Area */}
+      <main className={`
+        flex-1 overflow-hidden relative
+        ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''} 
+        ${!hasApiKey ? 'mt-6' : ''}
+        ${showSidebar ? 'pt-14 lg:pt-0' : ''}
+      `}>
+        {renderContent()}
+      </main>
+
+      {/* Modals and Overlays */}
       <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
       {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
       {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
