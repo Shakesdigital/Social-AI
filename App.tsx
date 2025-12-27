@@ -43,7 +43,7 @@ const ShakesLogoSmall = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = ({ onComplete }) => {
+const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void; onBack?: () => void }> = ({ onComplete, onBack }) => {
   const [formData, setFormData] = useState<CompanyProfile>({
     name: '',
     industry: '',
@@ -65,44 +65,120 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] px-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome to SocialAI</h1>
-        <p className="text-slate-500 mb-8">Let's set up your business profile to generate tailored strategies.</p>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-              <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Header Navigation */}
+      <nav className="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={onBack}>
+              <span className="p-1.5 bg-brand-600 text-white rounded-lg font-bold text-lg">AI</span>
+              <span className="font-bold text-xl text-slate-800">SocialAI</span>
+            </div>
+            <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+              <span className="text-brand-600">Create Profile</span>
+            </div>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="text-slate-600 hover:text-brand-600 px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 text-sm"
+              >
+                ← Back to Home
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="flex-1 pt-32 pb-20">
+        <div className="flex items-center justify-center px-4">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Your Profile</h1>
+            <p className="text-slate-500 mb-8">Let's set up your business profile to generate tailored strategies.</p>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                  <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
+                  <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">What do you do?</label>
+                <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Describe your products or services..." />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
+                  <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business Owners..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Brand Voice</label>
+                  <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Witty, Friendly..." />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Marketing Goals</label>
+                <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
+              </div>
+              <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-lg hover:bg-brand-700 transition-colors">
+                Initialize Assistant
+              </button>
+            </form>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 pt-12 pb-6 text-slate-300">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div className="col-span-1">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="p-1 bg-brand-600 text-white rounded font-bold text-sm">AI</span>
+                <span className="font-bold text-xl text-white">SocialAI</span>
+              </div>
+              <p className="text-sm text-slate-400">
+                The intelligent marketing assistant for modern businesses.
+              </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
-              <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">What do you do?</label>
-            <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Describe your products or services..." />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
-              <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business Owners..." />
+              <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Product</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Features</a></li>
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Pricing</a></li>
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Auto-Pilot</a></li>
+              </ul>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Brand Voice</label>
-              <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Witty, Friendly..." />
+              <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Company</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="hover:text-brand-400 transition-colors">About Us</a></li>
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Careers</a></li>
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Contact</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Legal</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-brand-400 transition-colors">Terms of Service</a></li>
+              </ul>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Marketing Goals</label>
-            <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
+          <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
+            <p>© 2025 SocialAI Inc. All rights reserved.</p>
+            <div className="flex gap-4 mt-4 md:mt-0">
+              <a href="#" className="hover:text-white transition-colors">Twitter</a>
+              <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
+              <a href="#" className="hover:text-white transition-colors">Instagram</a>
+            </div>
           </div>
-          <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-lg hover:bg-brand-700 transition-colors">
-            Initialize Assistant
-          </button>
-        </form>
-      </div>
+        </div>
+      </footer>
     </div>
   );
 };
@@ -502,7 +578,7 @@ export default function App() {
     }
     if (!profile && view !== AppView.ONBOARDING) return null;
     switch (view) {
-      case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} />;
+      case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} onBack={() => setView(AppView.LANDING)} />;
       case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
       case AppView.RESEARCH: return <ResearchView profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
       case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
