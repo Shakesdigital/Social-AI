@@ -49,22 +49,23 @@ export interface ModelConfig {
 
 export const MODELS: Record<LLMProvider, ModelConfig> = {
     groq: {
-        // Using stable, well-tested models
-        fast: 'llama3-70b-8192',
-        reasoning: 'llama3-70b-8192',
+        // Currently active Groq models (as of Dec 2024)
+        fast: 'llama-3.1-70b-versatile',
+        reasoning: 'llama-3.1-70b-versatile',
         maxTokens: 4096,
         supportsSystemPrompt: true,
     },
     openrouter: {
-        // Using best available free models on OpenRouter
-        fast: 'meta-llama/llama-3.2-3b-instruct:free',
-        reasoning: 'deepseek/deepseek-r1-distill-llama-70b:free',
+        // Confirmed working free models on OpenRouter
+        fast: 'google/gemma-2-9b-it:free',
+        reasoning: 'meta-llama/llama-3.2-3b-instruct:free',
         maxTokens: 4096,
         supportsSystemPrompt: true,
     },
     huggingface: {
-        fast: 'HuggingFaceH4/zephyr-7b-beta',
-        reasoning: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
+        // Updated to models with better CORS support
+        fast: 'mistralai/Mistral-7B-Instruct-v0.3',
+        reasoning: 'mistralai/Mistral-7B-Instruct-v0.3',
         maxTokens: 2048,
         supportsSystemPrompt: false, // Requires custom formatting
     },
