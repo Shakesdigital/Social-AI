@@ -43,6 +43,79 @@ const ShakesLogoSmall = ({ className }: { className?: string }) => (
   </svg>
 );
 
+// Reusable App Header (matches Landing Page header)
+const AppHeader: React.FC<{ onLogoClick?: () => void }> = ({ onLogoClick }) => (
+  <nav className="w-full bg-white/90 backdrop-blur-md border-b border-slate-100 shrink-0">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-between items-center h-16 md:h-20">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={onLogoClick}>
+          <span className="p-1.5 bg-brand-600 text-white rounded-lg font-bold text-lg">AI</span>
+          <span className="font-bold text-xl text-slate-800">SocialAI</span>
+        </div>
+        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+          <span className="text-brand-600">Dashboard</span>
+        </div>
+      </div>
+    </div>
+  </nav>
+);
+
+// Reusable App Footer (matches Landing Page footer)
+const AppFooter: React.FC = () => (
+  <footer className="w-full bg-slate-900 pt-12 md:pt-16 pb-6 md:pb-8 border-t border-slate-800 text-slate-300 shrink-0">
+    <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12 md:mb-16">
+      <div className="col-span-2 md:col-span-1">
+        <div className="flex items-center gap-2 mb-4 md:mb-6">
+          <span className="p-1 bg-brand-600 text-white rounded font-bold text-sm">AI</span>
+          <span className="font-bold text-xl text-white">SocialAI</span>
+        </div>
+        <p className="text-sm leading-relaxed text-slate-400">
+          The intelligent marketing assistant that helps businesses research, plan, and automate their social media growth.
+        </p>
+      </div>
+
+      <div>
+        <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4 md:mb-6">Product</h4>
+        <ul className="space-y-2 md:space-y-3 text-sm">
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Features</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Pricing</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Auto-Pilot</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Case Studies</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4 md:mb-6">Company</h4>
+        <ul className="space-y-2 md:space-y-3 text-sm">
+          <li><a href="#" className="hover:text-brand-400 transition-colors">About Us</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Careers</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Blog</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Contact</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4 md:mb-6">Legal</h4>
+        <ul className="space-y-2 md:space-y-3 text-sm">
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Privacy Policy</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Terms of Service</a></li>
+          <li><a href="#" className="hover:text-brand-400 transition-colors">Cookie Policy</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div className="max-w-7xl mx-auto px-4 border-t border-slate-800 pt-6 md:pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
+      <p>© 2025 SocialAI Inc. All rights reserved.</p>
+      <div className="flex gap-6 mt-4 md:mt-0">
+        <a href="#" className="hover:text-white transition-colors">Twitter</a>
+        <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
+        <a href="#" className="hover:text-white transition-colors">Instagram</a>
+      </div>
+    </div>
+  </footer>
+);
+
+
 const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = ({ onComplete }) => {
   const [formData, setFormData] = useState<CompanyProfile>({
     name: '',
@@ -109,62 +182,68 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
 
 const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView) => void }> = ({ profile, onNavigate }) => {
   return (
-    <div className="p-8 overflow-y-auto h-full">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500">Welcome back, {profile.name}.</p>
-      </header>
+    <div className="flex flex-col h-full overflow-y-auto">
+      {/* Dashboard Content */}
+      <div className="p-6 md:p-8 flex-1">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500">Welcome back, {profile.name}.</p>
+        </header>
 
-      {/* Social Media Section */}
-      <h2 className="text-lg font-semibold text-slate-700 mb-4">Social Media Marketing</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div onClick={() => onNavigate(AppView.RESEARCH)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Market Research</h3>
-          <p className="text-sm text-slate-500">View latest trends and competitor analysis.</p>
+        {/* Social Media Section */}
+        <h2 className="text-lg font-semibold text-slate-700 mb-4">Social Media Marketing</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+          <div onClick={() => onNavigate(AppView.RESEARCH)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
+            <h3 className="text-lg font-semibold mb-1">Market Research</h3>
+            <p className="text-sm text-slate-500">View latest trends and competitor analysis.</p>
+          </div>
+          <div onClick={() => onNavigate(AppView.STRATEGY)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4"><Lightbulb size={24} /></div>
+            <h3 className="text-lg font-semibold mb-1">Strategic Plan</h3>
+            <p className="text-sm text-slate-500">Deep-dive marketing strategy generation.</p>
+          </div>
+          <div onClick={() => onNavigate(AppView.CALENDAR)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4"><CalendarIcon size={24} /></div>
+            <h3 className="text-lg font-semibold mb-1">Content Calendar</h3>
+            <p className="text-sm text-slate-500">Manage posts and schedule content.</p>
+          </div>
         </div>
-        <div onClick={() => onNavigate(AppView.STRATEGY)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4"><Lightbulb size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Strategic Plan</h3>
-          <p className="text-sm text-slate-500">Deep-dive marketing strategy generation.</p>
+
+        {/* Digital Marketing Suite Section */}
+        <h2 className="text-lg font-semibold text-slate-700 mb-4">Digital Marketing Suite</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+          <div onClick={() => onNavigate(AppView.LEADS)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-4"><Users size={24} /></div>
+            <h3 className="text-lg font-semibold mb-1">Lead Research</h3>
+            <p className="text-sm text-slate-500">Find and research potential marketing leads.</p>
+          </div>
+          <div onClick={() => onNavigate(AppView.EMAIL)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-4"><Mail size={24} /></div>
+            <h3 className="text-lg font-semibold mb-1">Email Marketing</h3>
+            <p className="text-sm text-slate-500">Create personalized outreach campaigns.</p>
+          </div>
+          <div onClick={() => onNavigate(AppView.BLOG)} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-4"><FileText size={24} /></div>
+            <h3 className="text-lg font-semibold mb-1">Blog Content</h3>
+            <p className="text-sm text-slate-500">Generate SEO-optimized blog posts.</p>
+          </div>
         </div>
-        <div onClick={() => onNavigate(AppView.CALENDAR)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4"><CalendarIcon size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Content Calendar</h3>
-          <p className="text-sm text-slate-500">Manage posts and schedule content.</p>
+
+        <div className="bg-brand-900 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden">
+          <div className="relative z-10">
+            <h2 className="text-xl md:text-2xl font-bold mb-2">Need real-time advice?</h2>
+            <p className="mb-6 opacity-90 max-w-lg text-sm md:text-base">Talk directly to your AI marketing consultant using Gemini Live Native Audio.</p>
+            <button onClick={() => document.getElementById('live-btn')?.click()} className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold hover:bg-slate-100 inline-flex items-center gap-2">
+              <Mic size={18} /> Start Conversation
+            </button>
+          </div>
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent"></div>
         </div>
       </div>
 
-      {/* Digital Marketing Suite Section */}
-      <h2 className="text-lg font-semibold text-slate-700 mb-4">Digital Marketing Suite</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div onClick={() => onNavigate(AppView.LEADS)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-4"><Users size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Lead Research</h3>
-          <p className="text-sm text-slate-500">Find and research potential marketing leads.</p>
-        </div>
-        <div onClick={() => onNavigate(AppView.EMAIL)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-4"><Mail size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Email Marketing</h3>
-          <p className="text-sm text-slate-500">Create personalized outreach campaigns.</p>
-        </div>
-        <div onClick={() => onNavigate(AppView.BLOG)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-4"><FileText size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Blog Content</h3>
-          <p className="text-sm text-slate-500">Generate SEO-optimized blog posts.</p>
-        </div>
-      </div>
-
-      <div className="bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
-          <p className="mb-6 opacity-90 max-w-lg">Talk directly to your AI marketing consultant using Gemini Live Native Audio.</p>
-          <button onClick={() => document.getElementById('live-btn')?.click()} className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold hover:bg-slate-100 inline-flex items-center gap-2">
-            <Mic size={18} /> Start Conversation
-          </button>
-        </div>
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent"></div>
-      </div>
+      {/* Footer */}
+      <AppFooter />
     </div>
   );
 };
@@ -502,7 +581,16 @@ export default function App() {
     }
     if (!profile && view !== AppView.ONBOARDING) return null;
     switch (view) {
-      case AppView.ONBOARDING: return <Onboarding onComplete={handleOnboardingComplete} />;
+      case AppView.ONBOARDING:
+        return (
+          <div className="min-h-screen flex flex-col bg-slate-50">
+            <AppHeader onLogoClick={() => setView(AppView.LANDING)} />
+            <main className="flex-1 overflow-y-auto">
+              <Onboarding onComplete={handleOnboardingComplete} />
+            </main>
+            <AppFooter />
+          </div>
+        );
       case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
       case AppView.RESEARCH: return <ResearchView profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
       case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
