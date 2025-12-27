@@ -49,8 +49,9 @@ export interface ModelConfig {
 
 export const MODELS: Record<LLMProvider, ModelConfig> = {
     groq: {
-        fast: 'llama-3.3-70b-versatile',
-        reasoning: 'llama-3.3-70b-versatile',
+        // Using stable, well-tested models
+        fast: 'llama3-70b-8192',
+        reasoning: 'llama3-70b-8192',
         maxTokens: 4096,
         supportsSystemPrompt: true,
     },
@@ -179,7 +180,14 @@ export const QUOTA_STORAGE_KEY = 'socialai_llm_quota';
  */
 export function hasValidApiKey(provider: LLMProvider): boolean {
     const key = API_KEYS[provider];
-    return typeof key === 'string' && key.length > 10 && !key.includes('your-');
+    const isValid = typeof key === 'string' && key.length > 10 && !key.includes('your-');
+
+    // Debug logging (only in dev or when troubleshooting)
+    if (typeof window !== 'undefined' && (window as any).__LLM_DEBUG__) {
+        console.log(`[LLM Config] ${provider}: key length=${key?.length || 0}, valid=${isValid}`);
+    }
+
+    return isValid;
 }
 
 /**

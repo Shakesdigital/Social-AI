@@ -34,6 +34,24 @@ import {
 } from './llmProviderConfig';
 
 // ============================================
+// STARTUP LOGGING - Shows configured providers
+// ============================================
+const configuredProviders = getConfiguredProviders();
+console.log('[LLM Service] Initialized with providers:', configuredProviders.length > 0
+    ? configuredProviders.join(', ')
+    : 'NONE - Please check your environment variables!');
+
+if (configuredProviders.length === 0) {
+    console.warn('[LLM Service] ⚠️ No LLM providers configured!');
+    console.warn('[LLM Service] Required env vars: VITE_GROQ_API_KEY, VITE_OPENROUTER_API_KEY, or VITE_HUGGINGFACE_API_KEY');
+    console.warn('[LLM Service] API Keys detected:', {
+        groq: API_KEYS.groq ? `${API_KEYS.groq.substring(0, 8)}...` : 'NOT SET',
+        openrouter: API_KEYS.openrouter ? `${API_KEYS.openrouter.substring(0, 8)}...` : 'NOT SET',
+        huggingface: API_KEYS.huggingface ? `${API_KEYS.huggingface.substring(0, 8)}...` : 'NOT SET',
+    });
+}
+
+// ============================================
 // TYPES
 // ============================================
 
