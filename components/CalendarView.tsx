@@ -103,16 +103,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
         }
     }, [posts, topics, pendingPosts, autoPilotConfig, connectedAccounts]);
 
-    const generateTopics = async () => {
+    const [topicError, setTopicError] = useState<string | null>(null);
+
+    const generateTopics = async (isRetry = false) => {
         setGeneratingTopics(true);
+        setTopicError(null);
         try {
             const newTopics = await generateContentTopics(profile);
-            // Append new topics to existing ones (avoid duplicates)
-            setTopics(prev => {
-                const combined = [...newTopics, ...prev];
-                return [...new Set(combined)]; // Remove duplicates
-            });
-        } catch (e: any) { alert(`Failed: ${e.message}`); }
+            if (newTopics.length > 0) {
+                setTopics(prev => {
+                    const combined = [...newTopics, ...prev];
+                    return [...new Set(combined)];
+                });
+            } else if (!isRetry) {
+                // Empty results, try once more
+                setTopicError('Taking a quick breather — trying again...');
+                setTimeout(() => generateTopics(true), 3000);
+                return;
+            }
+        } catch (e: any) {
+            console.error('[CalendarView] Topic generation failed:', e);
+
+            if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+                setTopicError('Taking a quick breather — trying again...');
+                setTimeout(() => generateTopics(true), 3000);
+                return;
+            }
+
+            setTopicError(isRetry
+                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                : 'Something went wrong. Please try again.');
+        }
         setGeneratingTopics(false);
     };
 
@@ -156,22 +177,46 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
         setIsCreatorOpen(false);
     };
 
-    const handleRunAutoPilot = async () => {
+    const [autoPilotError, setAutoPilotError] = useState<string | null>(null);
+
+    const handleRunAutoPilot = async (isRetry = false) => {
         setShowAutoPilotSettings(false);
         setIsAutoGenerating(true);
+        setAutoPilotError(null);
         try {
             const generatedPosts = await generateBatchContent(profile, autoPilotConfig);
-            if (autoPilotConfig.autoApprove) {
-                setPosts(prev => [...prev, ...generatedPosts.map(p => ({ ...p, status: 'Scheduled' } as SocialPost))]);
+            if (generatedPosts.length > 0) {
+                if (autoPilotConfig.autoApprove) {
+                    setPosts(prev => [...prev, ...generatedPosts.map(p => ({ ...p, status: 'Scheduled' } as SocialPost))]);
+                } else {
+                    setPendingPosts(generatedPosts);
+                    setShowReviewDashboard(true);
+                }
+            } else if (!isRetry) {
+                // Empty results, try once more
+                setAutoPilotError('Taking a quick breather — trying again...');
+                setTimeout(() => handleRunAutoPilot(true), 3000);
+                return;
             } else {
-                setPendingPosts(generatedPosts);
-                setShowReviewDashboard(true);
+                setAutoPilotError('Content generation returned no results. Please try again.');
             }
         } catch (e: any) {
-            alert(`Auto-Pilot failed: ${e.message}`);
+            console.error('[CalendarView] Auto-pilot failed:', e);
+
+            if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+                setAutoPilotError('Taking a quick breather — trying again...');
+                setTimeout(() => handleRunAutoPilot(true), 3000);
+                return;
+            }
+
+            setAutoPilotError(isRetry
+                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                : 'Something went wrong. Please try again.');
         } finally {
-            setIsAutoGenerating(false);
-            setAutoPilotConfig(prev => ({ ...prev, enabled: true }));
+            if (!autoPilotError?.includes('breather')) {
+                setIsAutoGenerating(false);
+                setAutoPilotConfig(prev => ({ ...prev, enabled: true }));
+            }
         }
     };
 
@@ -240,7 +285,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
 
     return (
         <div className="p-8 h-full flex flex-col relative">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold font-display text-slate-900">Content Calendar</h1>
                 <div className="flex gap-2">
                     <button
@@ -251,13 +296,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                         {autoPilotConfig.enabled ? 'Auto-Pilot Active' : 'Enable Auto-Pilot'}
                     </button>
                     <button
-                        onClick={generateTopics}
+                        onClick={() => generateTopics()}
                         className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors shadow-sm"
                     >
                         <PlusCircle size={18} /> {generatingTopics ? 'Thinking...' : 'Generate Ideas'}
                     </button>
                 </div>
             </div>
+
+            {/* Error displays */}
+            {(topicError || autoPilotError) && (
+                <div className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${(topicError || autoPilotError)?.includes('breather')
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-red-50 text-red-700'
+                    }`}>
+                    {(topicError || autoPilotError)?.includes('breather') && (
+                        <span className="inline-block w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></span>
+                    )}
+                    {topicError || autoPilotError}
+                </div>
+            )}
 
             <div className="flex gap-8 h-full overflow-hidden">
                 {/* Left Column - Topics */}

@@ -46,10 +46,13 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
         setSelectedLeadIds([]);
     };
 
-    const handleGenerateEmail = async () => {
+    const [emailError, setEmailError] = useState<string | null>(null);
+
+    const handleGenerateEmail = async (isRetry = false) => {
         if (!selectedCampaign || selectedCampaign.leadIds.length === 0) return;
 
         setIsLoading(true);
+        setEmailError(null);
         try {
             const firstLeadId = selectedCampaign.leadIds[0];
             const lead = leads.find(l => l.id === firstLeadId);
@@ -63,15 +66,28 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
                     : c
             ));
             setSelectedCampaign(prev => prev ? { ...prev, emails: [...prev.emails, email] } : null);
-        } catch (e) {
-            console.error('Failed to generate email:', e);
+        } catch (e: any) {
+            console.error('[EmailView] Failed to generate email:', e);
+
+            if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+                setEmailError('Taking a quick breather — trying again...');
+                setTimeout(() => handleGenerateEmail(true), 3000);
+                return;
+            }
+
+            setEmailError(isRetry
+                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                : 'Something went wrong. Please try again.');
         } finally {
-            setIsLoading(false);
+            if (!emailError?.includes('breather')) {
+                setIsLoading(false);
+            }
         }
     };
 
-    const handleGenerateVariant = async (original: EmailTemplate) => {
+    const handleGenerateVariant = async (original: EmailTemplate, isRetry = false) => {
         setIsLoading(true);
+        setEmailError(null);
         try {
             const variant = await generateEmailVariant(original, profile);
 
@@ -81,17 +97,30 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
                     : c
             ));
             setSelectedCampaign(prev => prev ? { ...prev, emails: [...prev.emails, variant] } : null);
-        } catch (e) {
-            console.error('Failed to generate variant:', e);
+        } catch (e: any) {
+            console.error('[EmailView] Failed to generate variant:', e);
+
+            if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+                setEmailError('Taking a quick breather — trying again...');
+                setTimeout(() => handleGenerateVariant(original, true), 3000);
+                return;
+            }
+
+            setEmailError(isRetry
+                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                : 'Something went wrong. Please try again.');
         } finally {
-            setIsLoading(false);
+            if (!emailError?.includes('breather')) {
+                setIsLoading(false);
+            }
         }
     };
 
-    const handleGenerateDrip = async () => {
+    const handleGenerateDrip = async (isRetry = false) => {
         if (!selectedCampaign || selectedCampaign.leadIds.length === 0) return;
 
         setIsLoading(true);
+        setEmailError(null);
         try {
             const firstLeadId = selectedCampaign.leadIds[0];
             const lead = leads.find(l => l.id === firstLeadId);
@@ -105,10 +134,22 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
                     : c
             ));
             setSelectedCampaign(prev => prev ? { ...prev, emails: [...prev.emails, ...sequence] } : null);
-        } catch (e) {
-            console.error('Failed to generate drip sequence:', e);
+        } catch (e: any) {
+            console.error('[EmailView] Failed to generate drip sequence:', e);
+
+            if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+                setEmailError('Taking a quick breather — trying again...');
+                setTimeout(() => handleGenerateDrip(true), 3000);
+                return;
+            }
+
+            setEmailError(isRetry
+                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                : 'Something went wrong. Please try again.');
         } finally {
-            setIsLoading(false);
+            if (!emailError?.includes('breather')) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -144,6 +185,18 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
             {quotaWarning && (
                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
                     {quotaWarning}
+                </div>
+            )}
+
+            {emailError && (
+                <div className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${emailError.includes('breather')
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-red-50 text-red-700'
+                    }`}>
+                    {emailError.includes('breather') && (
+                        <span className="inline-block w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></span>
+                    )}
+                    {emailError}
                 </div>
             )}
 

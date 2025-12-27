@@ -175,6 +175,7 @@ const ResearchView: React.FC<{
   onStateChange?: (state: { report: ResearchReport | null }) => void
 }> = ({ profile, savedState, onStateChange }) => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const report = savedState?.report || null;
 
   const setReport = (newReport: ResearchReport | null) => {
@@ -183,15 +184,30 @@ const ResearchView: React.FC<{
     }
   };
 
-  const runResearch = async () => {
+  const runResearch = async (isRetry = false) => {
     setLoading(true);
+    setError(null);
     try {
       const result = await generateMarketResearch(profile);
       setReport({ rawContent: result.text, sources: result.sources, lastUpdated: new Date().toISOString() });
     } catch (e: any) {
-      alert(`Research Failed: ${e.message}. Ensure VITE_API_KEY is set in Netlify.`);
-    } finally {
+      console.error('[ResearchView] Failed:', e);
+
+      // Check if all providers failed - show friendly message and auto-retry
+      if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+        setError('Taking a quick breather — trying again...');
+        setTimeout(() => runResearch(true), 3000);
+        return;
+      }
+
+      setError(isRetry
+        ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+        : 'Something went wrong. Please try again.');
       setLoading(false);
+    } finally {
+      if (!error?.includes('breather')) {
+        setLoading(false);
+      }
     }
   };
 
@@ -199,13 +215,19 @@ const ResearchView: React.FC<{
     if (!report) runResearch();
   }, []);
 
-  if (loading) return <div className="p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse">Analysing market with Google Search...</div></div>;
+  if (loading) return <div className="p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse">Analysing market with AI...</div></div>;
   return (
     <div className="p-8 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Market Research</h1>
-        <button onClick={runResearch} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate</button>
+        <button onClick={() => runResearch()} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate</button>
       </div>
+      {error && (
+        <div className={`mb-4 p-4 rounded-lg ${error.includes('breather') ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+          {error.includes('breather') && <span className="inline-block w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mr-2"></span>}
+          {error}
+        </div>
+      )}
       {report && (
         <div className="flex gap-8">
           <div className="flex-1 bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none">
@@ -243,6 +265,7 @@ const StrategyWrapper: React.FC<{
 }> = ({ profile, researchText, savedState, onStateChange }) => {
   const [strategy, setStrategyLocal] = useState<string>(savedState?.strategy || '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const setStrategy = (newStrategy: string) => {
     setStrategyLocal(newStrategy);
@@ -251,41 +274,50 @@ const StrategyWrapper: React.FC<{
     }
   };
 
-  useEffect(() => {
-    // Only fetch if we don't have a saved strategy
-    if (savedState?.strategy) return;
-
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const res = await generateMarketingStrategy(profile, researchText || "No prior research.");
-        setStrategy(res);
-      } catch (e: any) {
-        setStrategy(`Failed to generate strategy: ${e.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
-  }, []);
-
-  const handleRegenerate = async () => {
+  const fetchStrategy = async (isRetry = false) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await generateMarketingStrategy(profile, researchText || "No prior research.");
       setStrategy(res);
     } catch (e: any) {
-      setStrategy(`Failed to generate strategy: ${e.message}`);
-    } finally {
+      console.error('[StrategyWrapper] Failed:', e);
+
+      // Check if all providers failed - show friendly message and auto-retry
+      if (!isRetry && (e.message?.includes('All LLM providers failed') || e.name === 'AllProvidersFailedError')) {
+        setError('Taking a quick breather — trying again...');
+        setTimeout(() => fetchStrategy(true), 3000);
+        return;
+      }
+
+      setError(isRetry
+        ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+        : 'Something went wrong. Please try again.');
       setLoading(false);
+    } finally {
+      if (!error?.includes('breather')) {
+        setLoading(false);
+      }
     }
   };
 
-  if (loading) return <div className="flex flex-col items-center justify-center h-96 text-center"><p>Thinking deeply...</p></div>;
+  useEffect(() => {
+    // Only fetch if we don't have a saved strategy
+    if (savedState?.strategy) return;
+    fetchStrategy();
+  }, []);
+
+  if (loading) return <div className="flex flex-col items-center justify-center h-96 text-center"><p className="animate-pulse">Generating strategy...</p></div>;
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={handleRegenerate} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate Strategy</button>
+      <div className="flex justify-between items-center mb-4">
+        {error && (
+          <div className={`flex-1 mr-4 p-3 rounded-lg text-sm ${error.includes('breather') ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+            {error.includes('breather') && <span className="inline-block w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mr-2"></span>}
+            {error}
+          </div>
+        )}
+        <button onClick={() => fetchStrategy()} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm">Regenerate Strategy</button>
       </div>
       <div className="bg-white p-8 rounded-xl shadow-sm prose prose-slate max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>
     </div>
