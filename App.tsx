@@ -18,7 +18,13 @@ import {
   AlertTriangle,
   Users,
   Mail,
-  FileText
+  FileText,
+  Shield,
+  Globe,
+  ArrowRight,
+  TrendingUp,
+  Target,
+  Sparkles
 } from 'lucide-react';
 import { AppView, CompanyProfile, ResearchReport, SocialPost, AutoPilotConfig, Lead } from './types';
 import { LiveAssistant } from './components/LiveAssistant';
@@ -165,109 +171,342 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void; onBa
   };
 
   return (
-    <div className="flex items-start justify-center px-4 min-h-[calc(100vh-160px)] py-12">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100 my-4">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Your Profile</h1>
-        <p className="text-slate-500 mb-8">Let's set up your business profile to generate tailored strategies.</p>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-              <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
-              <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
-            </div>
+    <div className="min-h-[calc(100vh-80px)] bg-gradient-to-br from-slate-50 via-white to-brand-50 flex items-center justify-center px-4 py-16">
+      {/* Background Decorations */}
+      <div className="absolute top-20 right-0 w-96 h-96 bg-brand-100 rounded-full blur-3xl opacity-30 -z-10"></div>
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-100 rounded-full blur-3xl opacity-30 -z-10"></div>
+
+      <div className="w-full max-w-2xl">
+        {/* Header Section */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-100 border border-brand-200 text-brand-700 text-sm font-semibold mb-6">
+            <Zap size={16} className="fill-current" /> Quick Setup • 2 Minutes
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">What do you do?</label>
-            <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Describe your products or services..." />
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">
+            Let's Build Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-700">Profile</span>
+          </h1>
+          <p className="text-lg text-slate-600 max-w-md mx-auto">
+            Tell us about your business and we'll create a personalized marketing strategy.
+          </p>
+        </div>
+
+        {/* Form Card */}
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+          {/* Progress Bar */}
+          <div className="h-1.5 bg-slate-100">
+            <div className="h-full bg-gradient-to-r from-brand-500 to-brand-600 w-full rounded-r-full"></div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-8">
+            {/* Section 1: Basic Info */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
-              <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business Owners..." />
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 bg-brand-600 text-white text-xs rounded-full flex items-center justify-center">1</span>
+                Basic Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="group">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Company Name</label>
+                  <input
+                    required
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+                    placeholder="e.g. Acme Inc."
+                  />
+                </div>
+                <div className="group">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Industry</label>
+                  <input
+                    required
+                    name="industry"
+                    value={formData.industry}
+                    onChange={handleChange}
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+                    placeholder="e.g. Technology, Retail"
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Section 2: About Business */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Brand Voice</label>
-              <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Witty, Friendly..." />
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 bg-brand-600 text-white text-xs rounded-full flex items-center justify-center">2</span>
+                About Your Business
+              </h3>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">What do you do?</label>
+                <textarea
+                  required
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all min-h-[120px] resize-none"
+                  placeholder="Describe your products, services, and what makes you unique..."
+                />
+              </div>
             </div>
+
+            {/* Section 3: Marketing Details */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 bg-brand-600 text-white text-xs rounded-full flex items-center justify-center">3</span>
+                Marketing Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Target Audience</label>
+                  <input
+                    required
+                    name="targetAudience"
+                    value={formData.targetAudience}
+                    onChange={handleChange}
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+                    placeholder="e.g. Small business owners"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Brand Voice</label>
+                  <input
+                    required
+                    name="brandVoice"
+                    value={formData.brandVoice}
+                    onChange={handleChange}
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+                    placeholder="e.g. Professional, Friendly"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Marketing Goals</label>
+                <input
+                  required
+                  name="goals"
+                  value={formData.goals}
+                  onChange={handleChange}
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+                  placeholder="e.g. Increase brand awareness, drive sales"
+                />
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-brand-600 to-brand-700 text-white font-bold py-4 px-6 rounded-xl hover:from-brand-700 hover:to-brand-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 text-lg"
+            >
+              Launch My Assistant
+              <ArrowRight size={20} />
+            </button>
+          </form>
+        </div>
+
+        {/* Trust Indicators */}
+        <div className="mt-8 text-center">
+          <div className="flex items-center justify-center gap-6 text-sm text-slate-500">
+            <span className="flex items-center gap-1.5"><Shield size={16} className="text-green-500" /> Secure</span>
+            <span className="flex items-center gap-1.5"><Zap size={16} className="text-brand-500" /> AI-Powered</span>
+            <span className="flex items-center gap-1.5"><Globe size={16} className="text-blue-500" /> Free to Start</span>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Marketing Goals</label>
-            <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
-          </div>
-          <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-lg hover:bg-brand-700 transition-colors">
-            Initialize Assistant
-          </button>
-        </form>
+        </div>
       </div>
     </div>
   );
 };
+
 
 const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView) => void }> = ({ profile, onNavigate }) => {
   return (
-    <div className="p-8 overflow-y-auto h-full">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500">Welcome back, {profile.name}.</p>
-      </header>
-
-      {/* Social Media Section */}
-      <h2 className="text-lg font-semibold text-slate-700 mb-4">Social Media Marketing</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div onClick={() => onNavigate(AppView.RESEARCH)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Market Research</h3>
-          <p className="text-sm text-slate-500">View latest trends and competitor analysis.</p>
+    <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* Hero Welcome Section */}
+      <div className="bg-gradient-to-r from-brand-600 via-brand-700 to-indigo-700 text-white px-8 py-12 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+        <div className="relative z-10 max-w-4xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-2xl font-bold border border-white/30">
+              {profile.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-white/70 text-sm font-medium">Welcome back</p>
+              <h1 className="text-3xl font-bold">{profile.name}</h1>
+            </div>
+          </div>
+          <p className="text-white/80 text-lg max-w-xl">
+            Your AI-powered marketing command center. Let's grow your business today.
+          </p>
         </div>
-        <div onClick={() => onNavigate(AppView.STRATEGY)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4"><Lightbulb size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Strategic Plan</h3>
-          <p className="text-sm text-slate-500">Deep-dive marketing strategy generation.</p>
-        </div>
-        <div onClick={() => onNavigate(AppView.CALENDAR)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4"><CalendarIcon size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Content Calendar</h3>
-          <p className="text-sm text-slate-500">Manage posts and schedule content.</p>
-        </div>
+        <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+        <div className="absolute right-40 -top-10 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
       </div>
 
-      {/* Digital Marketing Suite Section */}
-      <h2 className="text-lg font-semibold text-slate-700 mb-4">Digital Marketing Suite</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div onClick={() => onNavigate(AppView.LEADS)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-4"><Users size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Lead Research</h3>
-          <p className="text-sm text-slate-500">Find and research potential marketing leads.</p>
+      <div className="p-8 max-w-6xl mx-auto">
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 -mt-8 mb-10 relative z-20">
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 hover:shadow-xl transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">AI Ready</p>
+                <p className="text-xs text-slate-500">Gemini Powered</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 hover:shadow-xl transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-brand-100 text-brand-600 rounded-xl flex items-center justify-center">
+                <Target size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">{profile.industry}</p>
+                <p className="text-xs text-slate-500">Industry Focus</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 hover:shadow-xl transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+                <Users size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 truncate max-w-[100px]">{profile.targetAudience.split(',')[0]}</p>
+                <p className="text-xs text-slate-500">Target Audience</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 hover:shadow-xl transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 truncate max-w-[100px]">{profile.brandVoice.split(',')[0]}</p>
+                <p className="text-xs text-slate-500">Brand Voice</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div onClick={() => onNavigate(AppView.EMAIL)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-4"><Mail size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Email Marketing</h3>
-          <p className="text-sm text-slate-500">Create personalized outreach campaigns.</p>
-        </div>
-        <div onClick={() => onNavigate(AppView.BLOG)} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-4"><FileText size={24} /></div>
-          <h3 className="text-lg font-semibold mb-1">Blog Content</h3>
-          <p className="text-sm text-slate-500">Generate SEO-optimized blog posts.</p>
-        </div>
-      </div>
 
-      <div className="bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
-          <p className="mb-6 opacity-90 max-w-lg">Talk directly to your AI marketing consultant using Gemini Live Native Audio.</p>
-          <button onClick={() => document.getElementById('live-btn')?.click()} className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold hover:bg-slate-100 inline-flex items-center gap-2">
-            <Mic size={18} /> Start Conversation
-          </button>
+        {/* Social Media Section */}
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
+              <Globe size={20} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Social Media Marketing</h2>
+              <p className="text-sm text-slate-500">Research, strategize, and schedule your content</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div onClick={() => onNavigate(AppView.RESEARCH)} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-blue-200 hover:-translate-y-1 transition-all cursor-pointer">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg shadow-blue-200">
+                <Search size={26} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Market Research</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">Discover trends, analyze competitors, and find opportunities.</p>
+              <div className="mt-4 flex items-center text-blue-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                Explore <ArrowRight size={16} className="ml-1" />
+              </div>
+            </div>
+            <div onClick={() => onNavigate(AppView.STRATEGY)} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-purple-200 hover:-translate-y-1 transition-all cursor-pointer">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg shadow-purple-200">
+                <Lightbulb size={26} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Strategic Plan</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">AI-generated marketing strategies tailored to your brand.</p>
+              <div className="mt-4 flex items-center text-purple-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                Create <ArrowRight size={16} className="ml-1" />
+              </div>
+            </div>
+            <div onClick={() => onNavigate(AppView.CALENDAR)} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-green-200 hover:-translate-y-1 transition-all cursor-pointer">
+              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg shadow-green-200">
+                <CalendarIcon size={26} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Content Calendar</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">Schedule posts and manage your content workflow.</p>
+              <div className="mt-4 flex items-center text-green-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                Schedule <ArrowRight size={16} className="ml-1" />
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent"></div>
+
+        {/* Digital Marketing Suite Section */}
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-pink-600 rounded-xl flex items-center justify-center text-white">
+              <Mail size={20} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Digital Marketing Suite</h2>
+              <p className="text-sm text-slate-500">Lead generation, outreach, and content creation</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div onClick={() => onNavigate(AppView.LEADS)} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-orange-200 hover:-translate-y-1 transition-all cursor-pointer">
+              <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg shadow-orange-200">
+                <Users size={26} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Lead Research</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">Find and research potential customers and partners.</p>
+              <div className="mt-4 flex items-center text-orange-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                Find Leads <ArrowRight size={16} className="ml-1" />
+              </div>
+            </div>
+            <div onClick={() => onNavigate(AppView.EMAIL)} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 hover:-translate-y-1 transition-all cursor-pointer">
+              <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-200">
+                <Mail size={26} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Email Marketing</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">Create personalized outreach and nurture campaigns.</p>
+              <div className="mt-4 flex items-center text-indigo-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                Compose <ArrowRight size={16} className="ml-1" />
+              </div>
+            </div>
+            <div onClick={() => onNavigate(AppView.BLOG)} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-pink-200 hover:-translate-y-1 transition-all cursor-pointer">
+              <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-pink-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg shadow-pink-200">
+                <FileText size={26} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Blog Content</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">Generate SEO-optimized articles and blog posts.</p>
+              <div className="mt-4 flex items-center text-pink-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                Write <ArrowRight size={16} className="ml-1" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Consultant CTA */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-8 md:p-10 text-white relative overflow-hidden shadow-2xl">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')]"></div>
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-500/30">
+                <Mic size={28} className="animate-pulse" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold mb-1">Live AI Consultant</h2>
+                <p className="text-white/70 max-w-md">Talk directly to your AI marketing expert using voice. Get instant advice and brainstorm ideas.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => document.getElementById('live-btn')?.click()}
+              className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-8 py-4 rounded-xl font-bold hover:from-red-600 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-3 whitespace-nowrap"
+            >
+              <Mic size={20} /> Start Conversation
+            </button>
+          </div>
+          <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-gradient-to-br from-red-500/20 to-pink-600/20 rounded-full blur-3xl"></div>
+        </div>
       </div>
     </div>
   );
 };
+
 
 const ResearchView: React.FC<{
   profile: CompanyProfile,
