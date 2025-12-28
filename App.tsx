@@ -679,9 +679,9 @@ export default function App() {
     switch (view) {
       case AppView.ONBOARDING:
         return (
-          <div className="min-h-screen flex flex-col bg-slate-50">
+          <div className="h-screen flex flex-col bg-slate-50 overflow-y-auto">
             <AppHeader onLogoClick={() => setView(AppView.LANDING)} />
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1">
               <Onboarding onComplete={handleOnboardingComplete} />
             </main>
             <AppFooter />
@@ -793,8 +793,8 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className={`
-        flex-1 overflow-hidden relative
-        ${view === AppView.LANDING ? 'h-full overflow-y-auto' : ''} 
+        flex-1 relative
+        ${view === AppView.LANDING || view === AppView.ONBOARDING ? 'h-full overflow-y-auto' : 'overflow-hidden'} 
         ${!hasApiKey ? 'mt-6' : ''}
         ${showSidebar ? 'pt-14 lg:pt-0' : ''}
       `}>
