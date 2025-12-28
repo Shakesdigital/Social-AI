@@ -36,33 +36,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900 overflow-x-hidden">
       {/* Navigation */}
-      <nav className="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
+      <nav className="fixed w-full z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <img src="/market-mi-logo.png" alt="Market MI" className="w-10 h-10 object-contain" />
-              <span className="font-bold text-xl text-slate-800">Market MI</span>
+          <div className="flex justify-between items-center h-16 sm:h-18 md:h-20">
+            {/* Logo */}
+            <div className="flex items-center gap-2 cursor-pointer shrink-0">
+              <img src="/market-mi-logo.png" alt="Market MI" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+              <span className="font-bold text-lg sm:text-xl text-slate-800">Market MI</span>
             </div>
-            <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+
+            {/* Desktop Navigation Links */}
+            <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-600">
               <a href="#features" className="hover:text-brand-600 transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-brand-600 transition-colors">How it Works</a>
               <a href="#pricing" className="hover:text-brand-600 transition-colors">Pricing</a>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Show Login button for returning users */}
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Show Login button for returning users - hidden on very small screens */}
               {showLoginOption && existingProfile && (
                 <button
                   onClick={handleContinueAsUser}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-md font-medium transition-all flex items-center gap-2 text-sm"
+                  className="hidden sm:flex bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all items-center gap-2 text-xs sm:text-sm"
                 >
-                  <LogIn size={16} /> Continue as {existingProfile.name}
+                  <LogIn size={14} className="sm:w-4 sm:h-4" />
+                  <span className="hidden md:inline">Continue as {existingProfile.name}</span>
+                  <span className="md:hidden">Login</span>
                 </button>
               )}
               <button
                 onClick={onGetStarted}
-                className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-md font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2 text-sm"
+                className="bg-brand-600 hover:bg-brand-700 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
               >
-                {showLoginOption ? 'New Profile' : 'Get Started'} <ArrowRight size={16} />
+                <span>{showLoginOption ? 'New' : 'Start'}</span>
+                <ArrowRight size={14} className="sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
@@ -70,55 +78,62 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
       </nav>
 
       {/* Hero Section */}
-      <header className="pt-32 pb-20 lg:pt-48 lg:pb-32 relative overflow-hidden bg-slate-50">
-        <div className="absolute top-0 right-0 -mr-40 -mt-40 w-[600px] h-[600px] bg-brand-100 rounded-full blur-3xl opacity-50 mix-blend-multiply filter"></div>
-        <div className="absolute bottom-0 left-0 -ml-40 -mb-40 w-[600px] h-[600px] bg-indigo-100 rounded-full blur-3xl opacity-50 mix-blend-multiply filter"></div>
+      <header className="pt-24 pb-12 sm:pt-28 sm:pb-16 md:pt-32 md:pb-20 lg:pt-40 lg:pb-28 relative overflow-hidden bg-gradient-to-b from-slate-50 to-white">
+        {/* Decorative Background Elements - Smaller on mobile */}
+        <div className="absolute top-0 right-0 -mr-20 sm:-mr-32 md:-mr-40 -mt-20 sm:-mt-32 md:-mt-40 w-[300px] sm:w-[450px] md:w-[600px] h-[300px] sm:h-[450px] md:h-[600px] bg-brand-100 rounded-full blur-3xl opacity-40 sm:opacity-50 mix-blend-multiply filter"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 sm:-ml-32 md:-ml-40 -mb-20 sm:-mb-32 md:-mb-40 w-[300px] sm:w-[450px] md:w-[600px] h-[300px] sm:h-[450px] md:h-[600px] bg-indigo-100 rounded-full blur-3xl opacity-40 sm:opacity-50 mix-blend-multiply filter"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-xs font-semibold uppercase tracking-wide mb-6">
-            <Zap size={14} className="fill-current" /> Powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>
+          {/* Powered By Badge */}
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-[10px] sm:text-xs font-semibold uppercase tracking-wide mb-4 sm:mb-6">
+            <Zap size={12} className="sm:w-3.5 sm:h-3.5 fill-current" /> Powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>
           </div>
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-8 leading-tight">
-            The Only Marketing<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-700">Assistant You Need</span>
+
+          {/* Main Headline */}
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-slate-900 mb-4 sm:mb-6 md:mb-8 leading-[1.15]">
+            The Only Marketing<br className="hidden xs:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-700"> Assistant You Need</span>
           </h1>
-          <p className="max-w-2xl mx-auto text-xl text-slate-600 mb-10 leading-relaxed font-light">
+
+          {/* Subheadline */}
+          <p className="max-w-xl sm:max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-slate-600 mb-6 sm:mb-8 md:mb-10 leading-relaxed font-light px-2">
             Automate your entire marketing workflow. From market research and strategy to content creation and scheduling—Market MI does it all.
           </p>
 
           {/* Welcome Back Card for Returning Users */}
           {showLoginOption && existingProfile && (
-            <div className="max-w-md mx-auto mb-8 bg-white rounded-xl shadow-lg border border-brand-200 p-6 text-left">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-brand-500 to-brand-700 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+            <div className="max-w-sm sm:max-w-md mx-auto mb-6 sm:mb-8 bg-white rounded-xl shadow-lg border border-brand-200 p-4 sm:p-6 text-left">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-brand-500 to-brand-700 rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold shrink-0">
                   {existingProfile.name.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-500">Welcome back!</p>
-                  <p className="text-lg font-semibold text-slate-900">{existingProfile.name}</p>
-                  <p className="text-sm text-slate-500">{existingProfile.industry}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-500">Welcome back!</p>
+                  <p className="text-base sm:text-lg font-semibold text-slate-900 truncate">{existingProfile.name}</p>
+                  <p className="text-xs sm:text-sm text-slate-500 truncate">{existingProfile.industry}</p>
                 </div>
               </div>
               <button
                 onClick={handleContinueAsUser}
-                className="mt-4 w-full bg-brand-600 hover:bg-brand-700 text-white px-4 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                className="mt-3 sm:mt-4 w-full bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 sm:py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                <LogIn size={18} /> Continue to Dashboard
+                <LogIn size={16} className="sm:w-[18px] sm:h-[18px]" /> Continue to Dashboard
               </button>
-              <p className="mt-3 text-xs text-center text-slate-400">
+              <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-center text-slate-400">
                 Your data and sessions are preserved
               </p>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4 sm:px-0">
             <button
               onClick={onGetStarted}
-              className="px-8 py-4 bg-brand-600 text-white rounded-md font-bold text-lg hover:bg-brand-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2"
+              className="px-6 sm:px-8 py-3 sm:py-4 bg-brand-600 text-white rounded-xl font-bold text-base sm:text-lg hover:bg-brand-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {showLoginOption ? 'Create New Profile' : 'Start Free Trial'} <ArrowRight size={18} />
             </button>
-            <button className="px-8 py-4 bg-white text-slate-700 border border-slate-300 rounded-md font-bold text-lg hover:bg-slate-50 transition-all shadow-sm">
+            <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-slate-700 border-2 border-slate-200 rounded-xl font-bold text-base sm:text-lg hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-[0.98]">
               View Demo
             </button>
           </div>
