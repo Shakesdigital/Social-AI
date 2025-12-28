@@ -64,7 +64,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                             <User className="text-brand-600" size={24} />
                             Profile Settings
                         </h1>
-                        <p className="text-slate-500 text-xs sm:text-sm">Update your business profile for better AI-powered marketing</p>
+                        <p className="text-slate-500 text-xs sm:text-sm">Update your business profile for better assistant-powered marketing</p>
                     </div>
                 </div>
                 {showSuccess && (
@@ -128,7 +128,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                                 placeholder="Describe what your business does, your products or services..."
                             />
                             <p className="text-xs text-slate-400 mt-1">
-                                This helps AI generate more relevant marketing content for your business.
+                                This helps our assistant generate more relevant marketing content for your business.
                             </p>
                         </div>
                     </div>
@@ -233,7 +233,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                         </div>
                     </div>
 
-                    {/* AI Tips Card */}
+                    {/* Agent Tips Card */}
                     <div className="bg-gradient-to-r from-brand-50 to-indigo-50 rounded-xl border border-brand-100 p-5 sm:p-6">
                         <div className="flex items-start gap-3">
                             <div className="p-2 bg-brand-100 rounded-lg">
@@ -242,7 +242,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                             <div>
                                 <h3 className="font-semibold text-slate-800 mb-1">Pro Tip: Better Profile = Better Results</h3>
                                 <p className="text-sm text-slate-600">
-                                    The more detailed your profile, the better our AI can tailor marketing strategies,
+                                    The more detailed your profile, the better our marketing assistant can tailor strategies,
                                     content ideas, and outreach campaigns specifically for your business. Take time to
                                     fill in all fields for optimal results.
                                 </p>

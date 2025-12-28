@@ -78,7 +78,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                         }
                     } catch (retryError) {
                         console.error('[BlogView] Retry also failed:', retryError);
-                        setError('Our AI is taking a short break. Please try again in a minute! 🙏');
+                        setError('Our assistant is taking a short break. Please try again in a minute! 🙏');
                     }
                     setIsLoadingTopics(false);
                 }, 3000);
@@ -130,7 +130,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                         }
                     } catch (retryError) {
                         console.error('[BlogView] Retry failed:', retryError);
-                        setError('Our AI is taking a short break. Please try again in a minute! 🙏');
+                        setError('Our assistant is taking a short break. Please try again in a minute! 🙏');
                     }
                     setIsLoadingPost(false);
                 }, 3000);

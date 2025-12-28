@@ -76,7 +76,7 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
             }
 
             setEmailError(isRetry
-                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                ? 'Our assistant is taking a short break. Please try again in a minute! 🙏'
                 : 'Something went wrong. Please try again.');
         } finally {
             if (!emailError?.includes('breather')) {
@@ -107,7 +107,7 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
             }
 
             setEmailError(isRetry
-                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                ? 'Our assistant is taking a short break. Please try again in a minute! 🙏'
                 : 'Something went wrong. Please try again.');
         } finally {
             if (!emailError?.includes('breather')) {
@@ -144,7 +144,7 @@ export const EmailView: React.FC<EmailViewProps> = ({ profile, leads, savedState
             }
 
             setEmailError(isRetry
-                ? 'Our AI is taking a short break. Please try again in a minute! 🙏'
+                ? 'Our assistant is taking a short break. Please try again in a minute! 🙏'
                 : 'Something went wrong. Please try again.');
         } finally {
             if (!emailError?.includes('breather')) {

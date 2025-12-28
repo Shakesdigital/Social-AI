@@ -278,7 +278,7 @@ Give specific, actionable advice. Be concise but comprehensive.`,
               <div className="w-16 h-16 bg-gradient-to-br from-brand-100 to-brand-200 text-brand-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
                 <Zap size={32} />
               </div>
-              <p className="font-bold text-slate-800 text-lg">Hi! I'm your AI marketing expert</p>
+              <p className="font-bold text-slate-800 text-lg">Hi! I'm your marketing agent</p>
               <p className="text-sm text-slate-500 text-center mt-1 mb-4">Ask me anything about marketing, content, leads, or strategy</p>
 
               {/* Quick Actions */}

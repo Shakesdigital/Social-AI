@@ -309,7 +309,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       const businessContext = getBusinessContext();
       const memoryContext = getRecentConversationContext();
       const profile = getStoredProfile();
-      const history = conversationHistory.slice(-4).map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.text}`).join('\n');
+      const history = conversationHistory.slice(-4).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n');
 
       const llmResponse = await callLLM(`
 ${businessContext}
@@ -320,7 +320,7 @@ User: ${userText}
 
 Respond in 2-3 short sentences. Be helpful and specific.`, {
         type: 'fast',
-        systemPrompt: `You are a warm, friendly marketing consultant and AI assistant helping a business owner with their marketing strategy. ${profile ? `The user runs "${profile.name}" in the ${profile.industry || 'business'} industry.` : ''}
+        systemPrompt: `You are a warm, friendly marketing consultant and assistant helping a business owner with their marketing strategy. ${profile ? `The user runs "${profile.name}" in the ${profile.industry || 'business'} industry.` : ''}}
 
 IMPORTANT PERSONALITY GUIDELINES:
 - You are speaking TO the business owner as their advisor/consultant, NOT as their business
@@ -640,7 +640,7 @@ IMPORTANT PERSONALITY GUIDELINES:
             {response && (
               <div>
                 <span className="text-xs text-brand-500 flex items-center gap-1">
-                  <MessageCircle size={10} /> AI:
+                  <MessageCircle size={10} /> Assistant:
                 </span>
                 <p className="text-slate-700">{response}</p>
               </div>

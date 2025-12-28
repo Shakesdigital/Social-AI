@@ -73,7 +73,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
                         }
                     } catch (retryError) {
                         console.error('[LeadsView] Retry also failed:', retryError);
-                        setError('Our AI is taking a short break. Please try again in a minute! 🙏');
+                        setError('Our assistant is taking a short break. Please try again in a minute! 🙏');
                     }
                     setIsLoading(false);
                 }, 3000);

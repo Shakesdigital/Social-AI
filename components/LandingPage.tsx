@@ -79,8 +79,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <Zap size={14} className="fill-current" /> Powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>
           </div>
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-8 leading-tight">
-            The Only Social Media<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-700">Manager You Need</span>
+            The Only Marketing<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-700">Assistant You Need</span>
           </h1>
           <p className="max-w-2xl mx-auto text-xl text-slate-600 mb-10 leading-relaxed font-light">
             Automate your entire marketing workflow. From market research and strategy to content creation and scheduling—Market MI does it all.
@@ -199,7 +199,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
                 <div className="bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
                   <div className="relative z-10">
                     <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
-                    <p className="mb-6 opacity-90 max-w-lg">Talk directly to your AI marketing consultant powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>.</p>
+                    <p className="mb-6 opacity-90 max-w-lg">Talk directly to your marketing assistant powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>.</p>
                     <div className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold inline-flex items-center gap-2">
                       <Mic size={18} /> Start Conversation
                     </div>
@@ -217,7 +217,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-20">
             <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl mb-4">Everything You Need to Grow</h2>
-            <p className="text-lg text-slate-500">Our AI agents work 24/7 to research, plan, and execute your social media strategy.</p>
+            <p className="text-lg text-slate-500">Our marketing assistants work 24/7 to research, plan, and execute your marketing strategy.</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -230,7 +230,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <FeatureCard
               icon={<Lightbulb className="w-6 h-6 text-brand-600" />}
               title="Strategic Planning"
-              description="AI generates comprehensive marketing strategies, content pillars, and KPIs tailored to your business goals."
+              description="Our marketing assistant generates comprehensive strategies, content pillars, and KPIs tailored to your business goals."
               action="View Strategy"
             />
             <FeatureCard
@@ -248,7 +248,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <FeatureCard
               icon={<Mic className="w-6 h-6 text-brand-600" />}
               title="Live Consultant"
-              description="Talk to your AI marketing expert in real-time using voice to brainstorm ideas or get immediate advice."
+              description="Talk to your marketing assistant in real-time using voice to brainstorm ideas or get immediate advice."
               action="Talk Now"
             />
             <FeatureCard
@@ -278,7 +278,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 relative">
               <div className="w-12 h-12 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">2</div>
               <h3 className="font-bold text-lg mb-2">Generate Strategy</h3>
-              <p className="text-slate-500 text-sm">AI analyzes the market and creates a tailored content plan.</p>
+              <p className="text-slate-500 text-sm">Our assistant analyzes the market and creates a tailored content plan.</p>
             </div>
             <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 relative">
               <div className="w-12 h-12 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">3</div>
