@@ -10,10 +10,11 @@
   },
   "dependencies": {
     "lucide-react": "^0.556.0",
-    "react-dom": "^19.2.1",
     "openai": "^4.77.0",
-    "react-markdown": "^10.1.0",
-    "react": "^19.2.1"
+    "pocketbase": "^0.26.5",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
