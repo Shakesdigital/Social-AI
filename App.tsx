@@ -139,43 +139,130 @@ const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = 
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] px-4 py-6 md:py-8">
-      <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-slate-100">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Welcome to Market MI</h1>
-        <p className="text-slate-500 mb-6 md:mb-8 text-sm sm:text-base">Let's set up your business profile to generate tailored strategies.</p>
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Company Name</label>
-              <input required name="name" value={formData.name} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Acme Inc." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
-              <input required name="industry" value={formData.industry} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Technology, Retail, etc." />
-            </div>
+    <div className="w-full px-4 py-8 sm:py-12 md:py-16">
+      {/* Centered form container with max-width */}
+      <div className="mx-auto w-full max-w-2xl">
+        {/* Logo and branding */}
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center gap-2 mb-4">
+            <img src="/market-mi-logo.png" alt="Market MI" className="w-12 h-12 sm:w-14 sm:h-14 object-contain" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">What do you do?</label>
-            <textarea required name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 h-24 text-base focus:ring-2 focus:ring-brand-500 outline-none resize-none" placeholder="Describe your products or services..." />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Target Audience</label>
-              <input required name="targetAudience" value={formData.targetAudience} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Millennials, Small Business..." />
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-2">
+            Welcome to Market MI
+          </h1>
+          <p className="text-slate-500 text-sm sm:text-base max-w-md mx-auto">
+            Let's set up your business profile to generate tailored marketing strategies.
+          </p>
+        </div>
+
+        {/* Form card */}
+        <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+            {/* Company Name & Industry */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Company Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg p-3 sm:p-3.5 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                  placeholder="Acme Inc."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Industry <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  name="industry"
+                  value={formData.industry}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg p-3 sm:p-3.5 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                  placeholder="Technology, Retail, etc."
+                />
+              </div>
             </div>
+
+            {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Brand Voice</label>
-              <input required name="brandVoice" value={formData.brandVoice} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Professional, Friendly..." />
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                What do you do? <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                required
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={3}
+                className="w-full border border-slate-300 rounded-lg p-3 sm:p-3.5 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none transition-all"
+                placeholder="Describe your products or services..."
+              />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Marketing Goals</label>
-            <input required name="goals" value={formData.goals} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Increase brand awareness, drive sales..." />
-          </div>
-          <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3.5 rounded-lg hover:bg-brand-700 transition-colors text-base">
-            Initialize Assistant
-          </button>
-        </form>
+
+            {/* Target Audience & Brand Voice */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Target Audience <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  name="targetAudience"
+                  value={formData.targetAudience}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg p-3 sm:p-3.5 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                  placeholder="Millennials, Small Business..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Brand Voice <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  name="brandVoice"
+                  value={formData.brandVoice}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg p-3 sm:p-3.5 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                  placeholder="Professional, Friendly..."
+                />
+              </div>
+            </div>
+
+            {/* Marketing Goals */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Marketing Goals <span className="text-red-500">*</span>
+              </label>
+              <input
+                required
+                name="goals"
+                value={formData.goals}
+                onChange={handleChange}
+                className="w-full border border-slate-300 rounded-lg p-3 sm:p-3.5 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                placeholder="Increase brand awareness, drive sales..."
+              />
+            </div>
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              className="w-full bg-brand-600 text-white font-semibold py-3.5 sm:py-4 rounded-lg hover:bg-brand-700 active:scale-[0.98] transition-all text-base shadow-lg shadow-brand-600/20"
+            >
+              Get Started
+            </button>
+          </form>
+
+          {/* Privacy note */}
+          <p className="text-center text-xs text-slate-400 mt-4">
+            Your data is stored locally and never shared without your permission.
+          </p>
+        </div>
       </div>
     </div>
   );
