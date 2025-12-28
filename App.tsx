@@ -506,6 +506,9 @@ const StrategyWrapper: React.FC<{
 // --- Main App Component ---
 
 export default function App() {
+  // Auth state from Supabase
+  const { user, isAuthenticated, logout: authLogout, isLoading: authLoading } = useAuth();
+
   const [profile, setProfile] = useState<CompanyProfile | null>(() => {
     try {
       const saved = localStorage.getItem('socialai_profile');
@@ -555,9 +558,30 @@ export default function App() {
   const [isLiveOpen, setIsLiveOpen] = useState(false);
   const [leadsForEmail, setLeadsForEmail] = useState<Lead[]>([]);
 
-  // Sync state: If profile is null, force view to Landing or Onboarding
+  // Handle auth state changes (including OAuth callback)
   useEffect(() => {
-    if (!profile && view !== AppView.LANDING && view !== AppView.ONBOARDING) {
+    if (authLoading) return; // Wait for auth to initialize
+
+    if (isAuthenticated && user) {
+      // User is authenticated
+      localStorage.removeItem('socialai_logged_out');
+
+      // If on landing or auth page, check profile and route accordingly
+      if (view === AppView.LANDING || view === AppView.AUTH) {
+        const storedProfile = localStorage.getItem('socialai_profile');
+        if (storedProfile) {
+          setProfile(JSON.parse(storedProfile));
+          setView(AppView.DASHBOARD);
+        } else {
+          setView(AppView.ONBOARDING);
+        }
+      }
+    }
+  }, [isAuthenticated, user, authLoading]);
+
+  // Sync state: If profile is null and not authenticated, force view to Landing or Onboarding or Auth
+  useEffect(() => {
+    if (!profile && view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH) {
       setView(AppView.LANDING);
     }
   }, [profile, view]);
@@ -569,9 +593,10 @@ export default function App() {
     setView(AppView.DASHBOARD);
   };
 
-  const handleLogout = () => {
-    // Don't delete data - just log out (preserve session for returning users)
-    // Set a flag indicating the user has a profile but is logged out
+  const handleLogout = async () => {
+    // Log out from Supabase
+    await authLogout();
+    // Set a flag indicating the user is logged out (preserves profile for returning users)
     localStorage.setItem('socialai_logged_out', 'true');
     setProfile(null);
     setView(AppView.LANDING);
