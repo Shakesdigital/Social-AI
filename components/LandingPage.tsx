@@ -102,13 +102,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
           </p>
 
           {/* Welcome Back Card for Returning Users */}
+          {showLoginOption && existingProfile && (
+            <div className="max-w-sm sm:max-w-md mx-auto mb-6 sm:mb-8 bg-white rounded-xl shadow-lg border border-brand-200 p-4 sm:p-6 text-left">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-brand-500 to-brand-700 rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold shrink-0">
+                  {existingProfile.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-500">Welcome back!</p>
+                  <p className="text-base sm:text-lg font-semibold text-slate-900 truncate">{existingProfile.name}</p>
+                  <p className="text-xs sm:text-sm text-slate-500 truncate">{existingProfile.industry}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleContinueAsUser}
+                className="mt-3 sm:mt-4 w-full bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 sm:py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <LogIn size={16} className="sm:w-[18px] sm:h-[18px]" /> Continue to Dashboard
+              </button>
+              <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-center text-slate-400">
+                Your data and sessions are preserved
+              </p>
+            </div>
+          )}
+
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4 sm:px-0">
             <button
-              onClick={onLogin || onGetStarted}
+              onClick={onGetStarted}
               className="px-6 sm:px-8 py-3 sm:py-4 bg-brand-600 text-white rounded-xl font-bold text-base sm:text-lg hover:bg-brand-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-[0.98]"
             >
-              Get Started Free <ArrowRight size={18} />
+              {showLoginOption ? 'Create New Profile' : 'Start Free Trial'} <ArrowRight size={18} />
             </button>
             <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-slate-700 border-2 border-slate-200 rounded-xl font-bold text-base sm:text-lg hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-[0.98]">
               View Demo
