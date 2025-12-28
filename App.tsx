@@ -28,6 +28,7 @@ import { LeadsView } from './components/LeadsView';
 import { EmailView } from './components/EmailView';
 import { BlogView } from './components/BlogView';
 import { CalendarView } from './components/CalendarView';
+import { ProfileSettings } from './components/ProfileSettings';
 import { LLMDiagnostics } from './components/LLMDiagnostics';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
@@ -606,6 +607,7 @@ export default function App() {
       case AppView.LEADS: return <LeadsView profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
       case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
       case AppView.BLOG: return <BlogView profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
+      case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => { setProfile(updatedProfile); localStorage.setItem('socialai_profile', JSON.stringify(updatedProfile)); }} onBack={() => setView(AppView.DASHBOARD)} />;
       default: return <div>Not Implemented</div>;
     }
   };
@@ -685,6 +687,8 @@ export default function App() {
             <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
             <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
             <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
+            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
+            <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
           </nav>
           <div className="p-4 border-t border-slate-100 space-y-3">
             <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">

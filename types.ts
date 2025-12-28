@@ -126,6 +126,7 @@ export enum AppView {
   LEADS = 'LEADS',
   EMAIL = 'EMAIL',
   BLOG = 'BLOG',
+  SETTINGS = 'SETTINGS',
 }
 
 export interface ImageGenerationConfig {
