@@ -398,16 +398,27 @@ IMPORTANT PERSONALITY GUIDELINES:
 
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Natural speech settings - optimized for human-like delivery
-      utterance.rate = 0.85;  // Slower for more natural pacing
-      utterance.pitch = voicePreference === 'female' ? 1.05 : 0.95; // Subtle pitch adjustment
-      utterance.volume = 1.0;
+      // Voice personality settings - inspired by high-quality AI voices
+      // Male "Ember" style: Confident, optimistic, warm, steady
+      // Female "Vale" style: Bright, inquisitive, friendly, expressive
+      if (voicePreference === 'female') {
+        // Vale-inspired: Bright and inquisitive
+        utterance.rate = 0.92;   // Slightly faster, more lively
+        utterance.pitch = 1.12;  // Brighter, higher pitch
+        utterance.volume = 1.0;
+      } else {
+        // Ember-inspired: Confident and optimistic
+        utterance.rate = 0.88;   // Steady, deliberate pace
+        utterance.pitch = 0.88;  // Deeper, more resonant
+        utterance.volume = 1.0;
+      }
 
-      // Add natural pauses by preprocessing text
+      // Add natural pauses and improve flow
       const naturalText = text
-        .replace(/\. /g, '... ')  // Add pauses after sentences
-        .replace(/! /g, '!... ') // Add pauses after exclamations
-        .replace(/\? /g, '?... '); // Add pauses after questions
+        .replace(/\. /g, '. ... ')    // Natural pause after sentences
+        .replace(/! /g, '! ... ')     // Pause after exclamations
+        .replace(/\? /g, '? ... ')    // Thoughtful pause after questions
+        .replace(/, /g, ', ');        // Brief pause at commas
       utterance.text = naturalText;
 
       // Select the best voice based on preference
@@ -418,11 +429,13 @@ IMPORTANT PERSONALITY GUIDELINES:
         let selectedVoice: SpeechSynthesisVoice | null = null;
 
         // Define preferred voices for natural sound (ordered by quality - premium neural voices first)
+        // Female "Vale" style: bright, clear, expressive voices
         const femaleNames = [
           'Microsoft Aria Online', 'Microsoft Jenny Online', 'Google US English Female',
           'Samantha', 'Karen', 'Moira', 'Fiona', 'Victoria', 'Tessa',
           'Microsoft Zira', 'Google UK English Female', 'en-US-Wavenet'
         ];
+        // Male "Ember" style: warm, confident, resonant voices
         const maleNames = [
           'Microsoft Guy Online', 'Microsoft Christopher Online', 'Google US English Male',
           'Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'James', 'Thomas'
@@ -518,8 +531,8 @@ IMPORTANT PERSONALITY GUIDELINES:
 
   const testSpeech = () => {
     const testText = voicePreference === 'female'
-      ? "Hi there! I'm your friendly marketing assistant. How can I help you today?"
-      : "Hello! I'm your marketing assistant. What would you like to know?";
+      ? "Hey! I'm so excited to help with your marketing today. What are you curious about?"
+      : "Hello there! I'm confident we can make great things happen. How can I help you succeed?";
     speak(testText);
   };
 
@@ -682,7 +695,7 @@ IMPORTANT PERSONALITY GUIDELINES:
                   : 'text-slate-600 hover:bg-slate-200'
                   }`}
               >
-                <User size={12} /> Female
+                <User size={12} /> Vale
               </button>
               <button
                 onClick={() => handleVoiceChange('male')}
@@ -691,7 +704,7 @@ IMPORTANT PERSONALITY GUIDELINES:
                   : 'text-slate-600 hover:bg-slate-200'
                   }`}
               >
-                <Users size={12} /> Male
+                <Users size={12} /> Ember
               </button>
             </div>
             <button
