@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   Users,
   Mail,
-  FileText
+  FileText,
+  LogIn
 } from 'lucide-react';
 import { AppView, CompanyProfile, ResearchReport, SocialPost, AutoPilotConfig, Lead } from './types';
 import { LiveAssistant } from './components/LiveAssistant';
@@ -30,6 +31,9 @@ import { BlogView } from './components/BlogView';
 import { CalendarView } from './components/CalendarView';
 import { ProfileSettings } from './components/ProfileSettings';
 import { LLMDiagnostics } from './components/LLMDiagnostics';
+import { AuthPage } from './components/AuthPage';
+import { UserMenu } from './components/UserMenu';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import ReactMarkdown from 'react-markdown';
@@ -667,6 +671,7 @@ export default function App() {
       return (
         <LandingPage
           onGetStarted={() => setView(AppView.ONBOARDING)}
+          onLogin={() => setView(AppView.AUTH)}
           onContinueAsUser={(p) => {
             setProfile(p);
             localStorage.removeItem('socialai_logged_out');
@@ -675,8 +680,24 @@ export default function App() {
         />
       );
     }
-    if (!profile && view !== AppView.ONBOARDING) return null;
+    if (!profile && view !== AppView.ONBOARDING && view !== AppView.AUTH) return null;
     switch (view) {
+      case AppView.AUTH:
+        return (
+          <AuthPage
+            onSuccess={() => {
+              // After login, go to dashboard if profile exists, otherwise onboarding
+              const storedProfile = localStorage.getItem('socialai_profile');
+              if (storedProfile) {
+                setProfile(JSON.parse(storedProfile));
+                setView(AppView.DASHBOARD);
+              } else {
+                setView(AppView.ONBOARDING);
+              }
+            }}
+            onBack={() => setView(AppView.LANDING)}
+          />
+        );
       case AppView.ONBOARDING:
         return (
           <div className="h-screen flex flex-col bg-slate-50 overflow-y-auto">
@@ -699,7 +720,7 @@ export default function App() {
     }
   };
 
-  const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING;
+  const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Close mobile menu when view changes

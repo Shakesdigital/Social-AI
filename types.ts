@@ -118,6 +118,7 @@ export interface TrendingTopic {
 
 export enum AppView {
   LANDING = 'LANDING',
+  AUTH = 'AUTH',
   ONBOARDING = 'ONBOARDING',
   DASHBOARD = 'DASHBOARD',
   RESEARCH = 'RESEARCH',

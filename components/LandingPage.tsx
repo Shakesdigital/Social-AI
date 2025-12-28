@@ -5,9 +5,10 @@ import { CompanyProfile } from '../types';
 interface LandingPageProps {
   onGetStarted: () => void;
   onContinueAsUser?: (profile: CompanyProfile) => void;
+  onLogin?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContinueAsUser }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContinueAsUser, onLogin }) => {
   const [existingProfile, setExistingProfile] = useState<CompanyProfile | null>(null);
   const [showLoginOption, setShowLoginOption] = useState(false);
 
@@ -54,15 +55,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Show Login button for returning users - hidden on very small screens */}
+              {/* Show Continue button for returning users with local profile */}
               {showLoginOption && existingProfile && (
                 <button
                   onClick={handleContinueAsUser}
                   className="hidden sm:flex bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all items-center gap-2 text-xs sm:text-sm"
                 >
-                  <LogIn size={14} className="sm:w-4 sm:h-4" />
+                  <User size={14} className="sm:w-4 sm:h-4" />
                   <span className="hidden md:inline">Continue as {existingProfile.name}</span>
-                  <span className="md:hidden">Login</span>
+                  <span className="md:hidden">Continue</span>
+                </button>
+              )}
+              {/* Sign In button - always visible */}
+              {onLogin && (
+                <button
+                  onClick={onLogin}
+                  className="hidden sm:flex bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all items-center gap-2 text-xs sm:text-sm"
+                >
+                  <LogIn size={14} className="sm:w-4 sm:h-4" />
+                  <span>Sign In</span>
                 </button>
               )}
               <button
