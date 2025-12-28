@@ -36,6 +36,7 @@ import { UserMenu } from './components/UserMenu';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
+import { fetchProfile, saveProfile } from './services/profileService';
 import ReactMarkdown from 'react-markdown';
 
 // Logo Component - Uses the Market MI logo image
@@ -562,54 +563,62 @@ export default function App() {
   useEffect(() => {
     if (authLoading) return; // Wait for auth to initialize
 
-    if (isAuthenticated && user) {
-      // User is authenticated
-      localStorage.removeItem('socialai_logged_out');
-
-      // Check if this is the same user or a different user
-      const storedUserId = localStorage.getItem('socialai_user_id');
-      const storedProfile = localStorage.getItem('socialai_profile');
-
-      if (storedUserId && storedUserId !== user.id) {
-        // Different user is logging in - reset everything
-        console.log('[Auth] Different user detected, clearing previous data');
-        localStorage.removeItem('socialai_profile');
-        localStorage.removeItem('socialai_calendar_state');
-        localStorage.removeItem('socialai_research_state');
-        localStorage.removeItem('socialai_strategy_state');
-        localStorage.removeItem('socialai_leads_state');
-        localStorage.removeItem('socialai_email_state');
-        localStorage.removeItem('socialai_blog_state');
+    const handleAuthChange = async () => {
+      if (isAuthenticated && user) {
+        // User is authenticated
         localStorage.removeItem('socialai_logged_out');
-        setProfile(null);
-        // Save new user ID and go to onboarding
-        localStorage.setItem('socialai_user_id', user.id);
-        setView(AppView.ONBOARDING);
-      } else if (!storedUserId) {
-        // First time login on this device - save user ID
+
+        // Check if this is the same user or a different user
+        const storedUserId = localStorage.getItem('socialai_user_id');
+
+        if (storedUserId && storedUserId !== user.id) {
+          // Different user is logging in - clear local data
+          console.log('[Auth] Different user detected, clearing local data');
+          localStorage.removeItem('socialai_profile');
+          localStorage.removeItem('socialai_calendar_state');
+          localStorage.removeItem('socialai_research_state');
+          localStorage.removeItem('socialai_strategy_state');
+          localStorage.removeItem('socialai_leads_state');
+          localStorage.removeItem('socialai_email_state');
+          localStorage.removeItem('socialai_blog_state');
+          localStorage.removeItem('socialai_logged_out');
+          setProfile(null);
+        }
+
+        // Save current user ID
         localStorage.setItem('socialai_user_id', user.id);
 
-        if (storedProfile) {
-          // Has profile (from before auth was added) - use it
-          setProfile(JSON.parse(storedProfile));
+        // Try to fetch profile from Supabase (cross-device sync)
+        console.log('[Auth] Fetching profile from Supabase...');
+        const cloudProfile = await fetchProfile(user.id);
+
+        if (cloudProfile) {
+          // Profile found in Supabase - use it
+          console.log('[Auth] Profile found in Supabase, loading...');
+          setProfile(cloudProfile);
+          localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
           setView(AppView.DASHBOARD);
         } else {
-          // No profile, go to onboarding
-          setView(AppView.ONBOARDING);
-        }
-      } else {
-        // Same user logging in again
-        if (view === AppView.LANDING || view === AppView.AUTH) {
-          if (storedProfile) {
-            setProfile(JSON.parse(storedProfile));
+          // No profile in Supabase - check localStorage
+          const localProfile = localStorage.getItem('socialai_profile');
+          if (localProfile && storedUserId === user.id) {
+            // Same user, has local profile - use it
+            setProfile(JSON.parse(localProfile));
             setView(AppView.DASHBOARD);
           } else {
+            // No profile anywhere, go to onboarding
+            console.log('[Auth] No profile found, going to onboarding');
             setView(AppView.ONBOARDING);
           }
         }
       }
+    };
+
+    // Only run when on landing/auth page to avoid re-running on every render
+    if (isAuthenticated && user && (view === AppView.LANDING || view === AppView.AUTH)) {
+      handleAuthChange();
     }
-  }, [isAuthenticated, user, authLoading]);
+  }, [isAuthenticated, user, authLoading, view]);
 
   // Sync state: If profile is null and not authenticated, force view to Landing or Onboarding or Auth
   useEffect(() => {
@@ -618,10 +627,17 @@ export default function App() {
     }
   }, [profile, view]);
 
-  const handleOnboardingComplete = (p: CompanyProfile) => {
+  const handleOnboardingComplete = async (p: CompanyProfile) => {
     setProfile(p);
     localStorage.setItem('socialai_profile', JSON.stringify(p));
     localStorage.removeItem('socialai_logged_out'); // Clear logged out flag
+
+    // Save to Supabase for cross-device sync
+    if (user) {
+      console.log('[Onboarding] Saving profile to Supabase...');
+      await saveProfile(user.id, p);
+    }
+
     setView(AppView.DASHBOARD);
   };
 
