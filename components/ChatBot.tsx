@@ -359,7 +359,7 @@ Give specific, actionable advice. Be concise but comprehensive.`,
           </div>
           <div className="text-center mt-2 flex items-center justify-center gap-2">
             <p className="text-[10px] text-slate-400">
-              Powered by Free AI
+              Powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-500 hover:underline">Shakes Digital</a>
               {isWebResearchConfigured() && (
                 <span className="inline-flex items-center gap-1 ml-1 text-brand-500">
                   <Globe size={8} /> + Web Research

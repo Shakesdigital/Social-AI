@@ -76,7 +76,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-xs font-semibold uppercase tracking-wide mb-6">
-            <Zap size={14} className="fill-current" /> Powered by Gemini 3.0 Pro
+            <Zap size={14} className="fill-current" /> Powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>
           </div>
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-8 leading-tight">
             The Only Social Media<br />
@@ -181,7 +181,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4"><Search size={24} /></div>
                     <h3 className="text-lg font-semibold mb-1">Market Research</h3>
-                    <p className="text-sm text-slate-500">View latest trends and competitor analysis powered by Google Search.</p>
+                    <p className="text-sm text-slate-500">View latest trends and competitor analysis powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-600 hover:underline">Shakes Digital</a>.</p>
                   </div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4"><Lightbulb size={24} /></div>
@@ -199,7 +199,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
                 <div className="bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
                   <div className="relative z-10">
                     <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
-                    <p className="mb-6 opacity-90 max-w-lg">Talk directly to your AI marketing consultant using Gemini Live Native Audio.</p>
+                    <p className="mb-6 opacity-90 max-w-lg">Talk directly to your AI marketing consultant powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>.</p>
                     <div className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold inline-flex items-center gap-2">
                       <Mic size={18} /> Start Conversation
                     </div>
@@ -230,7 +230,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
             <FeatureCard
               icon={<Lightbulb className="w-6 h-6 text-brand-600" />}
               title="Strategic Planning"
-              description="Gemini 3 Pro generates comprehensive marketing strategies, content pillars, and KPIs tailored to your business goals."
+              description="AI generates comprehensive marketing strategies, content pillars, and KPIs tailored to your business goals."
               action="View Strategy"
             />
             <FeatureCard
