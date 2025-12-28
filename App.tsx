@@ -566,14 +566,46 @@ export default function App() {
       // User is authenticated
       localStorage.removeItem('socialai_logged_out');
 
-      // If on landing or auth page, check profile and route accordingly
-      if (view === AppView.LANDING || view === AppView.AUTH) {
-        const storedProfile = localStorage.getItem('socialai_profile');
+      // Check if this is the same user or a different user
+      const storedUserId = localStorage.getItem('socialai_user_id');
+      const storedProfile = localStorage.getItem('socialai_profile');
+
+      if (storedUserId && storedUserId !== user.id) {
+        // Different user is logging in - reset everything
+        console.log('[Auth] Different user detected, clearing previous data');
+        localStorage.removeItem('socialai_profile');
+        localStorage.removeItem('socialai_calendar_state');
+        localStorage.removeItem('socialai_research_state');
+        localStorage.removeItem('socialai_strategy_state');
+        localStorage.removeItem('socialai_leads_state');
+        localStorage.removeItem('socialai_email_state');
+        localStorage.removeItem('socialai_blog_state');
+        localStorage.removeItem('socialai_logged_out');
+        setProfile(null);
+        // Save new user ID and go to onboarding
+        localStorage.setItem('socialai_user_id', user.id);
+        setView(AppView.ONBOARDING);
+      } else if (!storedUserId) {
+        // First time login on this device - save user ID
+        localStorage.setItem('socialai_user_id', user.id);
+
         if (storedProfile) {
+          // Has profile (from before auth was added) - use it
           setProfile(JSON.parse(storedProfile));
           setView(AppView.DASHBOARD);
         } else {
+          // No profile, go to onboarding
           setView(AppView.ONBOARDING);
+        }
+      } else {
+        // Same user logging in again
+        if (view === AppView.LANDING || view === AppView.AUTH) {
+          if (storedProfile) {
+            setProfile(JSON.parse(storedProfile));
+            setView(AppView.DASHBOARD);
+          } else {
+            setView(AppView.ONBOARDING);
+          }
         }
       }
     }
