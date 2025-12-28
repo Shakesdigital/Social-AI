@@ -6,16 +6,17 @@ import {
     login as authLogin,
     signup as authSignup,
     logout as authLogout,
-    onAuthStateChange,
-    refreshAuth
+    loginWithOAuth as authLoginWithOAuth,
+    onAuthStateChange
 } from '../services/authService';
-import { isPocketBaseConfigured } from '../services/pocketbase';
+import { isSupabaseConfigured } from '../services/supabase';
 
 interface AuthContextType extends AuthState {
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string, name?: string) => Promise<void>;
-    logout: () => void;
-    isPocketBaseConfigured: boolean;
+    loginWithOAuth: (provider: 'google' | 'github') => Promise<void>;
+    logout: () => Promise<void>;
+    isSupabaseConfigured: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,15 +28,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: true,
     });
 
-    const [pbConfigured] = useState(() => isPocketBaseConfigured());
+    const [supabaseConfigured] = useState(() => isSupabaseConfigured());
 
     // Initialize auth state
     useEffect(() => {
-        // Refresh token on mount
-        refreshAuth().finally(() => {
+        if (!supabaseConfigured) {
             setState({
-                user: getCurrentUser(),
-                isAuthenticated: !!getCurrentUser(),
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+            });
+            return;
+        }
+
+        // Get initial user
+        getCurrentUser().then((user) => {
+            setState({
+                user,
+                isAuthenticated: !!user,
                 isLoading: false,
             });
         });
@@ -50,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         return unsubscribe;
-    }, []);
+    }, [supabaseConfigured]);
 
     const login = useCallback(async (email: string, password: string) => {
         setState(prev => ({ ...prev, isLoading: true }));
@@ -74,8 +84,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, []);
 
-    const logout = useCallback(() => {
-        authLogout();
+    const loginWithOAuth = useCallback(async (provider: 'google' | 'github') => {
+        await authLoginWithOAuth(provider);
+    }, []);
+
+    const logout = useCallback(async () => {
+        await authLogout();
         setState({ user: null, isAuthenticated: false, isLoading: false });
     }, []);
 
@@ -84,8 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...state,
             login,
             signup,
+            loginWithOAuth,
             logout,
-            isPocketBaseConfigured: pbConfigured
+            isSupabaseConfigured: supabaseConfigured
         }}>
             {children}
         </AuthContext.Provider>
