@@ -250,8 +250,8 @@ Give specific, actionable advice. Be concise but comprehensive.`,
           onClick={() => setIsOpen(false)}
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <Sparkles size={20} />
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-1.5">
+              <img src="/market-mi-logo.png" alt="Market MI" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm">Market MI Assistant</span>

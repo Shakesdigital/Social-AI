@@ -538,7 +538,9 @@ IMPORTANT PERSONALITY GUIDELINES:
         {/* Header */}
         <div className="bg-gradient-to-r from-brand-600 to-brand-700 text-white p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Sparkles size={20} />
+            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center p-1">
+              <img src="/market-mi-logo.png" alt="Market MI" className="w-full h-full object-contain" />
+            </div>
             <span className="font-bold">Voice Assistant</span>
           </div>
           <div className="flex items-center gap-2">
