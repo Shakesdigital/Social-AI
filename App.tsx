@@ -614,9 +614,19 @@ export default function App() {
       }
     };
 
-    // Only run when on landing/auth page to avoid re-running on every render
-    if (isAuthenticated && user && (view === AppView.LANDING || view === AppView.AUTH)) {
+    // Check if this is an OAuth callback (URL contains access_token hash)
+    const isOAuthCallback = window.location.hash.includes('access_token');
+
+    // Only run when:
+    // 1. Coming from AUTH page (user explicitly clicked sign in)
+    // 2. OAuth callback (returned from Google/GitHub)
+    // Do NOT run when just browsing landing page
+    if (isAuthenticated && user && (view === AppView.AUTH || isOAuthCallback)) {
       handleAuthChange();
+      // Clear the hash after handling OAuth callback
+      if (isOAuthCallback) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
   }, [isAuthenticated, user, authLoading, view]);
 
