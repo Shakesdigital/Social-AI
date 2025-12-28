@@ -559,6 +559,9 @@ export default function App() {
   const [isLiveOpen, setIsLiveOpen] = useState(false);
   const [leadsForEmail, setLeadsForEmail] = useState<Lead[]>([]);
 
+  // Track if we've already handled an OAuth callback this session
+  const [oauthHandled, setOauthHandled] = useState(false);
+
   // Handle auth state changes (including OAuth callback)
   useEffect(() => {
     if (authLoading) return; // Wait for auth to initialize
@@ -619,16 +622,18 @@ export default function App() {
 
     // Only run when:
     // 1. Coming from AUTH page (user explicitly clicked sign in)
-    // 2. OAuth callback (returned from Google/GitHub)
-    // Do NOT run when just browsing landing page
-    if (isAuthenticated && user && (view === AppView.AUTH || isOAuthCallback)) {
+    // 2. OAuth callback (returned from Google/GitHub) - works on any page
+    // Do NOT run when just browsing landing page without OAuth callback
+    const shouldHandle = view === AppView.AUTH || (isOAuthCallback && !oauthHandled);
+    if (isAuthenticated && user && shouldHandle) {
       handleAuthChange();
-      // Clear the hash after handling OAuth callback
+      // Clear the hash and mark as handled after OAuth callback
       if (isOAuthCallback) {
+        setOauthHandled(true);
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
-  }, [isAuthenticated, user, authLoading, view]);
+  }, [isAuthenticated, user, authLoading, view, oauthHandled]);
 
   // Sync state: If profile is null and not authenticated, force view to Landing or Onboarding or Auth
   useEffect(() => {
