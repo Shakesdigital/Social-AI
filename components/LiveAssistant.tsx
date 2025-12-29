@@ -193,13 +193,30 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       recognition.maxAlternatives = 1;
 
       let fullTranscript = '';
+      let silenceTimeout: NodeJS.Timeout | null = null;
+      let lastSpeechTime = Date.now();
+      const SILENCE_THRESHOLD = 1500; // 1.5 seconds of silence triggers processing
+
+      // Function to reset silence timer
+      const resetSilenceTimer = () => {
+        if (silenceTimeout) clearTimeout(silenceTimeout);
+        lastSpeechTime = Date.now();
+        silenceTimeout = setTimeout(() => {
+          // Auto-stop after silence if we have transcript
+          if (fullTranscript.trim() || transcript.trim()) {
+            addDiagnostic('Auto-stopping after silence');
+            recognition.stop();
+          }
+        }, SILENCE_THRESHOLD);
+      };
 
       recognition.onstart = () => {
-        addDiagnostic('Recording started');
+        addDiagnostic('Recording started - speak naturally');
         setIsRecording(true);
         setTranscript('');
-        setStatus('🎤 Listening... Tap mic to stop');
+        setStatus('🎤 Listening... (will auto-detect when you\'re done)');
         fullTranscript = '';
+        resetSilenceTimer();
       };
 
       recognition.onresult = (event: any) => {
@@ -216,10 +233,14 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         fullTranscript = final;
         setTranscript((final + interim).trim());
         addDiagnostic(`Heard: "${(final + interim).trim().slice(0, 30)}..."`);
+
+        // Reset silence timer on speech detected
+        resetSilenceTimer();
       };
 
       recognition.onerror = (event: any) => {
         addDiagnostic(`Recognition error: ${event.error}`);
+        if (silenceTimeout) clearTimeout(silenceTimeout);
         if (event.error === 'network') {
           setStatus('Network issue. Try again or use text.');
         } else if (event.error === 'no-speech') {
@@ -231,13 +252,14 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
       recognition.onend = () => {
         addDiagnostic('Recording ended');
+        if (silenceTimeout) clearTimeout(silenceTimeout);
         setIsRecording(false);
         if (fullTranscript.trim()) {
           handleUserInput(fullTranscript.trim());
         } else if (transcript.trim()) {
           handleUserInput(transcript.trim());
         } else {
-          setStatus('No speech captured. Try again.');
+          setStatus('No speech captured. Tap mic to try again.');
         }
       };
 
@@ -531,8 +553,8 @@ IMPORTANT PERSONALITY GUIDELINES:
 
   const testSpeech = () => {
     const testText = voicePreference === 'female'
-      ? "Hey! I'm so excited to help with your marketing today. What are you curious about?"
-      : "Hello there! I'm confident we can make great things happen. How can I help you succeed?";
+      ? "Hi there! I'm your marketing assistant. How can I help you today?"
+      : "Hello! I'm your marketing assistant. What would you like to know?";
     speak(testText);
   };
 
@@ -695,7 +717,7 @@ IMPORTANT PERSONALITY GUIDELINES:
                   : 'text-slate-600 hover:bg-slate-200'
                   }`}
               >
-                <User size={12} /> Vale
+                <User size={12} /> Female
               </button>
               <button
                 onClick={() => handleVoiceChange('male')}
@@ -704,7 +726,7 @@ IMPORTANT PERSONALITY GUIDELINES:
                   : 'text-slate-600 hover:bg-slate-200'
                   }`}
               >
-                <Users size={12} /> Ember
+                <Users size={12} /> Male
               </button>
             </div>
             <button
