@@ -4,6 +4,7 @@ import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../servi
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 import { isOpenAITTSConfigured, speakWithOpenAI, getRecommendedVoice } from '../services/openaiTTSService';
+import { isElevenLabsConfigured, speakWithElevenLabs, getRecommendedElevenLabsVoice } from '../services/elevenLabsTTSService';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -35,7 +36,10 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [useNaturalVoice, setUseNaturalVoice] = useState(() => isOpenAITTSConfigured());
+  // Check for natural voice: prefer ElevenLabs (free) over OpenAI
+  const [useNaturalVoice, setUseNaturalVoice] = useState(() =>
+    isElevenLabsConfigured() || isOpenAITTSConfigured()
+  );
 
   // Detect mobile device
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -424,11 +428,35 @@ IMPORTANT PERSONALITY GUIDELINES:
   };
 
   const speak = async (text: string): Promise<void> => {
-    // Try OpenAI TTS first for natural voice
+    // Try ElevenLabs first (FREE tier available)
+    if (useNaturalVoice && isElevenLabsConfigured()) {
+      try {
+        setIsSpeaking(true);
+        setStatus('🔊 Speaking (ElevenLabs)...');
+        addDiagnostic('Using ElevenLabs TTS (free tier)');
+
+        const voice = getRecommendedElevenLabsVoice(voicePreference);
+        const success = await speakWithElevenLabs(text, { voice });
+
+        if (success) {
+          setIsSpeaking(false);
+          setStatus('✨ Ready! Tap mic to speak.');
+          addDiagnostic('ElevenLabs TTS completed');
+          return;
+        }
+
+        addDiagnostic('ElevenLabs TTS failed, trying OpenAI...');
+      } catch (error) {
+        addDiagnostic(`ElevenLabs TTS error: ${error}`);
+      }
+      setIsSpeaking(false);
+    }
+
+    // Try OpenAI TTS next
     if (useNaturalVoice && isOpenAITTSConfigured()) {
       try {
         setIsSpeaking(true);
-        setStatus('🔊 Speaking (Natural Voice)...');
+        setStatus('🔊 Speaking (OpenAI)...');
         addDiagnostic('Using OpenAI TTS for natural voice');
 
         const voice = getRecommendedVoice(voicePreference);
@@ -441,7 +469,6 @@ IMPORTANT PERSONALITY GUIDELINES:
           return;
         }
 
-        // Fall through to browser TTS if OpenAI fails
         addDiagnostic('OpenAI TTS failed, falling back to browser');
       } catch (error) {
         addDiagnostic(`OpenAI TTS error: ${error}`);
@@ -851,15 +878,17 @@ IMPORTANT PERSONALITY GUIDELINES:
                 <Users size={12} /> Male
               </button>
             </div>
-            {/* Natural Voice Toggle - Only shown if OpenAI is configured */}
-            {isOpenAITTSConfigured() && (
+            {/* Natural Voice Toggle - Shown if ElevenLabs or OpenAI is configured */}
+            {(isElevenLabsConfigured() || isOpenAITTSConfigured()) && (
               <button
                 onClick={() => setUseNaturalVoice(!useNaturalVoice)}
                 className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1 transition-all ${useNaturalVoice
                   ? 'bg-purple-500 text-white shadow'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
-                title={useNaturalVoice ? 'Using AI voice (OpenAI)' : 'Using browser voice'}
+                title={useNaturalVoice
+                  ? `Using ${isElevenLabsConfigured() ? 'ElevenLabs' : 'OpenAI'} voice`
+                  : 'Using browser voice'}
               >
                 <Sparkles size={12} /> {useNaturalVoice ? 'AI Voice' : 'Basic'}
               </button>
