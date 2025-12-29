@@ -494,87 +494,127 @@ IMPORTANT PERSONALITY GUIDELINES:
       }
 
       setIsSpeaking(true);
-      setStatus('🔊 Speaking...');
-      addDiagnostic('Starting speech...');
+      setStatus('🔊 Speaking (Browser)...');
+      addDiagnostic('Using optimized browser speech');
 
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Voice personality settings
-      if (voicePreference === 'female') {
-        utterance.rate = 0.92;
-        utterance.pitch = 1.12;
-        utterance.volume = 1.0;
-      } else {
-        utterance.rate = 0.88;
-        utterance.pitch = 0.88;
-        utterance.volume = 1.0;
-      }
-
-      // Add natural pauses and improve flow
-      const naturalText = text
-        .replace(/\. /g, '. ... ')
-        .replace(/! /g, '! ... ')
-        .replace(/\? /g, '? ... ')
-        .replace(/, /g, ', ');
-      utterance.text = naturalText;
-
-      // Select the best voice based on preference
+      // Get all available voices
       const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
-      addDiagnostic(`Selecting from ${voices.length} voices (${voicePreference})`);
+      addDiagnostic(`Found ${voices.length} voices`);
+
+      // OPTIMIZED VOICE SELECTION - prioritize high-quality neural/online voices
+      let selectedVoice: SpeechSynthesisVoice | null = null;
+      let voiceQuality: 'neural' | 'standard' | 'basic' = 'basic';
 
       if (voices.length > 0) {
-        let selectedVoice: SpeechSynthesisVoice | null = null;
+        // TIER 1: Microsoft Neural/Online voices (best quality on Windows/Edge)
+        const neuralVoices = voicePreference === 'female'
+          ? ['Microsoft Aria Online', 'Microsoft Jenny Online', 'Microsoft Zira Online', 'Microsoft Aria', 'Microsoft Jenny']
+          : ['Microsoft Guy Online', 'Microsoft Ryan Online', 'Microsoft Christopher Online', 'Microsoft Guy', 'Microsoft Ryan'];
 
-        // Define preferred voices (premium neural voices first)
-        const femaleNames = [
-          'Microsoft Aria Online', 'Microsoft Jenny Online', 'Google US English Female',
-          'Samantha', 'Karen', 'Moira', 'Fiona', 'Victoria', 'Tessa',
-          'Microsoft Zira', 'Google UK English Female', 'en-US-Wavenet'
-        ];
-        const maleNames = [
-          'Microsoft Guy Online', 'Microsoft Christopher Online', 'Google US English Male',
-          'Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'James', 'Thomas'
-        ];
-
-        const preferredNames = voicePreference === 'female' ? femaleNames : maleNames;
-
-        // Try to find a preferred voice
-        for (const name of preferredNames) {
+        for (const name of neuralVoices) {
           const found = voices.find(v => v.name.includes(name));
           if (found) {
             selectedVoice = found;
+            voiceQuality = 'neural';
             break;
           }
         }
 
-        // Fallback: Try to find any voice with gender hint
+        // TIER 2: Google Neural voices
         if (!selectedVoice) {
-          if (voicePreference === 'female') {
-            selectedVoice = voices.find(v =>
-              v.name.toLowerCase().includes('female') ||
-              v.name.toLowerCase().includes('woman') ||
-              v.name.includes('Zira') ||
-              v.name.includes('Samantha')
-            ) || null;
-          } else {
-            selectedVoice = voices.find(v =>
-              v.name.toLowerCase().includes('male') ||
-              v.name.toLowerCase().includes('david') ||
-              v.name.includes('Daniel')
-            ) || null;
+          const googleVoices = voicePreference === 'female'
+            ? ['Google US English Female', 'Google UK English Female']
+            : ['Google US English Male', 'Google UK English Male'];
+
+          for (const name of googleVoices) {
+            const found = voices.find(v => v.name.includes(name));
+            if (found) {
+              selectedVoice = found;
+              voiceQuality = 'neural';
+              break;
+            }
           }
         }
 
-        // Final fallback: just pick first English voice
+        // TIER 3: Apple voices (macOS/iOS - these are quite good)
+        if (!selectedVoice) {
+          const appleVoices = voicePreference === 'female'
+            ? ['Samantha', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Victoria']
+            : ['Daniel', 'Alex', 'Fred', 'Thomas', 'Oliver'];
+
+          for (const name of appleVoices) {
+            const found = voices.find(v => v.name.includes(name) && v.lang.startsWith('en'));
+            if (found) {
+              selectedVoice = found;
+              voiceQuality = 'standard';
+              break;
+            }
+          }
+        }
+
+        // TIER 4: Any English voice with gender hint
+        if (!selectedVoice) {
+          const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+          if (voicePreference === 'female') {
+            selectedVoice = englishVoices.find(v =>
+              v.name.toLowerCase().includes('female') ||
+              v.name.toLowerCase().includes('woman') ||
+              v.name.includes('Zira') ||
+              v.name.includes('Helena') ||
+              v.name.includes('Catherine')
+            ) || null;
+          } else {
+            selectedVoice = englishVoices.find(v =>
+              v.name.toLowerCase().includes('male') ||
+              v.name.includes('David') ||
+              v.name.includes('Mark') ||
+              v.name.includes('James')
+            ) || null;
+          }
+          if (selectedVoice) voiceQuality = 'standard';
+        }
+
+        // TIER 5: First English voice
         if (!selectedVoice) {
           selectedVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+          voiceQuality = 'basic';
         }
 
         if (selectedVoice) {
           utterance.voice = selectedVoice;
-          addDiagnostic(`Using: ${selectedVoice.name} (${selectedVoice.lang})`);
+          addDiagnostic(`Selected: ${selectedVoice.name} (${voiceQuality} quality)`);
         }
       }
+
+      // OPTIMIZED SPEECH PARAMETERS based on voice quality and gender
+      if (voiceQuality === 'neural') {
+        // Neural voices sound great with minimal adjustment
+        utterance.rate = voicePreference === 'female' ? 1.0 : 0.95;
+        utterance.pitch = 1.0; // Neural voices handle pitch naturally
+        utterance.volume = 1.0;
+      } else if (voiceQuality === 'standard') {
+        // Standard voices need some tuning
+        utterance.rate = voicePreference === 'female' ? 0.95 : 0.9;
+        utterance.pitch = voicePreference === 'female' ? 1.05 : 0.95;
+        utterance.volume = 1.0;
+      } else {
+        // Basic voices need more adjustment to sound natural
+        utterance.rate = voicePreference === 'female' ? 0.9 : 0.85;
+        utterance.pitch = voicePreference === 'female' ? 1.1 : 0.9;
+        utterance.volume = 1.0;
+      }
+
+      // Add natural pauses for better prosody
+      const naturalText = text
+        .replace(/\. /g, '. ... ')    // Pause after periods
+        .replace(/! /g, '! ... ')     // Pause after exclamations  
+        .replace(/\? /g, '? ... ')    // Pause after questions
+        .replace(/: /g, ': ... ')     // Pause after colons
+        .replace(/; /g, '; .. ')      // Shorter pause after semicolons
+        .replace(/, /g, ', ');        // Brief pause at commas
+      utterance.text = naturalText;
 
       let hasStarted = false;
       let hasEnded = false;
