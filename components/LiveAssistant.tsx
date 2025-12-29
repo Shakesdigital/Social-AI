@@ -3,6 +3,7 @@ import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, 
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
+import { isOpenAITTSConfigured, speakWithOpenAI, getRecommendedVoice } from '../services/openaiTTSService';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [useNaturalVoice, setUseNaturalVoice] = useState(() => isOpenAITTSConfigured());
 
   // Detect mobile device
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -422,6 +424,32 @@ IMPORTANT PERSONALITY GUIDELINES:
   };
 
   const speak = async (text: string): Promise<void> => {
+    // Try OpenAI TTS first for natural voice
+    if (useNaturalVoice && isOpenAITTSConfigured()) {
+      try {
+        setIsSpeaking(true);
+        setStatus('🔊 Speaking (Natural Voice)...');
+        addDiagnostic('Using OpenAI TTS for natural voice');
+
+        const voice = getRecommendedVoice(voicePreference);
+        const success = await speakWithOpenAI(text, { voice, speed: 1.0 });
+
+        if (success) {
+          setIsSpeaking(false);
+          setStatus('✨ Ready! Tap mic to speak.');
+          addDiagnostic('OpenAI TTS completed');
+          return;
+        }
+
+        // Fall through to browser TTS if OpenAI fails
+        addDiagnostic('OpenAI TTS failed, falling back to browser');
+      } catch (error) {
+        addDiagnostic(`OpenAI TTS error: ${error}`);
+      }
+      setIsSpeaking(false);
+    }
+
+    // Fallback to browser speech synthesis
     return new Promise((resolve) => {
       if (!window.speechSynthesis) {
         addDiagnostic('No speechSynthesis');
@@ -823,12 +851,25 @@ IMPORTANT PERSONALITY GUIDELINES:
                 <Users size={12} /> Male
               </button>
             </div>
+            {/* Natural Voice Toggle - Only shown if OpenAI is configured */}
+            {isOpenAITTSConfigured() && (
+              <button
+                onClick={() => setUseNaturalVoice(!useNaturalVoice)}
+                className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1 transition-all ${useNaturalVoice
+                  ? 'bg-purple-500 text-white shadow'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                title={useNaturalVoice ? 'Using AI voice (OpenAI)' : 'Using browser voice'}
+              >
+                <Sparkles size={12} /> {useNaturalVoice ? 'AI Voice' : 'Basic'}
+              </button>
+            )}
             <button
               onClick={testSpeech}
               disabled={!speechReady || isSpeaking}
               className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 flex items-center gap-1"
             >
-              <Play size={12} /> Test Voice
+              <Play size={12} /> Test
             </button>
           </div>
 
