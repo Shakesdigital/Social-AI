@@ -4,6 +4,7 @@ import { CompanyProfile, BlogPost, TrendingTopic } from '../types';
 import { researchTrendingTopics, generateBlogPost, publishToWordPress } from '../services/blogService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
 import ReactMarkdown from 'react-markdown';
+import { InlineChat } from './InlineChat';
 
 interface BlogViewProps {
     profile: CompanyProfile;
@@ -398,6 +399,15 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                                 <div className="prose prose-lg max-w-none prose-headings:text-slate-900 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-p:text-slate-700 prose-p:leading-relaxed prose-li:text-slate-700 prose-strong:text-slate-800 prose-blockquote:border-brand-500 prose-blockquote:bg-brand-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-lg">
                                     <ReactMarkdown>{selectedPost.content}</ReactMarkdown>
                                 </div>
+                            </div>
+
+                            {/* Inline Chat for follow-up questions about the blog */}
+                            <div className="p-4 border-t border-slate-100">
+                                <InlineChat
+                                    context={`Title: ${selectedPost.title}\n\nContent: ${selectedPost.content}\n\nKeywords: ${selectedPost.seoKeywords.join(', ')}`}
+                                    contextType="blog"
+                                    placeholder="Ask about this blog post..."
+                                />
                             </div>
 
                             {/* Actions */}

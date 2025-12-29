@@ -38,6 +38,7 @@ import { generateMarketResearch, generateMarketingStrategy, generateContentTopic
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
 import ReactMarkdown from 'react-markdown';
+import { InlineChat } from './components/InlineChat';
 
 // Logo Component - Uses the Market MI logo image
 const MarketMILogo = ({ className, onClick }: { className?: string; onClick?: () => void }) => (
@@ -405,8 +406,16 @@ const ResearchView: React.FC<{
       )}
       {report && (
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
-          <div className="flex-1 bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-sm prose prose-slate prose-sm sm:prose max-w-none">
-            <ReactMarkdown>{report.rawContent}</ReactMarkdown>
+          <div className="flex-1">
+            <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-sm prose prose-slate prose-sm sm:prose max-w-none">
+              <ReactMarkdown>{report.rawContent}</ReactMarkdown>
+            </div>
+            {/* Inline Chat for follow-up questions */}
+            <InlineChat
+              context={report.rawContent}
+              contextType="research"
+              placeholder="Ask about this research..."
+            />
           </div>
           {report.sources.length > 0 && (
             <div className="w-full lg:w-72 xl:w-80 space-y-3 sm:space-y-4">
@@ -500,6 +509,14 @@ const StrategyWrapper: React.FC<{
         </div>
       )}
       <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-sm prose prose-slate prose-sm sm:prose max-w-none"><ReactMarkdown>{strategy}</ReactMarkdown></div>
+      {/* Inline Chat for follow-up questions */}
+      {strategy && (
+        <InlineChat
+          context={strategy}
+          contextType="strategy"
+          placeholder="Ask about this strategy..."
+        />
+      )}
     </div>
   );
 };
