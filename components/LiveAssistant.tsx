@@ -33,6 +33,10 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   });
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  // Detect mobile device
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -178,6 +182,21 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
 
     // Don't start if busy
     if (isThinking || isSpeaking) return;
+
+    // Unlock audio on mobile (requires user interaction)
+    if (isMobile && !audioUnlocked) {
+      if (window.speechSynthesis) {
+        const utterance = new SpeechSynthesisUtterance('');
+        utterance.volume = 0;
+        window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.cancel();
+      }
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+      setAudioUnlocked(true);
+      addDiagnostic('Audio unlocked via mic tap');
+    }
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -414,33 +433,34 @@ IMPORTANT PERSONALITY GUIDELINES:
       // Cancel any ongoing speech
       window.speechSynthesis.cancel();
 
+      // Mobile fix: Resume audio context if suspended
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => { });
+      }
+
       setIsSpeaking(true);
       setStatus('🔊 Speaking...');
       addDiagnostic('Starting speech...');
 
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Voice personality settings - inspired by high-quality AI voices
-      // Male "Ember" style: Confident, optimistic, warm, steady
-      // Female "Vale" style: Bright, inquisitive, friendly, expressive
+      // Voice personality settings
       if (voicePreference === 'female') {
-        // Vale-inspired: Bright and inquisitive
-        utterance.rate = 0.92;   // Slightly faster, more lively
-        utterance.pitch = 1.12;  // Brighter, higher pitch
+        utterance.rate = 0.92;
+        utterance.pitch = 1.12;
         utterance.volume = 1.0;
       } else {
-        // Ember-inspired: Confident and optimistic
-        utterance.rate = 0.88;   // Steady, deliberate pace
-        utterance.pitch = 0.88;  // Deeper, more resonant
+        utterance.rate = 0.88;
+        utterance.pitch = 0.88;
         utterance.volume = 1.0;
       }
 
       // Add natural pauses and improve flow
       const naturalText = text
-        .replace(/\. /g, '. ... ')    // Natural pause after sentences
-        .replace(/! /g, '! ... ')     // Pause after exclamations
-        .replace(/\? /g, '? ... ')    // Thoughtful pause after questions
-        .replace(/, /g, ', ');        // Brief pause at commas
+        .replace(/\. /g, '. ... ')
+        .replace(/! /g, '! ... ')
+        .replace(/\? /g, '? ... ')
+        .replace(/, /g, ', ');
       utterance.text = naturalText;
 
       // Select the best voice based on preference
@@ -450,14 +470,12 @@ IMPORTANT PERSONALITY GUIDELINES:
       if (voices.length > 0) {
         let selectedVoice: SpeechSynthesisVoice | null = null;
 
-        // Define preferred voices for natural sound (ordered by quality - premium neural voices first)
-        // Female "Vale" style: bright, clear, expressive voices
+        // Define preferred voices (premium neural voices first)
         const femaleNames = [
           'Microsoft Aria Online', 'Microsoft Jenny Online', 'Google US English Female',
           'Samantha', 'Karen', 'Moira', 'Fiona', 'Victoria', 'Tessa',
           'Microsoft Zira', 'Google UK English Female', 'en-US-Wavenet'
         ];
-        // Male "Ember" style: warm, confident, resonant voices
         const maleNames = [
           'Microsoft Guy Online', 'Microsoft Christopher Online', 'Google US English Male',
           'Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'James', 'Thomas'
@@ -503,11 +521,17 @@ IMPORTANT PERSONALITY GUIDELINES:
         }
       }
 
+      let hasStarted = false;
+      let hasEnded = false;
+
       utterance.onstart = () => {
+        hasStarted = true;
         addDiagnostic('Speech started');
       };
 
       utterance.onend = () => {
+        if (hasEnded) return;
+        hasEnded = true;
         addDiagnostic('Speech completed');
         setIsSpeaking(false);
         setStatus('✨ Ready! Tap mic to speak.');
@@ -515,33 +539,79 @@ IMPORTANT PERSONALITY GUIDELINES:
       };
 
       utterance.onerror = (e) => {
+        if (hasEnded) return;
+        hasEnded = true;
         addDiagnostic(`Speech error: ${e.error}`);
         setIsSpeaking(false);
-        setStatus('Speech failed. See response above.');
+
+        // On mobile, if speech fails, show the response text
+        if (e.error === 'not-allowed' || e.error === 'synthesis-failed') {
+          setStatus('Voice blocked by browser. See response above.');
+        } else {
+          setStatus('Speech failed. See response above.');
+        }
         resolve();
       };
 
-      // Small delay helps on some browsers
-      setTimeout(() => {
+      // Mobile Safari and iOS fix: need to trigger speech multiple times
+      const startSpeech = () => {
         try {
-          window.speechSynthesis.speak(utterance);
+          // Clear any pending speech
+          window.speechSynthesis.cancel();
 
-          // Chrome workaround: keep speech alive
-          const keepAlive = setInterval(() => {
-            if (!window.speechSynthesis.speaking) {
-              clearInterval(keepAlive);
-            } else {
-              window.speechSynthesis.pause();
-              window.speechSynthesis.resume();
-            }
-          }, 5000);
+          // Small delay then speak
+          setTimeout(() => {
+            window.speechSynthesis.speak(utterance);
 
+            // Mobile workaround: iOS sometimes stops speaking
+            // Periodically check and keep alive
+            let checkCount = 0;
+            const keepAlive = setInterval(() => {
+              checkCount++;
+
+              // Safety: stop checking after 60 seconds max
+              if (checkCount > 120 || hasEnded) {
+                clearInterval(keepAlive);
+                return;
+              }
+
+              if (window.speechSynthesis.speaking) {
+                // Chrome/Edge fix: pause and resume to prevent stopping
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+              } else if (hasStarted && !hasEnded) {
+                // Speech stopped unexpectedly
+                clearInterval(keepAlive);
+                if (!hasEnded) {
+                  hasEnded = true;
+                  setIsSpeaking(false);
+                  setStatus('✨ Ready! Tap mic to speak.');
+                  resolve();
+                }
+              }
+            }, 500);
+
+            // Fallback timeout: if speech doesn't start in 3 seconds, resolve anyway
+            setTimeout(() => {
+              if (!hasStarted && !hasEnded) {
+                addDiagnostic('Speech timeout - did not start');
+                hasEnded = true;
+                setIsSpeaking(false);
+                setStatus('Voice may not be available. See response above.');
+                resolve();
+              }
+            }, 3000);
+
+          }, 100);
         } catch (err: any) {
           addDiagnostic(`Speak error: ${err.message}`);
           setIsSpeaking(false);
+          setStatus('Speech failed. See response above.');
           resolve();
         }
-      }, 50);
+      };
+
+      startSpeech();
     });
   };
 
@@ -551,7 +621,31 @@ IMPORTANT PERSONALITY GUIDELINES:
     addDiagnostic(`Voice changed to: ${pref}`);
   };
 
+  // Unlock audio on mobile - needs user interaction
+  const unlockAudio = () => {
+    if (audioUnlocked) return;
+
+    // Create and play a silent audio to unlock
+    if (window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance('');
+      utterance.volume = 0;
+      window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.cancel();
+    }
+
+    // Resume audio context
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+
+    setAudioUnlocked(true);
+    addDiagnostic('Audio unlocked for mobile');
+  };
+
   const testSpeech = () => {
+    // Unlock audio first on mobile
+    unlockAudio();
+
     const testText = voicePreference === 'female'
       ? "Hi there! I'm your marketing assistant. How can I help you today?"
       : "Hello! I'm your marketing assistant. What would you like to know?";
