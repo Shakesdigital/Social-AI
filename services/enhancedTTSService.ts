@@ -170,24 +170,30 @@ const speakWithBrowser = async (
             }
         }
 
-        // Optimized speech parameters
+        // Optimized speech parameters - FIXED: male was too slow
         if (voiceQuality === 'neural') {
             utterance.rate = 1.0;
             utterance.pitch = 1.0;
         } else if (voiceQuality === 'enhanced') {
-            utterance.rate = gender === 'female' ? 0.95 : 0.92;
-            utterance.pitch = gender === 'female' ? 1.0 : 0.95;
+            // Enhanced voices - slight adjustments
+            utterance.rate = gender === 'female' ? 0.98 : 1.0;  // Male speed increased
+            utterance.pitch = gender === 'female' ? 1.0 : 0.98;
         } else if (voiceQuality === 'standard') {
-            utterance.rate = gender === 'female' ? 0.9 : 0.88;
-            utterance.pitch = gender === 'female' ? 1.03 : 0.92;
+            // Standard voices - moderate adjustments
+            utterance.rate = gender === 'female' ? 0.95 : 0.98;  // Male speed increased from 0.88
+            utterance.pitch = gender === 'female' ? 1.02 : 0.95;
         } else {
-            utterance.rate = gender === 'female' ? 0.85 : 0.82;
-            utterance.pitch = gender === 'female' ? 1.06 : 0.88;
+            // Basic voices - more natural adjustments (FIXED: male was way too slow at 0.82)
+            utterance.rate = gender === 'female' ? 0.92 : 0.95;  // Male speed increased from 0.82
+            utterance.pitch = gender === 'female' ? 1.03 : 0.92;
         }
 
-        // Mobile adjustments
+        // Mobile adjustments - make voices sound MORE natural, not slower
         if (isMobile && voiceQuality !== 'neural') {
-            utterance.rate = Math.max(0.75, utterance.rate - 0.08);
+            // On mobile, use slightly HIGHER rate for better natural flow
+            utterance.rate = Math.min(1.05, utterance.rate + 0.05);
+            // Adjust pitch slightly for warmer sound
+            utterance.pitch = gender === 'female' ? 1.0 : 0.95;
         }
 
         utterance.volume = 1.0;

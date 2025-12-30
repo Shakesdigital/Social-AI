@@ -6,64 +6,45 @@ export type PuterVoice =
     | 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable'
     | 'nova' | 'onyx' | 'sage' | 'shimmer' | 'verse';
 
-export type PuterEngine = 'openai-tts-1' | 'openai-tts-1-hd' | 'aws-neural' | 'aws-standard';
-
 export interface PuterTTSOptions {
     voice?: PuterVoice;
-    engine?: PuterEngine;
     speed?: number;  // 0.25 to 4.0
 }
 
-// Check if Puter is loaded
+// Check if Puter is loaded and ready
 export const isPuterLoaded = (): boolean => {
-    return typeof (window as any).puter !== 'undefined' &&
-        typeof (window as any).puter.ai?.txt2speech === 'function';
+    const puter = (window as any).puter;
+    const isLoaded = puter !== undefined && typeof puter.ai?.txt2speech === 'function';
+    console.log('[Puter TTS] isPuterLoaded check:', isLoaded, {
+        puterExists: puter !== undefined,
+        aiExists: puter?.ai !== undefined,
+        txt2speechExists: typeof puter?.ai?.txt2speech === 'function'
+    });
+    return isLoaded;
 };
 
-// Load Puter.js script dynamically
-export const loadPuterScript = (): Promise<boolean> => {
+// Wait for Puter to be ready
+export const waitForPuter = (maxWaitMs: number = 5000): Promise<boolean> => {
     return new Promise((resolve) => {
-        // Check if already loaded
+        // Check immediately
         if (isPuterLoaded()) {
-            console.log('[Puter TTS] Already loaded');
+            console.log('[Puter TTS] Puter already loaded');
             resolve(true);
             return;
         }
 
-        // Check if script is already in DOM
-        const existingScript = document.querySelector('script[src*="puter.js"]');
-        if (existingScript) {
-            // Wait for it to load
-            existingScript.addEventListener('load', () => {
-                console.log('[Puter TTS] Script loaded from existing tag');
-                resolve(isPuterLoaded());
-            });
-            existingScript.addEventListener('error', () => {
-                console.error('[Puter TTS] Failed to load existing script');
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (isPuterLoaded()) {
+                clearInterval(checkInterval);
+                console.log('[Puter TTS] Puter became available');
+                resolve(true);
+            } else if (Date.now() - startTime > maxWaitMs) {
+                clearInterval(checkInterval);
+                console.warn('[Puter TTS] Timeout waiting for Puter');
                 resolve(false);
-            });
-            return;
-        }
-
-        // Create and load script
-        const script = document.createElement('script');
-        script.src = 'https://js.puter.com/v2/';
-        script.async = true;
-
-        script.onload = () => {
-            console.log('[Puter TTS] Script loaded successfully');
-            // Give Puter a moment to initialize
-            setTimeout(() => {
-                resolve(isPuterLoaded());
-            }, 500);
-        };
-
-        script.onerror = () => {
-            console.error('[Puter TTS] Failed to load script');
-            resolve(false);
-        };
-
-        document.head.appendChild(script);
+            }
+        }, 100);
     });
 };
 
@@ -73,10 +54,10 @@ export const generateSpeechPuter = async (
     options: PuterTTSOptions = {}
 ): Promise<Blob | null> => {
     try {
-        // Ensure Puter is loaded
-        const loaded = await loadPuterScript();
-        if (!loaded) {
-            console.error('[Puter TTS] Puter.js not available');
+        // Wait for Puter to be ready
+        const isReady = await waitForPuter(3000);
+        if (!isReady) {
+            console.error('[Puter TTS] Puter.js not available after waiting');
             return null;
         }
 
@@ -84,28 +65,41 @@ export const generateSpeechPuter = async (
 
         const {
             voice = 'nova',  // Default to nova (female-sounding)
-            engine = 'openai-tts-1',
             speed = 1.0
         } = options;
 
-        console.log('[Puter TTS] Generating speech:', { textLength: text.length, voice, engine, speed });
+        console.log('[Puter TTS] Generating speech:', { textLength: text.length, voice, speed });
 
-        // Call Puter TTS API
-        const audioBlob = await puter.ai.txt2speech(text, {
+        // Call Puter TTS API - using the documented syntax
+        const result = await puter.ai.txt2speech(text, {
             voice,
-            model: engine,
             speed
         });
 
-        if (audioBlob instanceof Blob) {
-            console.log('[Puter TTS] Generated audio blob:', audioBlob.size, 'bytes');
-            return audioBlob;
+        console.log('[Puter TTS] API response type:', typeof result, result);
+
+        // Handle different response types
+        if (result instanceof Blob) {
+            console.log('[Puter TTS] Generated audio blob:', result.size, 'bytes');
+            return result;
         }
 
-        console.error('[Puter TTS] Unexpected response type');
+        // If it returns an audio element or URL
+        if (result && result.audio) {
+            console.log('[Puter TTS] Got audio from result.audio');
+            return result.audio;
+        }
+
+        // If it returns ArrayBuffer
+        if (result instanceof ArrayBuffer) {
+            console.log('[Puter TTS] Converting ArrayBuffer to Blob');
+            return new Blob([result], { type: 'audio/mp3' });
+        }
+
+        console.error('[Puter TTS] Unexpected response type:', typeof result);
         return null;
     } catch (error: any) {
-        console.error('[Puter TTS] Error generating speech:', error);
+        console.error('[Puter TTS] Error generating speech:', error.message || error);
         return null;
     }
 };
@@ -119,6 +113,7 @@ export const playAudioBlob = async (blob: Blob): Promise<boolean> => {
 
             audio.onended = () => {
                 URL.revokeObjectURL(url);
+                console.log('[Puter TTS] Audio playback completed');
                 resolve(true);
             };
 
@@ -145,21 +140,21 @@ export const speakWithPuter = async (
     text: string,
     options: PuterTTSOptions = {}
 ): Promise<boolean> => {
-    console.log('[Puter TTS] speakWithPuter called');
+    console.log('[Puter TTS] speakWithPuter called with text length:', text.length);
 
-    const audioBlob = await generateSpeechPuter(text, options);
-    if (!audioBlob) {
+    try {
+        const audioBlob = await generateSpeechPuter(text, options);
+        if (!audioBlob) {
+            console.error('[Puter TTS] No audio blob generated');
+            return false;
+        }
+
+        console.log('[Puter TTS] Playing audio blob...');
+        return await playAudioBlob(audioBlob);
+    } catch (error: any) {
+        console.error('[Puter TTS] speakWithPuter error:', error.message || error);
         return false;
     }
-
-    return await playAudioBlob(audioBlob);
-};
-
-// Check if Puter TTS is configured/available
-export const isPuterTTSConfigured = async (): Promise<boolean> => {
-    const loaded = await loadPuterScript();
-    console.log('[Puter TTS] Configuration check:', loaded);
-    return loaded;
 };
 
 // Get recommended voice based on gender
