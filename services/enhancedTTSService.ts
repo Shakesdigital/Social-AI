@@ -129,13 +129,15 @@ export const speak = async (
                 // Pitch 0.8 - 0.9 is the "sweet spot" for a natural male voice.
 
                 if (isConfirmedMale) {
-                    // It's already a male voice, just minimal tuning
-                    utterance.pitch = 0.90; // Just slightly deeper than default
-                    utterance.rate = 1.0;   // Normal speed
+                    // Young & Professional Male
+                    // Higher pitch = Younger (1.1)
+                    // Faster rate = Professional/Energetic (1.15)
+                    utterance.pitch = 1.1;
+                    utterance.rate = 1.15;
                 } else {
-                    // Unsure/Generic voice - pitch down to sound male but not robotic
-                    utterance.pitch = 0.8;
-                    utterance.rate = 0.95; // Slightly slower
+                    // Fallback: Pitch up slightly generic voice
+                    utterance.pitch = 1.05;
+                    utterance.rate = 1.1;
                 }
             } else {  // DESKTOP TUNING
                 if (isConfirmedMale) {
