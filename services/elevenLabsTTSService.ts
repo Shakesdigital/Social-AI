@@ -43,8 +43,10 @@ export const generateSpeechElevenLabs = async (
     text: string,
     options: ElevenLabsTTSOptions = {}
 ): Promise<ArrayBuffer | null> => {
+    console.log('[ElevenLabs] generateSpeechElevenLabs called with text length:', text.length);
+
     if (!isElevenLabsConfigured()) {
-        console.log('[ElevenLabs] API key not configured');
+        console.log('[ElevenLabs] API key not configured - skipping');
         return null;
     }
 
@@ -55,6 +57,7 @@ export const generateSpeechElevenLabs = async (
     } = options;
 
     const voiceId = ELEVENLABS_VOICES[voice];
+    console.log('[ElevenLabs] Making API call with voice:', voice, 'voiceId:', voiceId);
 
     try {
         const response = await fetch(
@@ -77,9 +80,11 @@ export const generateSpeechElevenLabs = async (
             }
         );
 
+        console.log('[ElevenLabs] API response status:', response.status, response.statusText);
+
         if (!response.ok) {
             const error = await response.text();
-            console.error('[ElevenLabs] API error:', error);
+            console.error('[ElevenLabs] API error (status ' + response.status + '):', error);
             return null;
         }
 

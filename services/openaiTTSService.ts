@@ -26,12 +26,15 @@ export const generateSpeech = async (
     text: string,
     options: TTSOptions = {}
 ): Promise<ArrayBuffer | null> => {
+    console.log('[OpenAI TTS] generateSpeech called with text length:', text.length);
+
     if (!isOpenAITTSConfigured()) {
-        console.log('[TTS] OpenAI API key not configured');
+        console.log('[OpenAI TTS] API key not configured - skipping');
         return null;
     }
 
     const { voice = 'nova', speed = 1.0 } = options;
+    console.log('[OpenAI TTS] Making API call with voice:', voice, 'speed:', speed);
 
     try {
         const response = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -49,9 +52,11 @@ export const generateSpeech = async (
             }),
         });
 
+        console.log('[OpenAI TTS] API response status:', response.status, response.statusText);
+
         if (!response.ok) {
             const error = await response.text();
-            console.error('[TTS] OpenAI API error:', error);
+            console.error('[OpenAI TTS] API error (status ' + response.status + '):', error);
             return null;
         }
 
