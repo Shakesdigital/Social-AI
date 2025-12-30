@@ -57,7 +57,7 @@ export const getBestProvider = (): TTSProvider => {
     return 'none';
 };
 
-// Enhanced browser speech synthesis with better voice selection
+// Enhanced browser speech synthesis with better voice selection for ALL devices including mobile
 const speakWithBrowser = async (
     text: string,
     gender: VoiceGender,
@@ -74,37 +74,113 @@ const speakWithBrowser = async (
         // Cancel any ongoing speech
         window.speechSynthesis.cancel();
 
+        // Detect device type for optimized voice selection
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const isChrome = /Chrome/i.test(navigator.userAgent) && !/Edg/i.test(navigator.userAgent);
+        const isEdge = /Edg/i.test(navigator.userAgent);
+        const isSafari = /Safari/i.test(navigator.userAgent) && !/Chrome/i.test(navigator.userAgent);
+
+        console.log('[EnhancedTTS] Device detection:', { isMobile, isIOS, isAndroid, isChrome, isEdge, isSafari });
+
         const utterance = new SpeechSynthesisUtterance(text);
-        const voices = window.speechSynthesis.getVoices();
 
-        console.log('[EnhancedTTS] Browser voices available:', voices.length);
+        // Wait a bit for voices to load on some browsers
+        const getVoicesWithRetry = (): SpeechSynthesisVoice[] => {
+            let voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) {
+                // Try again - some browsers need a moment
+                voices = window.speechSynthesis.getVoices();
+            }
+            return voices;
+        };
 
-        // Enhanced voice selection with quality tiers
+        const voices = getVoicesWithRetry();
+        console.log('[EnhancedTTS] Browser voices available:', voices.length,
+            voices.map(v => `${v.name} (${v.lang})`).slice(0, 10));
+
+        // Enhanced voice selection with device-specific tiers
         let selectedVoice: SpeechSynthesisVoice | null = null;
-        let voiceQuality = 'basic';
+        let voiceQuality: 'neural' | 'enhanced' | 'standard' | 'basic' = 'basic';
 
         if (voices.length > 0) {
-            // TIER 1: Premium Neural/Online voices (Microsoft Edge, Google Chrome)
-            const premiumVoicePatterns = gender === 'female'
-                ? ['Microsoft Aria Online', 'Microsoft Jenny Online', 'Google US English Female', 'Microsoft Zira']
-                : ['Microsoft Guy Online', 'Microsoft Ryan Online', 'Google US English Male', 'Microsoft David'];
+            // TIER 1: Microsoft Neural/Online voices (Edge on any platform)
+            if (isEdge) {
+                const neuralVoices = gender === 'female'
+                    ? ['Microsoft Aria Online', 'Microsoft Jenny Online', 'Microsoft Zira Online', 'Aria', 'Jenny']
+                    : ['Microsoft Guy Online', 'Microsoft Ryan Online', 'Microsoft Christopher Online', 'Guy', 'Ryan'];
 
-            for (const pattern of premiumVoicePatterns) {
-                const found = voices.find(v => v.name.includes(pattern) && v.lang.startsWith('en'));
-                if (found) {
-                    selectedVoice = found;
-                    voiceQuality = 'premium';
-                    break;
+                for (const pattern of neuralVoices) {
+                    const found = voices.find(v => v.name.includes(pattern) && v.lang.startsWith('en'));
+                    if (found) {
+                        selectedVoice = found;
+                        voiceQuality = 'neural';
+                        break;
+                    }
                 }
             }
 
-            // TIER 2: Apple voices (macOS/iOS)
-            if (!selectedVoice) {
-                const appleVoices = gender === 'female'
-                    ? ['Samantha', 'Karen', 'Moira', 'Tessa', 'Victoria']
-                    : ['Daniel', 'Alex', 'Fred', 'Thomas', 'Oliver'];
+            // TIER 2: Google voices (Chrome on desktop/Android)
+            if (!selectedVoice && (isChrome || isAndroid)) {
+                const googleVoices = gender === 'female'
+                    ? ['Google US English Female', 'Google UK English Female', 'English United States']
+                    : ['Google US English Male', 'Google UK English Male', 'English United States'];
 
-                for (const name of appleVoices) {
+                for (const pattern of googleVoices) {
+                    const found = voices.find(v => v.name.includes(pattern) ||
+                        (v.name.includes('English') && v.lang.startsWith('en')));
+                    if (found) {
+                        selectedVoice = found;
+                        voiceQuality = 'enhanced';
+                        break;
+                    }
+                }
+            }
+
+            // TIER 3: iOS/macOS Siri voices (Safari, iOS)
+            if (!selectedVoice && (isIOS || isSafari)) {
+                // iOS has enhanced Siri voices - prefer these
+                const appleEnhanced = gender === 'female'
+                    ? ['Samantha (Enhanced)', 'Samantha', 'Karen', 'Moira', 'Tessa', 'Fiona']
+                    : ['Daniel (Enhanced)', 'Daniel', 'Alex', 'Fred', 'Oliver', 'Thomas'];
+
+                for (const name of appleEnhanced) {
+                    const found = voices.find(v => v.name.includes(name) && v.lang.startsWith('en'));
+                    if (found) {
+                        selectedVoice = found;
+                        voiceQuality = found.name.includes('Enhanced') ? 'enhanced' : 'standard';
+                        break;
+                    }
+                }
+            }
+
+            // TIER 4: Android-specific voices
+            if (!selectedVoice && isAndroid) {
+                // Try to find any female/male-sounding voice on Android
+                const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+                if (gender === 'female') {
+                    selectedVoice = englishVoices.find(v =>
+                        v.name.toLowerCase().includes('female') ||
+                        v.name.toLowerCase().includes('woman') ||
+                        v.name.includes('English United States') // Default Google voice is female
+                    ) || englishVoices[0] || null;
+                } else {
+                    selectedVoice = englishVoices.find(v =>
+                        v.name.toLowerCase().includes('male') ||
+                        v.name.toLowerCase().includes('man')
+                    ) || englishVoices[0] || null;
+                }
+                if (selectedVoice) voiceQuality = 'standard';
+            }
+
+            // TIER 5: Windows/Desktop fallback
+            if (!selectedVoice) {
+                const desktopVoices = gender === 'female'
+                    ? ['Microsoft Zira', 'Zira', 'Microsoft Hazel', 'Hazel', 'Helena', 'Catherine']
+                    : ['Microsoft David', 'David', 'Microsoft Mark', 'Mark', 'James', 'George'];
+
+                for (const name of desktopVoices) {
                     const found = voices.find(v => v.name.includes(name) && v.lang.startsWith('en'));
                     if (found) {
                         selectedVoice = found;
@@ -114,9 +190,10 @@ const speakWithBrowser = async (
                 }
             }
 
-            // TIER 3: Any English voice
+            // TIER 6: Any English voice as last resort
             if (!selectedVoice) {
-                selectedVoice = voices.find(v => v.lang.startsWith('en-US')) ||
+                selectedVoice = voices.find(v => v.lang === 'en-US') ||
+                    voices.find(v => v.lang.startsWith('en-')) ||
                     voices.find(v => v.lang.startsWith('en')) ||
                     voices[0];
                 voiceQuality = 'basic';
@@ -124,21 +201,40 @@ const speakWithBrowser = async (
 
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
-                console.log(`[EnhancedTTS] Selected browser voice: ${selectedVoice.name} (${voiceQuality})`);
+                console.log(`[EnhancedTTS] Selected voice: "${selectedVoice.name}" (${voiceQuality} quality, ${selectedVoice.lang})`);
             }
         }
 
-        // Optimize speech parameters based on quality
-        if (voiceQuality === 'premium') {
+        // OPTIMIZED SPEECH PARAMETERS for natural sound based on device and quality
+        // These settings make the voice sound LESS robotic
+        if (voiceQuality === 'neural') {
+            // Neural voices are already very natural
             utterance.rate = 1.0;
             utterance.pitch = 1.0;
+        } else if (voiceQuality === 'enhanced') {
+            // Slightly slower for better clarity
+            utterance.rate = gender === 'female' ? 0.95 : 0.92;
+            utterance.pitch = gender === 'female' ? 1.0 : 0.95;
         } else if (voiceQuality === 'standard') {
-            utterance.rate = gender === 'female' ? 0.95 : 0.9;
-            utterance.pitch = gender === 'female' ? 1.02 : 0.98;
+            // More adjustment for standard voices
+            utterance.rate = gender === 'female' ? 0.9 : 0.88;
+            utterance.pitch = gender === 'female' ? 1.03 : 0.92;
         } else {
-            utterance.rate = gender === 'female' ? 0.9 : 0.85;
-            utterance.pitch = gender === 'female' ? 1.05 : 0.95;
+            // Basic voices need significant tuning to sound acceptable
+            // Slower rate and adjusted pitch helps a lot with robotic-sounding voices
+            utterance.rate = gender === 'female' ? 0.85 : 0.82;
+            utterance.pitch = gender === 'female' ? 1.06 : 0.88;
         }
+
+        // Mobile-specific adjustments - mobile voices often sound more robotic
+        if (isMobile && voiceQuality !== 'neural') {
+            // Slow down mobile voices MORE for better naturalness
+            utterance.rate = Math.max(0.75, utterance.rate - 0.08);
+            // Adjust pitch slightly for warmer sound
+            utterance.pitch = gender === 'female' ? Math.min(1.1, utterance.pitch + 0.02) : Math.max(0.85, utterance.pitch - 0.02);
+            console.log(`[EnhancedTTS] Applied mobile adjustments: rate=${utterance.rate.toFixed(2)}, pitch=${utterance.pitch.toFixed(2)}`);
+        }
+
         utterance.volume = 1.0;
 
         let hasEnded = false;
@@ -174,7 +270,8 @@ const speakWithBrowser = async (
             resolve(false);
         };
 
-        // Chrome bug fix: prevent speech from stopping
+        // Chrome/Android bug fix: prevent speech from stopping mid-sentence
+        // More frequent checks on mobile
         keepAliveInterval = setInterval(() => {
             if (hasEnded) {
                 cleanup();
@@ -183,7 +280,7 @@ const speakWithBrowser = async (
             if (window.speechSynthesis.paused) {
                 window.speechSynthesis.resume();
             }
-        }, 1000);
+        }, isMobile ? 500 : 1000);
 
         // Speak with a small delay to ensure stability
         setTimeout(() => {
