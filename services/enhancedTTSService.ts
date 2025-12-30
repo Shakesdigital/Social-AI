@@ -125,19 +125,18 @@ export const speak = async (
 
             if (isMobile) {
                 // MOBILE TUNING - NATURAL MALE
-                // Pitch 0.3 is too deep/robotic. 
                 // Pitch 0.8 - 0.9 is the "sweet spot" for a natural male voice.
 
                 if (isConfirmedMale) {
                     // Young & Professional Male
                     // Higher pitch = Younger (1.1)
-                    // Faster rate = Professional/Energetic (1.15)
+                    // Normal rate = Clear/Professional (1.0)
                     utterance.pitch = 1.1;
-                    utterance.rate = 1.15;
+                    utterance.rate = 1.0;
                 } else {
-                    // Fallback: Pitch up slightly generic voice
+                    // Fallback
                     utterance.pitch = 1.05;
-                    utterance.rate = 1.1;
+                    utterance.rate = 1.0;
                 }
             } else {  // DESKTOP TUNING
                 if (isConfirmedMale) {
