@@ -440,7 +440,7 @@ VOICE CONVERSATION GUIDELINES:
 
     // Log TTS status for debugging
     const ttsStatus = getTTSStatus();
-    addDiagnostic(`TTS Status - ElevenLabs: ${ttsStatus.elevenlabs.isConfigured}, OpenAI: ${ttsStatus.openai.isConfigured}, Browser: ${ttsStatus.browser.isConfigured}`);
+    addDiagnostic(`TTS Status - Puter: available, ElevenLabs: ${ttsStatus.elevenlabs.isConfigured}, OpenAI: ${ttsStatus.openai.isConfigured}, Browser: ${ttsStatus.browser.isConfigured}`);
 
     const result = await enhancedSpeak(text, voicePreference, {
       onStart: () => {
@@ -453,6 +453,7 @@ VOICE CONVERSATION GUIDELINES:
       onProviderChange: (provider) => {
         setCurrentTTSProvider(provider);
         const statusMessages: Record<TTSProvider, string> = {
+          'puter': '🔊 Speaking (Puter - FREE)...',
           'elevenlabs': '🔊 Speaking (ElevenLabs)...',
           'openai': '🔊 Speaking (OpenAI)...',
           'browser': '🔊 Speaking (Browser)...',

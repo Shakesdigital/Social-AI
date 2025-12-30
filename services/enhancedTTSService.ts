@@ -1,11 +1,12 @@
 // Enhanced Text-to-Speech Service with robust fallback chain
-// Prioritizes: ElevenLabs → OpenAI → Enhanced Browser TTS
+// Priority: Puter.js (FREE unlimited) → ElevenLabs → OpenAI → Browser TTS
 
 import { isElevenLabsConfigured, speakWithElevenLabs, getRecommendedElevenLabsVoice } from './elevenLabsTTSService';
 import { isOpenAITTSConfigured, speakWithOpenAI, getRecommendedVoice } from './openaiTTSService';
+import { speakWithPuter, getRecommendedPuterVoice, loadPuterScript, isPuterLoaded } from './puterTTSService';
 
 export type VoiceGender = 'female' | 'male';
-export type TTSProvider = 'elevenlabs' | 'openai' | 'browser' | 'none';
+export type TTSProvider = 'puter' | 'elevenlabs' | 'openai' | 'browser' | 'none';
 
 export interface TTSStatus {
     provider: TTSProvider;
@@ -20,18 +21,25 @@ export interface SpeakResult {
 }
 
 // Get the status of all TTS providers
-export const getTTSStatus = (): { elevenlabs: TTSStatus; openai: TTSStatus; browser: TTSStatus } => {
+export const getTTSStatus = (): { puter: TTSStatus; elevenlabs: TTSStatus; openai: TTSStatus; browser: TTSStatus } => {
     const elevenlabsConfigured = isElevenLabsConfigured();
     const openaiConfigured = isOpenAITTSConfigured();
     const browserAvailable = typeof window !== 'undefined' && 'speechSynthesis' in window;
+    // Puter is always "available" - it loads dynamically
+    const puterAvailable = true;
 
     console.log('[EnhancedTTS] Provider status check:', {
+        puter: puterAvailable,
         elevenlabs: elevenlabsConfigured,
         openai: openaiConfigured,
         browser: browserAvailable
     });
 
     return {
+        puter: {
+            provider: 'puter',
+            isConfigured: puterAvailable
+        },
         elevenlabs: {
             provider: 'elevenlabs',
             isConfigured: elevenlabsConfigured
@@ -49,12 +57,8 @@ export const getTTSStatus = (): { elevenlabs: TTSStatus; openai: TTSStatus; brow
 
 // Get the best available TTS provider
 export const getBestProvider = (): TTSProvider => {
-    const status = getTTSStatus();
-
-    if (status.elevenlabs.isConfigured) return 'elevenlabs';
-    if (status.openai.isConfigured) return 'openai';
-    if (status.browser.isConfigured) return 'browser';
-    return 'none';
+    // Puter is always first since it's free/unlimited with high quality
+    return 'puter';
 };
 
 // Enhanced browser speech synthesis with better voice selection for ALL devices including mobile
@@ -90,15 +94,13 @@ const speakWithBrowser = async (
         const getVoicesWithRetry = (): SpeechSynthesisVoice[] => {
             let voices = window.speechSynthesis.getVoices();
             if (voices.length === 0) {
-                // Try again - some browsers need a moment
                 voices = window.speechSynthesis.getVoices();
             }
             return voices;
         };
 
         const voices = getVoicesWithRetry();
-        console.log('[EnhancedTTS] Browser voices available:', voices.length,
-            voices.map(v => `${v.name} (${v.lang})`).slice(0, 10));
+        console.log('[EnhancedTTS] Browser voices available:', voices.length);
 
         // Enhanced voice selection with device-specific tiers
         let selectedVoice: SpeechSynthesisVoice | null = null;
@@ -108,8 +110,8 @@ const speakWithBrowser = async (
             // TIER 1: Microsoft Neural/Online voices (Edge on any platform)
             if (isEdge) {
                 const neuralVoices = gender === 'female'
-                    ? ['Microsoft Aria Online', 'Microsoft Jenny Online', 'Microsoft Zira Online', 'Aria', 'Jenny']
-                    : ['Microsoft Guy Online', 'Microsoft Ryan Online', 'Microsoft Christopher Online', 'Guy', 'Ryan'];
+                    ? ['Microsoft Aria Online', 'Microsoft Jenny Online', 'Aria', 'Jenny']
+                    : ['Microsoft Guy Online', 'Microsoft Ryan Online', 'Guy', 'Ryan'];
 
                 for (const pattern of neuralVoices) {
                     const found = voices.find(v => v.name.includes(pattern) && v.lang.startsWith('en'));
@@ -124,12 +126,11 @@ const speakWithBrowser = async (
             // TIER 2: Google voices (Chrome on desktop/Android)
             if (!selectedVoice && (isChrome || isAndroid)) {
                 const googleVoices = gender === 'female'
-                    ? ['Google US English Female', 'Google UK English Female', 'English United States']
-                    : ['Google US English Male', 'Google UK English Male', 'English United States'];
+                    ? ['Google US English Female', 'Google UK English Female']
+                    : ['Google US English Male', 'Google UK English Male'];
 
                 for (const pattern of googleVoices) {
-                    const found = voices.find(v => v.name.includes(pattern) ||
-                        (v.name.includes('English') && v.lang.startsWith('en')));
+                    const found = voices.find(v => v.name.includes(pattern));
                     if (found) {
                         selectedVoice = found;
                         voiceQuality = 'enhanced';
@@ -138,49 +139,13 @@ const speakWithBrowser = async (
                 }
             }
 
-            // TIER 3: iOS/macOS Siri voices (Safari, iOS)
+            // TIER 3: iOS/macOS Siri voices
             if (!selectedVoice && (isIOS || isSafari)) {
-                // iOS has enhanced Siri voices - prefer these
                 const appleEnhanced = gender === 'female'
-                    ? ['Samantha (Enhanced)', 'Samantha', 'Karen', 'Moira', 'Tessa', 'Fiona']
-                    : ['Daniel (Enhanced)', 'Daniel', 'Alex', 'Fred', 'Oliver', 'Thomas'];
+                    ? ['Samantha', 'Karen', 'Moira', 'Tessa']
+                    : ['Daniel', 'Alex', 'Fred', 'Oliver'];
 
                 for (const name of appleEnhanced) {
-                    const found = voices.find(v => v.name.includes(name) && v.lang.startsWith('en'));
-                    if (found) {
-                        selectedVoice = found;
-                        voiceQuality = found.name.includes('Enhanced') ? 'enhanced' : 'standard';
-                        break;
-                    }
-                }
-            }
-
-            // TIER 4: Android-specific voices
-            if (!selectedVoice && isAndroid) {
-                // Try to find any female/male-sounding voice on Android
-                const englishVoices = voices.filter(v => v.lang.startsWith('en'));
-                if (gender === 'female') {
-                    selectedVoice = englishVoices.find(v =>
-                        v.name.toLowerCase().includes('female') ||
-                        v.name.toLowerCase().includes('woman') ||
-                        v.name.includes('English United States') // Default Google voice is female
-                    ) || englishVoices[0] || null;
-                } else {
-                    selectedVoice = englishVoices.find(v =>
-                        v.name.toLowerCase().includes('male') ||
-                        v.name.toLowerCase().includes('man')
-                    ) || englishVoices[0] || null;
-                }
-                if (selectedVoice) voiceQuality = 'standard';
-            }
-
-            // TIER 5: Windows/Desktop fallback
-            if (!selectedVoice) {
-                const desktopVoices = gender === 'female'
-                    ? ['Microsoft Zira', 'Zira', 'Microsoft Hazel', 'Hazel', 'Helena', 'Catherine']
-                    : ['Microsoft David', 'David', 'Microsoft Mark', 'Mark', 'James', 'George'];
-
-                for (const name of desktopVoices) {
                     const found = voices.find(v => v.name.includes(name) && v.lang.startsWith('en'));
                     if (found) {
                         selectedVoice = found;
@@ -190,7 +155,7 @@ const speakWithBrowser = async (
                 }
             }
 
-            // TIER 6: Any English voice as last resort
+            // TIER 4: Any English voice as last resort
             if (!selectedVoice) {
                 selectedVoice = voices.find(v => v.lang === 'en-US') ||
                     voices.find(v => v.lang.startsWith('en-')) ||
@@ -201,38 +166,28 @@ const speakWithBrowser = async (
 
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
-                console.log(`[EnhancedTTS] Selected voice: "${selectedVoice.name}" (${voiceQuality} quality, ${selectedVoice.lang})`);
+                console.log(`[EnhancedTTS] Selected voice: "${selectedVoice.name}" (${voiceQuality})`);
             }
         }
 
-        // OPTIMIZED SPEECH PARAMETERS for natural sound based on device and quality
-        // These settings make the voice sound LESS robotic
+        // Optimized speech parameters
         if (voiceQuality === 'neural') {
-            // Neural voices are already very natural
             utterance.rate = 1.0;
             utterance.pitch = 1.0;
         } else if (voiceQuality === 'enhanced') {
-            // Slightly slower for better clarity
             utterance.rate = gender === 'female' ? 0.95 : 0.92;
             utterance.pitch = gender === 'female' ? 1.0 : 0.95;
         } else if (voiceQuality === 'standard') {
-            // More adjustment for standard voices
             utterance.rate = gender === 'female' ? 0.9 : 0.88;
             utterance.pitch = gender === 'female' ? 1.03 : 0.92;
         } else {
-            // Basic voices need significant tuning to sound acceptable
-            // Slower rate and adjusted pitch helps a lot with robotic-sounding voices
             utterance.rate = gender === 'female' ? 0.85 : 0.82;
             utterance.pitch = gender === 'female' ? 1.06 : 0.88;
         }
 
-        // Mobile-specific adjustments - mobile voices often sound more robotic
+        // Mobile adjustments
         if (isMobile && voiceQuality !== 'neural') {
-            // Slow down mobile voices MORE for better naturalness
             utterance.rate = Math.max(0.75, utterance.rate - 0.08);
-            // Adjust pitch slightly for warmer sound
-            utterance.pitch = gender === 'female' ? Math.min(1.1, utterance.pitch + 0.02) : Math.max(0.85, utterance.pitch - 0.02);
-            console.log(`[EnhancedTTS] Applied mobile adjustments: rate=${utterance.rate.toFixed(2)}, pitch=${utterance.pitch.toFixed(2)}`);
         }
 
         utterance.volume = 1.0;
@@ -270,8 +225,7 @@ const speakWithBrowser = async (
             resolve(false);
         };
 
-        // Chrome/Android bug fix: prevent speech from stopping mid-sentence
-        // More frequent checks on mobile
+        // Chrome bug fix
         keepAliveInterval = setInterval(() => {
             if (hasEnded) {
                 cleanup();
@@ -282,7 +236,6 @@ const speakWithBrowser = async (
             }
         }, isMobile ? 500 : 1000);
 
-        // Speak with a small delay to ensure stability
         setTimeout(() => {
             if (!hasEnded) {
                 window.speechSynthesis.speak(utterance);
@@ -298,11 +251,12 @@ const speakWithBrowser = async (
                 onEnd?.();
                 resolve(false);
             }
-        }, 60000); // 60 second max
+        }, 60000);
     });
 };
 
 // Main speak function with automatic fallback
+// NEW ORDER: Puter.js → ElevenLabs → OpenAI → Browser
 export const speak = async (
     text: string,
     gender: VoiceGender = 'female',
@@ -317,7 +271,28 @@ export const speak = async (
 
     console.log('[EnhancedTTS] speak() called with text length:', text.length, 'gender:', gender);
 
-    // Try ElevenLabs first
+    // TRY PUTER.JS FIRST (FREE & UNLIMITED with OpenAI-quality voices)
+    console.log('[EnhancedTTS] Attempting Puter.js TTS (FREE unlimited)...');
+    callbacks?.onProviderChange?.('puter');
+    callbacks?.onStart?.();
+
+    try {
+        const voice = getRecommendedPuterVoice(gender);
+        const success = await speakWithPuter(text, { voice, speed: 1.0 });
+
+        if (success) {
+            console.log('[EnhancedTTS] Puter.js TTS successful');
+            callbacks?.onEnd?.();
+            return { success: true, provider: 'puter' };
+        }
+        console.warn('[EnhancedTTS] Puter.js TTS failed, trying fallbacks...');
+    } catch (error: any) {
+        console.error('[EnhancedTTS] Puter.js error:', error.message);
+        callbacks?.onError?.(error.message, 'puter');
+    }
+    callbacks?.onEnd?.();
+
+    // Try ElevenLabs
     if (status.elevenlabs.isConfigured) {
         console.log('[EnhancedTTS] Attempting ElevenLabs TTS...');
         callbacks?.onProviderChange?.('elevenlabs');
@@ -365,7 +340,7 @@ export const speak = async (
 
     // Fallback to browser
     if (status.browser.isConfigured) {
-        console.log('[EnhancedTTS] Attempting Browser TTS...');
+        console.log('[EnhancedTTS] Attempting Browser TTS (final fallback)...');
         callbacks?.onProviderChange?.('browser');
 
         const success = await speakWithBrowser(
@@ -390,6 +365,8 @@ export const getTTSStatusMessage = (): string => {
     const provider = getBestProvider();
 
     switch (provider) {
+        case 'puter':
+            return '🎙️ Premium voice (Puter.js - FREE)';
         case 'elevenlabs':
             return '🎙️ Premium voice (ElevenLabs)';
         case 'openai':
