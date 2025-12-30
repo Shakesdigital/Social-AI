@@ -647,26 +647,7 @@ VOICE CONVERSATION GUIDELINES:
 
           {/* Voice selection & Test */}
           <div className="flex justify-center items-center gap-2 mb-3">
-            <div className="flex bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => handleVoiceChange('female')}
-                className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1 transition-all ${voicePreference === 'female'
-                  ? 'bg-pink-500 text-white shadow'
-                  : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-              >
-                <User size={12} /> Female
-              </button>
-              <button
-                onClick={() => handleVoiceChange('male')}
-                className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1 transition-all ${voicePreference === 'male'
-                  ? 'bg-blue-500 text-white shadow'
-                  : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-              >
-                <Users size={12} /> Male
-              </button>
-            </div>
+            {/* Voice Gender Toggle removed - Enforcing Male voice */}
             {/* Natural Voice Toggle - Shown if ElevenLabs or OpenAI is configured */}
             {/* Natural Voice Toggle replaced by ResponsiveVoice defaults */}
             <button
