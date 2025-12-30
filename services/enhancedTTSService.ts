@@ -38,7 +38,17 @@ const selectMaleVoice = (voices: SpeechSynthesisVoice[], isMobile: boolean): Spe
 
     // 3. Platform Specific Strict Preferences
     if (isMobile) {
-        // iOS Male Voices
+        // Australian Male Priority
+        const auKeywords = ['australia', 'au', 'gordon', 'russell'];
+        for (const word of auKeywords) {
+            const found = voices.find(v => (v.name.toLowerCase().includes(word) || v.lang === 'en-AU') && v.name.toLowerCase().includes('male'));
+            if (found) return found;
+        }
+        // Specific check for any AU voice if strict male not found (often names don't say 'male')
+        const anyAu = voices.find(v => v.lang === 'en-AU' && isNotFemale(v));
+        if (anyAu) return anyAu;
+
+        // iOS Male Voices (Fallback)
         const iosMale = ['alex', 'daniel', 'fred', 'rishi'];
         for (const name of iosMale) {
             const found = voices.find(v => v.name.toLowerCase().includes(name) && v.lang.startsWith('en'));
@@ -123,12 +133,16 @@ export const speak = async (
             const name = selectedVoice ? selectedVoice.name.toLowerCase() : '';
             const isConfirmedMale = name.includes('male') || name.includes('guy') || name.includes('ryan') || name.includes('david') || name.includes('alex') || name.includes('daniel') || name.includes('fred');
 
-            if (isMobile) {
-                // MOBILE TUNING - NATURAL MALE
-                // Pitch 0.8 - 0.9 is the "sweet spot" for a natural male voice.
+            const isAustralian = selectedVoice?.lang === 'en-AU' || selectedVoice?.name.toLowerCase().includes('australia');
 
-                if (isConfirmedMale) {
-                    // Young & Professional Male
+            if (isMobile) {
+                // MOBILE TUNING
+                if (isAustralian) {
+                    // Native Australian voice - keep natural
+                    utterance.pitch = 1.0;
+                    utterance.rate = 1.0;
+                } else if (isConfirmedMale) {
+                    // Young & Professional Male (Non-AU Fallback)
                     // Higher pitch = Younger (1.1)
                     // Normal rate = Clear/Professional (1.0)
                     utterance.pitch = 1.1;
