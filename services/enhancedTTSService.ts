@@ -1,6 +1,6 @@
 // Browser Native Text-to-Speech Service (Optimized for Natural Sound)
-// Desktop: Prioritizes Microsoft Neural voices for best quality
-// Mobile: Tweaked settings for more human-like sound
+// Desktop: Prioritizes Microsoft Neural voices
+// Mobile: American accents with human-like tuning
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'browser' | 'none';
@@ -17,10 +17,51 @@ export const getTTSStatus = () => ({
 
 export const getBestProvider = (): TTSProvider => 'browser';
 
-// Smart voice selection with Microsoft priority for desktop
+// Smart voice selection
 const selectBestVoice = (voices: SpeechSynthesisVoice[], gender: VoiceGender, isMobile: boolean): SpeechSynthesisVoice | null => {
 
-    // DESKTOP: Prioritize Microsoft Neural voices (best quality)
+    // MOBILE: Prioritize American English voices (en-US)
+    if (isMobile) {
+        // American female voices
+        const americanFemale = [
+            'Google US English',       // Android - good quality
+            'Samantha',                 // iOS - excellent
+            'en-US-female',
+            'English United States',
+            'US English Female'
+        ];
+        // American male voices
+        const americanMale = [
+            'Google US English',       // Android
+            'Alex',                    // iOS - excellent male voice
+            'en-US-male',
+            'English United States',
+            'US English Male'
+        ];
+
+        const keywords = gender === 'female' ? americanFemale : americanMale;
+
+        // First: Try to find exact American voice
+        for (const keyword of keywords) {
+            const found = voices.find(v =>
+                v.name.includes(keyword) &&
+                v.lang === 'en-US'
+            );
+            if (found) {
+                console.log(`[TTS] Found American voice: ${found.name}`);
+                return found;
+            }
+        }
+
+        // Second: Any en-US voice
+        const usVoice = voices.find(v => v.lang === 'en-US');
+        if (usVoice) {
+            console.log(`[TTS] Using en-US voice: ${usVoice.name}`);
+            return usVoice;
+        }
+    }
+
+    // DESKTOP: Prioritize Microsoft Neural voices
     if (!isMobile) {
         const microsoftFemale = ['Microsoft Aria', 'Microsoft Jenny', 'Microsoft Zira'];
         const microsoftMale = ['Microsoft Guy', 'Microsoft Ryan', 'Microsoft David'];
@@ -35,9 +76,9 @@ const selectBestVoice = (voices: SpeechSynthesisVoice[], gender: VoiceGender, is
         }
     }
 
-    // General high-quality voices (desktop fallback + mobile)
-    const femaleKeywords = ['Samantha', 'Karen', 'Moira', 'Google US English Female', 'Tessa'];
-    const maleKeywords = ['Daniel', 'Alex', 'Google US English Male', 'Fred'];
+    // Fallback: General quality voices
+    const femaleKeywords = ['Samantha', 'Karen', 'Google US English Female'];
+    const maleKeywords = ['Daniel', 'Alex', 'Google US English Male'];
     const keywords = gender === 'female' ? femaleKeywords : maleKeywords;
 
     for (const keyword of keywords) {
@@ -48,14 +89,8 @@ const selectBestVoice = (voices: SpeechSynthesisVoice[], gender: VoiceGender, is
         }
     }
 
-    // Fallback: any English voice
-    const englishVoice = voices.find(v => v.lang.startsWith('en'));
-    if (englishVoice) {
-        console.log(`[TTS] Using English voice: ${englishVoice.name}`);
-        return englishVoice;
-    }
-
-    return voices[0] || null;
+    // Last resort: any English voice
+    return voices.find(v => v.lang.startsWith('en')) || voices[0] || null;
 };
 
 // Main Speak Function
@@ -89,55 +124,59 @@ export const speak = async (
             voices = window.speechSynthesis.getVoices();
 
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const isEdge = /Edg/i.test(navigator.userAgent);
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const isAndroid = /Android/i.test(navigator.userAgent);
 
-            console.log('[TTS] Device:', isMobile ? 'Mobile' : 'Desktop', isEdge ? '(Edge)' : '');
-            console.log('[TTS] Available voices:', voices.length, voices.slice(0, 5).map(v => v.name).join(', '), '...');
+            console.log('[TTS] Device:', isMobile ? (isIOS ? 'iOS' : 'Android') : 'Desktop');
+            console.log('[TTS] Voices available:', voices.length);
 
-            // Select best voice
+            // Select best voice (American for mobile)
             const selectedVoice = selectBestVoice(voices, gender, isMobile);
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
+                console.log(`[TTS] Selected: ${selectedVoice.name} (${selectedVoice.lang})`);
             }
 
             const isMicrosoftVoice = selectedVoice?.name.includes('Microsoft') || false;
 
             // ========================================
-            // VOICE SETTINGS
+            // VOICE SETTINGS - Tuned for natural sound
             // ========================================
 
             if (isMobile) {
-                // MOBILE: Tweaked for more human-like sound
-                if (gender === 'female') {
-                    utterance.rate = 0.95;   // Slightly slower for natural cadence
-                    utterance.pitch = 1.1;   // Slightly higher for warmth
+                // MOBILE: American accent with human-like settings
+                if (isIOS) {
+                    // iOS has better voices, less adjustment needed
+                    if (gender === 'female') {
+                        utterance.rate = 0.98;
+                        utterance.pitch = 1.05;
+                    } else {
+                        utterance.rate = 0.95;
+                        utterance.pitch = 0.9;
+                    }
                 } else {
-                    utterance.rate = 0.92;   // Slower for natural male speech
-                    utterance.pitch = 0.85;  // Lower but not too robotic
+                    // Android: More adjustment for robotic voices
+                    if (gender === 'female') {
+                        utterance.rate = 0.9;    // Slower for clarity
+                        utterance.pitch = 1.15;  // Higher for warmth
+                    } else {
+                        utterance.rate = 0.88;   // Slower male speech
+                        utterance.pitch = 0.8;   // Deeper but natural
+                    }
                 }
             } else if (isMicrosoftVoice) {
-                // DESKTOP WITH MICROSOFT VOICES: Near-default (already sounds great)
-                if (gender === 'female') {
-                    utterance.rate = 1.0;
-                    utterance.pitch = 1.0;
-                } else {
-                    utterance.rate = 1.0;
-                    utterance.pitch = 0.95;  // Slightly deeper
-                }
+                // DESKTOP WITH MICROSOFT: Already sounds great
+                utterance.rate = 1.0;
+                utterance.pitch = gender === 'female' ? 1.0 : 0.95;
             } else {
-                // DESKTOP WITHOUT MICROSOFT: User's original settings
-                if (gender === 'female') {
-                    utterance.rate = 1.0;
-                    utterance.pitch = 1.0;
-                } else {
-                    utterance.rate = 1.0;
-                    utterance.pitch = 0.3;   // Deep pitch per user preference
-                }
+                // DESKTOP WITHOUT MICROSOFT
+                utterance.rate = 1.0;
+                utterance.pitch = gender === 'female' ? 1.0 : 0.3;
             }
 
             utterance.volume = 1.0;
 
-            console.log(`[TTS] Voice: ${utterance.voice?.name || 'default'}, Rate: ${utterance.rate}, Pitch: ${utterance.pitch}`);
+            console.log(`[TTS] Settings - Rate: ${utterance.rate}, Pitch: ${utterance.pitch}`);
 
             utterance.onstart = () => {
                 console.log('[TTS] Speech started');
@@ -158,7 +197,7 @@ export const speak = async (
 
             window.speechSynthesis.speak(utterance);
 
-            // Chrome/Mobile bug fix
+            // Mobile bug fix
             if (isMobile) {
                 const keepAlive = setInterval(() => {
                     if (!window.speechSynthesis.speaking) {
