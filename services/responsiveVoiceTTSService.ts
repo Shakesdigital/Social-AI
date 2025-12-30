@@ -142,11 +142,12 @@ export const speakWithResponsiveVoice = async (
                 }
             });
 
-            // Fallback timeout (60 seconds max)
+            // Fast timeout for fallback (3 seconds max)
+            // If it doesn't finish (or start) in 3s, we assume failure/block and fallback
             setTimeout(() => {
-                console.warn('[ResponsiveVoice] Timeout - assuming speech finished');
-                resolve(true);
-            }, 60000);
+                console.warn('[ResponsiveVoice] Timeout - forcing fallback');
+                resolve(false); // Return false to trigger fallback
+            }, 3000);
 
         } catch (error: any) {
             console.error('[ResponsiveVoice] Error:', error);
