@@ -124,16 +124,20 @@ export const speak = async (
             const isConfirmedMale = name.includes('male') || name.includes('guy') || name.includes('ryan') || name.includes('david') || name.includes('alex') || name.includes('daniel') || name.includes('fred');
 
             if (isMobile) {
-                // MOBILE TUNING
-                // If we aren't 100% sure it's a male voice, we pitch shift AGGRESSIVELY
-                // Low pitch (0.1 - 0.4) makes female voices sound deeper/male-ish
-                const deepPitch = 0.3; // User requested 0.3
+                // MOBILE TUNING - NATURAL MALE
+                // Pitch 0.3 is too deep/robotic. 
+                // Pitch 0.8 - 0.9 is the "sweet spot" for a natural male voice.
 
-                utterance.rate = 0.95; // Slightly slower
-                utterance.pitch = deepPitch;
-
-            } else {
-                // DESKTOP TUNING
+                if (isConfirmedMale) {
+                    // It's already a male voice, just minimal tuning
+                    utterance.pitch = 0.90; // Just slightly deeper than default
+                    utterance.rate = 1.0;   // Normal speed
+                } else {
+                    // Unsure/Generic voice - pitch down to sound male but not robotic
+                    utterance.pitch = 0.8;
+                    utterance.rate = 0.95; // Slightly slower
+                }
+            } else {  // DESKTOP TUNING
                 if (isConfirmedMale) {
                     utterance.rate = 1.0;
                     utterance.pitch = 0.95; // Slight adjustment
