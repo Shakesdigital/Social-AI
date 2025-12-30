@@ -1,6 +1,6 @@
 // Browser Native Text-to-Speech Service
-// MALE VOICE ONLY - optimized for natural sound
-// Desktop: Microsoft voices, Mobile: American accent with pitch 0.3
+// MALE VOICE ONLY - STRICT ENFORCEMENT
+// Optimized for Mobile (iOS/Android) and Desktop
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'browser' | 'none';
@@ -17,66 +17,64 @@ export const getTTSStatus = () => ({
 
 export const getBestProvider = (): TTSProvider => 'browser';
 
-// Voice selection - MALE ONLY
+// Strict Male Voice Selection
 const selectMaleVoice = (voices: SpeechSynthesisVoice[], isMobile: boolean): SpeechSynthesisVoice | null => {
 
-    // MOBILE: American male voices
+    // 1. Filter out known female voices to avoid accidental selection
+    const femaleBlacklist = ['female', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'jenny', 'aria', 'zira', 'salli', 'joanna', 'ivy', 'kendra', 'kimberly'];
+
+    // Helper to check if voice is "safe" (not strictly female)
+    const isNotFemale = (v: SpeechSynthesisVoice) => !femaleBlacklist.some(name => v.name.toLowerCase().includes(name));
+
+    // 2. Look for Explicit "Male" in name
+    const maleVoice = voices.find(v =>
+        v.name.toLowerCase().includes('male') &&
+        v.lang.startsWith('en')
+    );
+    if (maleVoice) {
+        console.log(`[TTS] Found explicit male voice: ${maleVoice.name}`);
+        return maleVoice;
+    }
+
+    // 3. Platform Specific Strict Preferences
     if (isMobile) {
-        const americanMale = [
-            'Google US English',
-            'Alex',                    // iOS excellent male
-            'en-US-male',
-            'English United States',
-            'US English Male'
-        ];
-
-        for (const keyword of americanMale) {
-            const found = voices.find(v => v.name.includes(keyword) && v.lang === 'en-US');
-            if (found) {
-                console.log(`[TTS] Found American male voice: ${found.name}`);
-                return found;
-            }
+        // iOS Male Voices
+        const iosMale = ['alex', 'daniel', 'fred', 'rishi'];
+        for (const name of iosMale) {
+            const found = voices.find(v => v.name.toLowerCase().includes(name) && v.lang.startsWith('en'));
+            if (found) return found;
         }
 
-        // Any en-US voice
-        const usVoice = voices.find(v => v.lang === 'en-US');
-        if (usVoice) {
-            console.log(`[TTS] Using en-US voice: ${usVoice.name}`);
-            return usVoice;
-        }
+        // Android/Generic Filtered Loop
+        // Try to find ANY English voice that isn't on the female blacklist
+        const safeVoice = voices.find(v =>
+            v.lang.startsWith('en') &&
+            isNotFemale(v) &&
+            // Prefer US English
+            (v.lang === 'en-US' || v.name.includes('US'))
+        );
+        if (safeVoice) return safeVoice;
     }
 
-    // DESKTOP: Microsoft male voices
-    if (!isMobile) {
-        const microsoftMale = ['Microsoft Guy', 'Microsoft Ryan', 'Microsoft David'];
-
-        for (const keyword of microsoftMale) {
-            const found = voices.find(v => v.name.includes(keyword));
-            if (found) {
-                console.log(`[TTS] Found Microsoft male voice: ${found.name}`);
-                return found;
-            }
-        }
+    // 4. Desktop Preferences (Microsoft)
+    const msMale = ['microsoft guy', 'microsoft ryan', 'microsoft david', 'microsoft mark'];
+    for (const name of msMale) {
+        const found = voices.find(v => v.name.toLowerCase().includes(name));
+        if (found) return found;
     }
 
-    // Fallback: General male voices
-    const maleKeywords = ['Daniel', 'Alex', 'Google US English Male', 'David', 'Fred'];
-    for (const keyword of maleKeywords) {
-        const found = voices.find(v => v.name.includes(keyword) && v.lang.startsWith('en'));
-        if (found) {
-            console.log(`[TTS] Found male voice: ${found.name}`);
-            return found;
-        }
-    }
+    // 5. Last Resort: First English voice that is NOT female named
+    const anySafeEnglish = voices.find(v => v.lang.startsWith('en') && isNotFemale(v));
+    if (anySafeEnglish) return anySafeEnglish;
 
-    // Last resort: any English voice
+    // 6. Absolute Last Resort: Just picking the first English voice available
+    // (Even if it might be female, we will pitch shift it heavily)
     return voices.find(v => v.lang.startsWith('en')) || voices[0] || null;
 };
 
-// Main Speak Function - MALE VOICE ONLY
 export const speak = async (
     text: string,
-    gender: VoiceGender = 'female', // Ignored - always uses male
+    gender: VoiceGender = 'female', // Ignored
     callbacks?: {
         onStart?: () => void;
         onEnd?: () => void;
@@ -84,7 +82,7 @@ export const speak = async (
         onError?: (error: string, provider: TTSProvider) => void;
     }
 ): Promise<SpeakResult> => {
-    console.log('[TTS] speak() called:', { textLength: text.length, note: 'Using MALE voice only' });
+    console.log('[TTS] speak() called - Enforcing MALE voice');
     callbacks?.onProviderChange?.('browser');
 
     return new Promise((resolve) => {
@@ -105,67 +103,63 @@ export const speak = async (
 
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-            console.log('[TTS] Device:', isMobile ? 'Mobile' : 'Desktop');
-            console.log('[TTS] Voices available:', voices.length);
+            console.log('[TTS] Voices loaded:', voices.length);
+            // Debug log of all names to help diagnosis
+            if (voices.length < 10) console.log('[TTS] Names:', voices.map(v => v.name).join(', '));
 
-            // Always select MALE voice
             const selectedVoice = selectMaleVoice(voices, isMobile);
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
-                console.log(`[TTS] Selected: ${selectedVoice.name} (${selectedVoice.lang})`);
+                console.log(`[TTS] Selected Voice: "${selectedVoice.name}" (${selectedVoice.lang})`);
+            } else {
+                console.warn('[TTS] No specific male voice found, using system default + pitch shift');
             }
 
-            const isMicrosoftVoice = selectedVoice?.name.includes('Microsoft') || false;
+            // ========================================
+            // VOICE SETTINGS - HEAVY MALE ENFORCEMENT
+            // ========================================
 
-            // ========================================
-            // VOICE SETTINGS - MALE ONLY
-            // ========================================
+            // Check if we selected a known "Male" voice
+            const name = selectedVoice ? selectedVoice.name.toLowerCase() : '';
+            const isConfirmedMale = name.includes('male') || name.includes('guy') || name.includes('ryan') || name.includes('david') || name.includes('alex') || name.includes('daniel') || name.includes('fred');
 
             if (isMobile) {
-                // MOBILE: Pitch 0.3 for deep natural male voice
-                utterance.rate = 0.95;   // Slightly slower for natural speech
-                utterance.pitch = 0.3;   // Deep pitch as requested
-            } else if (isMicrosoftVoice) {
-                // DESKTOP WITH MICROSOFT: Near-natural
-                utterance.rate = 1.0;
-                utterance.pitch = 0.95;
+                // MOBILE TUNING
+                // If we aren't 100% sure it's a male voice, we pitch shift AGGRESSIVELY
+                // Low pitch (0.1 - 0.4) makes female voices sound deeper/male-ish
+                const deepPitch = 0.3; // User requested 0.3
+
+                utterance.rate = 0.95; // Slightly slower
+                utterance.pitch = deepPitch;
+
             } else {
-                // DESKTOP WITHOUT MICROSOFT
-                utterance.rate = 1.0;
-                utterance.pitch = 0.3;   // Deep pitch
+                // DESKTOP TUNING
+                if (isConfirmedMale) {
+                    utterance.rate = 1.0;
+                    utterance.pitch = 0.95; // Slight adjustment
+                } else {
+                    utterance.pitch = 0.5; // Force drop if unsure
+                }
             }
 
             utterance.volume = 1.0;
 
-            console.log(`[TTS] Settings - Rate: ${utterance.rate}, Pitch: ${utterance.pitch}`);
+            console.log(`[TTS] Applied Settings - Rate: ${utterance.rate}, Pitch: ${utterance.pitch}`);
 
-            utterance.onstart = () => {
-                console.log('[TTS] Speech started');
-                callbacks?.onStart?.();
-            };
-
-            utterance.onend = () => {
-                console.log('[TTS] Speech ended');
-                callbacks?.onEnd?.();
-                resolve({ success: true, provider: 'browser' });
-            };
-
+            utterance.onstart = () => callbacks?.onStart?.();
+            utterance.onend = () => { callbacks?.onEnd?.(); resolve({ success: true, provider: 'browser' }); };
             utterance.onerror = (e) => {
-                console.error('[TTS] Speech error:', e.error);
+                console.error('[TTS] Error:', e);
                 callbacks?.onEnd?.();
-                resolve({ success: false, provider: 'browser', error: e.error });
+                resolve({ success: false, provider: 'browser', error: String(e) });
             };
 
             window.speechSynthesis.speak(utterance);
 
-            // Mobile bug fix
             if (isMobile) {
                 const keepAlive = setInterval(() => {
-                    if (!window.speechSynthesis.speaking) {
-                        clearInterval(keepAlive);
-                    } else if (window.speechSynthesis.paused) {
-                        window.speechSynthesis.resume();
-                    }
+                    if (!window.speechSynthesis.speaking) clearInterval(keepAlive);
+                    else if (window.speechSynthesis.paused) window.speechSynthesis.resume();
                 }, 5000);
             }
         };
@@ -177,7 +171,7 @@ export const speak = async (
             setTimeout(() => {
                 voices = window.speechSynthesis.getVoices();
                 configureAndSpeak();
-            }, 300);
+            }, 500);
         }
     });
 };
