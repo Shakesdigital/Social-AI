@@ -1,17 +1,9 @@
-// Simplified Text-to-Speech Service - ResponsiveVoice with Native Fallback
-// Usage: ResponsiveVoice (Primary) -> Native Browser (Backup)
-// https://responsivevoice.org/
-
-import {
-    speakWithResponsiveVoice,
-    getRecommendedResponsiveVoice,
-    loadResponsiveVoiceScript,
-    isResponsiveVoiceLoaded,
-    ResponsiveVoiceName
-} from './responsiveVoiceTTSService';
+// Google Translate TTS Service (Unofficial)
+// Falls back to Native Browser TTS
+// Benefits: Consistent Google voices on all devices (Mobile/Desktop)
 
 export type VoiceGender = 'female' | 'male';
-export type TTSProvider = 'responsivevoice' | 'browser' | 'none';
+export type TTSProvider = 'google' | 'browser' | 'none';
 
 export interface SpeakResult {
     success: boolean;
@@ -19,65 +11,46 @@ export interface SpeakResult {
     error?: string;
 }
 
-// Get TTS status
 export const getTTSStatus = () => {
-    const isLoaded = isResponsiveVoiceLoaded();
-    console.log('[TTS] ResponsiveVoice status:', isLoaded ? 'ready' : 'loading...');
     return {
-        responsivevoice: {
-            provider: 'responsivevoice' as TTSProvider,
-            isConfigured: true
-        }
+        google: { provider: 'google' as TTSProvider, isConfigured: true }
     };
 };
 
-// Get the provider
-export const getBestProvider = (): TTSProvider => {
-    return 'responsivevoice';
+export const getBestProvider = (): TTSProvider => 'google';
+
+// Helper to split long text (Google TTS has 100 char limit usually, but we chunk it)
+const chunkText = (text: string, maxLength: number = 180): string[] => {
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    // Split by sentences first
+    const sentences = text.split(/([.!?]+)/);
+
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        if (currentChunk.length + sentence.length > maxLength) {
+            chunks.push(currentChunk.trim());
+            currentChunk = sentence;
+        } else {
+            currentChunk += sentence;
+        }
+    }
+    if (currentChunk.trim()) chunks.push(currentChunk.trim());
+    return chunks;
 };
 
-// Internal function for native browser fallback
-const speakWithNativeBrowser = async (
-    text: string,
-    gender: VoiceGender,
-    onStart?: () => void,
-    onEnd?: () => void
-): Promise<boolean> => {
-    return new Promise((resolve) => {
-        if (!window.speechSynthesis) {
-            resolve(false);
-            return;
-        }
-
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        // Simple voice selection for fallback
-        const voices = window.speechSynthesis.getVoices();
-        const preferredVoice = voices.find(v =>
-            v.lang.startsWith('en') &&
-            (gender === 'female' ? v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Google') : v.name.includes('Male'))
-        ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-
-        if (preferredVoice) utterance.voice = preferredVoice;
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-
-        utterance.onstart = () => onStart?.();
-        utterance.onend = () => {
-            onEnd?.();
-            resolve(true);
-        };
-        utterance.onerror = () => {
-            onEnd?.();
-            resolve(false);
-        };
-
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
+// Play audio from URL
+const playAudioUrl = (url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const audio = new Audio(url);
+        audio.onended = () => resolve();
+        audio.onerror = (e) => reject(e);
+        audio.play().catch(reject);
     });
 };
 
-// Main speak function
+// Main Speak Function
 export const speak = async (
     text: string,
     gender: VoiceGender = 'female',
@@ -88,44 +61,75 @@ export const speak = async (
         onError?: (error: string, provider: TTSProvider) => void;
     }
 ): Promise<SpeakResult> => {
-    console.log('[TTS] speak() called with:', { textLength: text.length, gender });
+    console.log('[TTS] speak() called with:', { textLength: text.length });
 
-    // 1. Try ResponsiveVoice (Primary)
+    // 1. Try Google Translate TTS (Consistent Voice)
     try {
-        callbacks?.onProviderChange?.('responsivevoice');
-        await loadResponsiveVoiceScript();
+        callbacks?.onProviderChange?.('google');
+        console.log('[TTS] Attempting Google TTS...');
 
-        const voice = getRecommendedResponsiveVoice(gender);
-        const success = await speakWithResponsiveVoice(text, voice, {
-            pitch: 1, rate: 1, volume: 1,
-            onstart: callbacks?.onStart,
-            onend: callbacks?.onEnd,
-            onerror: (err) => console.error('[TTS] ResponsiveVoice error:', err)
+        // Chunk text because GET request has length limits
+        const chunks = chunkText(text);
+
+        callbacks?.onStart?.();
+
+        for (const chunk of chunks) {
+            if (!chunk.trim()) continue;
+            // Use Google Translate TTS endpoint
+            // tl=en-gb (British English - usually female sounding and nice)
+            // tl=en-us (US English)
+            const lang = gender === 'female' ? 'en-gb' : 'en-us';
+            const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=${lang}&client=tw-ob`;
+
+            await playAudioUrl(url);
+        }
+
+        callbacks?.onEnd?.();
+        return { success: true, provider: 'google' };
+
+    } catch (error) {
+        console.warn('[TTS] Google TTS failed, falling back to native browser:', error);
+    }
+
+    // 2. Fallback to Native Browser
+    try {
+        callbacks?.onProviderChange?.('browser');
+        console.log('[TTS] Attempting Native Browser Fallback...');
+
+        await new Promise<void>((resolve) => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+
+            // Try to find a good voice
+            const voice = voices.find(v =>
+                v.lang.startsWith('en') &&
+                (gender === 'female' ? v.name.includes('Female') || v.name.includes('Google') : v.name.includes('Male'))
+            ) || voices[0];
+
+            if (voice) utterance.voice = voice;
+            utterance.rate = 1.0;
+
+            utterance.onstart = () => callbacks?.onStart?.();
+            utterance.onend = () => {
+                callbacks?.onEnd?.();
+                resolve();
+            };
+            utterance.onerror = () => {
+                callbacks?.onEnd?.(); // resolving anyway to prevent stuck state
+                resolve();
+            };
+
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
         });
 
-        if (success) return { success: true, provider: 'responsivevoice' };
+        return { success: true, provider: 'browser' };
 
-        console.warn('[TTS] ResponsiveVoice failed, trying native fallback...');
-    } catch (error) {
-        console.warn('[TTS] ResponsiveVoice error:', error);
+    } catch (e: any) {
+        const msg = e.message || 'All providers failed';
+        callbacks?.onError?.(msg, 'none');
+        return { success: false, provider: 'none', error: msg };
     }
-
-    // 2. Fallback to Native Browser (Backup)
-    try {
-        console.log('[TTS] Attempting native browser fallback');
-        callbacks?.onProviderChange?.('browser');
-
-        const success = await speakWithNativeBrowser(text, gender, callbacks?.onStart, callbacks?.onEnd);
-
-        if (success) return { success: true, provider: 'browser' };
-    } catch (err) {
-        console.error('[TTS] Native fallback error:', err);
-    }
-
-    // 3. Complete failure
-    const errorMsg = 'All TTS providers failed';
-    callbacks?.onError?.(errorMsg, 'none');
-    return { success: false, provider: 'none', error: errorMsg };
 };
 
 export const getTTSStatusMessage = (): string => {
