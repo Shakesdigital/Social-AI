@@ -5,6 +5,7 @@ import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebR
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
 import { isOpenAITTSConfigured, speakWithOpenAI, getRecommendedVoice } from '../services/openaiTTSService';
 import { isElevenLabsConfigured, speakWithElevenLabs, getRecommendedElevenLabsVoice } from '../services/elevenLabsTTSService';
+import { speak as enhancedSpeak, getTTSStatus, getBestProvider, getTTSStatusMessage, TTSProvider } from '../services/enhancedTTSService';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [currentTTSProvider, setCurrentTTSProvider] = useState<TTSProvider>(() => getBestProvider());
   // Check for natural voice: prefer ElevenLabs (free) over OpenAI
   const [useNaturalVoice, setUseNaturalVoice] = useState(() =>
     isElevenLabsConfigured() || isOpenAITTSConfigured()
@@ -434,300 +436,42 @@ VOICE CONVERSATION GUIDELINES:
   };
 
   const speak = async (text: string): Promise<void> => {
-    // Try ElevenLabs first (FREE tier available)
-    if (useNaturalVoice && isElevenLabsConfigured()) {
-      try {
+    addDiagnostic(`Starting speech with ${text.length} characters`);
+
+    // Log TTS status for debugging
+    const ttsStatus = getTTSStatus();
+    addDiagnostic(`TTS Status - ElevenLabs: ${ttsStatus.elevenlabs.isConfigured}, OpenAI: ${ttsStatus.openai.isConfigured}, Browser: ${ttsStatus.browser.isConfigured}`);
+
+    const result = await enhancedSpeak(text, voicePreference, {
+      onStart: () => {
         setIsSpeaking(true);
-        setStatus('🔊 Speaking (ElevenLabs)...');
-        addDiagnostic('Using ElevenLabs TTS (free tier)');
-
-        const voice = getRecommendedElevenLabsVoice(voicePreference);
-        const success = await speakWithElevenLabs(text, { voice });
-
-        if (success) {
-          setIsSpeaking(false);
-          setStatus('✨ Ready! Tap mic to speak.');
-          addDiagnostic('ElevenLabs TTS completed');
-          return;
-        }
-
-        addDiagnostic('ElevenLabs TTS failed, trying OpenAI...');
-      } catch (error) {
-        addDiagnostic(`ElevenLabs TTS error: ${error}`);
-      }
-      setIsSpeaking(false);
-    }
-
-    // Try OpenAI TTS next
-    if (useNaturalVoice && isOpenAITTSConfigured()) {
-      try {
-        setIsSpeaking(true);
-        setStatus('🔊 Speaking (OpenAI)...');
-        addDiagnostic('Using OpenAI TTS for natural voice');
-
-        const voice = getRecommendedVoice(voicePreference);
-        const success = await speakWithOpenAI(text, { voice, speed: 1.0 });
-
-        if (success) {
-          setIsSpeaking(false);
-          setStatus('✨ Ready! Tap mic to speak.');
-          addDiagnostic('OpenAI TTS completed');
-          return;
-        }
-
-        addDiagnostic('OpenAI TTS failed, falling back to browser');
-      } catch (error) {
-        addDiagnostic(`OpenAI TTS error: ${error}`);
-      }
-      setIsSpeaking(false);
-    }
-
-    // Fallback to browser speech synthesis
-    return new Promise((resolve) => {
-      if (!window.speechSynthesis) {
-        addDiagnostic('No speechSynthesis');
-        setStatus('Speech not available. See response above.');
-        resolve();
-        return;
-      }
-
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
-
-      // Mobile fix: Resume audio context if suspended
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume().catch(() => { });
-      }
-
-      setIsSpeaking(true);
-      setStatus('🔊 Speaking (Browser)...');
-      addDiagnostic('Using optimized browser speech');
-
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      // Get all available voices
-      const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
-      addDiagnostic(`Found ${voices.length} voices`);
-
-      // OPTIMIZED VOICE SELECTION - prioritize high-quality neural/online voices
-      let selectedVoice: SpeechSynthesisVoice | null = null;
-      let voiceQuality: 'neural' | 'standard' | 'basic' = 'basic';
-
-      if (voices.length > 0) {
-        // TIER 1: Microsoft Neural/Online voices (best quality on Windows/Edge)
-        const neuralVoices = voicePreference === 'female'
-          ? ['Microsoft Aria Online', 'Microsoft Jenny Online', 'Microsoft Zira Online', 'Microsoft Aria', 'Microsoft Jenny']
-          : ['Microsoft Guy Online', 'Microsoft Ryan Online', 'Microsoft Christopher Online', 'Microsoft Guy', 'Microsoft Ryan'];
-
-        for (const name of neuralVoices) {
-          const found = voices.find(v => v.name.includes(name));
-          if (found) {
-            selectedVoice = found;
-            voiceQuality = 'neural';
-            break;
-          }
-        }
-
-        // TIER 2: Google Neural voices
-        if (!selectedVoice) {
-          const googleVoices = voicePreference === 'female'
-            ? ['Google US English Female', 'Google UK English Female']
-            : ['Google US English Male', 'Google UK English Male'];
-
-          for (const name of googleVoices) {
-            const found = voices.find(v => v.name.includes(name));
-            if (found) {
-              selectedVoice = found;
-              voiceQuality = 'neural';
-              break;
-            }
-          }
-        }
-
-        // TIER 3: Apple voices (macOS/iOS - these are quite good)
-        if (!selectedVoice) {
-          const appleVoices = voicePreference === 'female'
-            ? ['Samantha', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Victoria']
-            : ['Daniel', 'Alex', 'Fred', 'Thomas', 'Oliver'];
-
-          for (const name of appleVoices) {
-            const found = voices.find(v => v.name.includes(name) && v.lang.startsWith('en'));
-            if (found) {
-              selectedVoice = found;
-              voiceQuality = 'standard';
-              break;
-            }
-          }
-        }
-
-        // TIER 4: Any English voice with gender hint
-        if (!selectedVoice) {
-          const englishVoices = voices.filter(v => v.lang.startsWith('en'));
-          if (voicePreference === 'female') {
-            selectedVoice = englishVoices.find(v =>
-              v.name.toLowerCase().includes('female') ||
-              v.name.toLowerCase().includes('woman') ||
-              v.name.includes('Zira') ||
-              v.name.includes('Helena') ||
-              v.name.includes('Catherine')
-            ) || null;
-          } else {
-            selectedVoice = englishVoices.find(v =>
-              v.name.toLowerCase().includes('male') ||
-              v.name.includes('David') ||
-              v.name.includes('Mark') ||
-              v.name.includes('James')
-            ) || null;
-          }
-          if (selectedVoice) voiceQuality = 'standard';
-        }
-
-        // TIER 5: First English voice
-        if (!selectedVoice) {
-          selectedVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-          voiceQuality = 'basic';
-        }
-
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-          addDiagnostic(`Selected: ${selectedVoice.name} (${voiceQuality} quality)`);
-        }
-      }
-
-      // OPTIMIZED SPEECH PARAMETERS based on voice quality and gender
-      if (voiceQuality === 'neural') {
-        // Neural voices sound great with minimal adjustment
-        utterance.rate = voicePreference === 'female' ? 1.0 : 0.95;
-        utterance.pitch = 1.0; // Neural voices handle pitch naturally
-        utterance.volume = 1.0;
-      } else if (voiceQuality === 'standard') {
-        // Standard voices need some tuning
-        utterance.rate = voicePreference === 'female' ? 0.95 : 0.9;
-        utterance.pitch = voicePreference === 'female' ? 1.05 : 0.95;
-        utterance.volume = 1.0;
-      } else {
-        // Basic voices need more adjustment to sound natural
-        utterance.rate = voicePreference === 'female' ? 0.9 : 0.85;
-        utterance.pitch = voicePreference === 'female' ? 1.1 : 0.9;
-        utterance.volume = 1.0;
-      }
-
-      // Simplified text processing - remove excessive pauses that cause breaks
-      // Only add slight pauses at sentence endings
-      const cleanText = text
-        .replace(/\s+/g, ' ')  // Normalize whitespace
-        .trim();
-      utterance.text = cleanText;
-
-      let hasStarted = false;
-      let hasEnded = false;
-      let keepAliveInterval: NodeJS.Timeout | null = null;
-
-      const cleanup = () => {
-        if (keepAliveInterval) {
-          clearInterval(keepAliveInterval);
-          keepAliveInterval = null;
-        }
-      };
-
-      utterance.onstart = () => {
-        hasStarted = true;
-        addDiagnostic('Speech started');
-      };
-
-      utterance.onend = () => {
-        if (hasEnded) return;
-        hasEnded = true;
-        cleanup();
-        addDiagnostic('Speech completed');
+      },
+      onEnd: () => {
         setIsSpeaking(false);
         setStatus('✨ Ready! Tap mic to speak.');
-        resolve();
-      };
-
-      utterance.onerror = (e) => {
-        if (hasEnded) return;
-        hasEnded = true;
-        cleanup();
-        addDiagnostic(`Speech error: ${e.error}`);
-        setIsSpeaking(false);
-
-        // On mobile, if speech fails, show the response text
-        if (e.error === 'not-allowed' || e.error === 'synthesis-failed') {
-          setStatus('Voice blocked by browser. See response above.');
-        } else if (e.error === 'interrupted' || e.error === 'canceled') {
-          // Don't show error for intentional interruptions
-          setStatus('✨ Ready! Tap mic to speak.');
-        } else {
-          setStatus('Speech failed. See response above.');
-        }
-        resolve();
-      };
-
-      // Start speech with minimal interference
-      const startSpeech = () => {
-        try {
-          // Clear any pending speech first
-          window.speechSynthesis.cancel();
-
-          // Small delay to ensure cancel completes
-          setTimeout(() => {
-            if (hasEnded) return;
-
-            window.speechSynthesis.speak(utterance);
-
-            // Chrome/Edge bug fix: Speech synthesis stops after ~15 seconds
-            // Use a gentler keep-alive that only resumes if paused
-            keepAliveInterval = setInterval(() => {
-              if (hasEnded) {
-                cleanup();
-                return;
-              }
-
-              // Only intervene if speech is paused (not if it's speaking normally)
-              if (window.speechSynthesis.paused) {
-                window.speechSynthesis.resume();
-              }
-
-              // Check if speech unexpectedly stopped (not paused, not speaking, but should be)
-              if (hasStarted && !window.speechSynthesis.speaking && !window.speechSynthesis.paused && !hasEnded) {
-                // Give it a moment - it might be between utterances
-                setTimeout(() => {
-                  if (!window.speechSynthesis.speaking && !hasEnded) {
-                    hasEnded = true;
-                    cleanup();
-                    setIsSpeaking(false);
-                    setStatus('✨ Ready! Tap mic to speak.');
-                    resolve();
-                  }
-                }, 300);
-              }
-            }, 1000); // Check every 1 second instead of 500ms
-
-            // Fallback timeout: if speech doesn't start in 5 seconds (increased from 3)
-            setTimeout(() => {
-              if (!hasStarted && !hasEnded) {
-                addDiagnostic('Speech timeout - did not start');
-                hasEnded = true;
-                cleanup();
-                setIsSpeaking(false);
-                setStatus('Voice may not be available. See response above.');
-                resolve();
-              }
-            }, 5000);
-
-          }, 50); // Reduced delay from 100ms
-        } catch (err: any) {
-          addDiagnostic(`Speak error: ${err.message}`);
-          cleanup();
-          setIsSpeaking(false);
-          setStatus('Speech failed. See response above.');
-          resolve();
-        }
-      };
-
-      startSpeech();
+      },
+      onProviderChange: (provider) => {
+        setCurrentTTSProvider(provider);
+        const statusMessages: Record<TTSProvider, string> = {
+          'elevenlabs': '🔊 Speaking (ElevenLabs)...',
+          'openai': '🔊 Speaking (OpenAI)...',
+          'browser': '🔊 Speaking (Browser)...',
+          'none': '❌ No voice available'
+        };
+        setStatus(statusMessages[provider]);
+        addDiagnostic(`Using TTS provider: ${provider}`);
+      },
+      onError: (error, provider) => {
+        addDiagnostic(`${provider} error: ${error}`);
+      }
     });
+
+    if (!result.success) {
+      addDiagnostic(`TTS failed with provider: ${result.provider}, error: ${result.error}`);
+      setStatus('Voice not available. See response above.');
+    } else {
+      addDiagnostic(`TTS completed successfully with: ${result.provider}`);
+    }
   };
 
   const handleVoiceChange = (pref: VoicePreference) => {
