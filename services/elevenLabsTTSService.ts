@@ -83,26 +83,66 @@ export const generateSpeechElevenLabs = async (
     }
 };
 
-// Play audio from ArrayBuffer
+// Play audio from ArrayBuffer with improved reliability
 export const playAudioElevenLabs = async (audioBuffer: ArrayBuffer): Promise<void> => {
     return new Promise((resolve, reject) => {
         try {
             const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
             const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
+            const audio = new Audio();
+
+            // Set up audio element before setting source
+            audio.preload = 'auto';
+            audio.volume = 1.0;
+
+            let hasEnded = false;
+
+            const cleanup = () => {
+                if (!hasEnded) {
+                    hasEnded = true;
+                    URL.revokeObjectURL(url);
+                }
+            };
 
             audio.onended = () => {
-                URL.revokeObjectURL(url);
+                cleanup();
                 resolve();
             };
 
             audio.onerror = (e) => {
-                URL.revokeObjectURL(url);
+                console.error('[ElevenLabs] Audio playback error:', e);
+                cleanup();
                 reject(e);
             };
 
-            audio.play().catch(reject);
+            audio.oncanplaythrough = () => {
+                // Audio is ready to play without buffering
+                audio.play()
+                    .then(() => {
+                        console.log('[ElevenLabs] Audio playing');
+                    })
+                    .catch((err) => {
+                        console.error('[ElevenLabs] Play failed:', err);
+                        cleanup();
+                        reject(err);
+                    });
+            };
+
+            // Set source after event handlers are attached
+            audio.src = url;
+            audio.load();
+
+            // Fallback timeout in case onended doesn't fire
+            setTimeout(() => {
+                if (!hasEnded && audio.paused && audio.currentTime === 0) {
+                    console.warn('[ElevenLabs] Audio may be blocked or failed');
+                    cleanup();
+                    reject(new Error('Audio playback blocked or failed'));
+                }
+            }, 10000);
+
         } catch (error) {
+            console.error('[ElevenLabs] Error creating audio:', error);
             reject(error);
         }
     });

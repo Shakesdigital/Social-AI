@@ -612,18 +612,23 @@ VOICE CONVERSATION GUIDELINES:
         utterance.volume = 1.0;
       }
 
-      // Add natural pauses for better prosody
-      const naturalText = text
-        .replace(/\. /g, '. ... ')    // Pause after periods
-        .replace(/! /g, '! ... ')     // Pause after exclamations  
-        .replace(/\? /g, '? ... ')    // Pause after questions
-        .replace(/: /g, ': ... ')     // Pause after colons
-        .replace(/; /g, '; .. ')      // Shorter pause after semicolons
-        .replace(/, /g, ', ');        // Brief pause at commas
-      utterance.text = naturalText;
+      // Simplified text processing - remove excessive pauses that cause breaks
+      // Only add slight pauses at sentence endings
+      const cleanText = text
+        .replace(/\s+/g, ' ')  // Normalize whitespace
+        .trim();
+      utterance.text = cleanText;
 
       let hasStarted = false;
       let hasEnded = false;
+      let keepAliveInterval: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (keepAliveInterval) {
+          clearInterval(keepAliveInterval);
+          keepAliveInterval = null;
+        }
+      };
 
       utterance.onstart = () => {
         hasStarted = true;
@@ -633,6 +638,7 @@ VOICE CONVERSATION GUIDELINES:
       utterance.onend = () => {
         if (hasEnded) return;
         hasEnded = true;
+        cleanup();
         addDiagnostic('Speech completed');
         setIsSpeaking(false);
         setStatus('✨ Ready! Tap mic to speak.');
@@ -642,70 +648,78 @@ VOICE CONVERSATION GUIDELINES:
       utterance.onerror = (e) => {
         if (hasEnded) return;
         hasEnded = true;
+        cleanup();
         addDiagnostic(`Speech error: ${e.error}`);
         setIsSpeaking(false);
 
         // On mobile, if speech fails, show the response text
         if (e.error === 'not-allowed' || e.error === 'synthesis-failed') {
           setStatus('Voice blocked by browser. See response above.');
+        } else if (e.error === 'interrupted' || e.error === 'canceled') {
+          // Don't show error for intentional interruptions
+          setStatus('✨ Ready! Tap mic to speak.');
         } else {
           setStatus('Speech failed. See response above.');
         }
         resolve();
       };
 
-      // Mobile Safari and iOS fix: need to trigger speech multiple times
+      // Start speech with minimal interference
       const startSpeech = () => {
         try {
-          // Clear any pending speech
+          // Clear any pending speech first
           window.speechSynthesis.cancel();
 
-          // Small delay then speak
+          // Small delay to ensure cancel completes
           setTimeout(() => {
+            if (hasEnded) return;
+
             window.speechSynthesis.speak(utterance);
 
-            // Mobile workaround: iOS sometimes stops speaking
-            // Periodically check and keep alive
-            let checkCount = 0;
-            const keepAlive = setInterval(() => {
-              checkCount++;
-
-              // Safety: stop checking after 60 seconds max
-              if (checkCount > 120 || hasEnded) {
-                clearInterval(keepAlive);
+            // Chrome/Edge bug fix: Speech synthesis stops after ~15 seconds
+            // Use a gentler keep-alive that only resumes if paused
+            keepAliveInterval = setInterval(() => {
+              if (hasEnded) {
+                cleanup();
                 return;
               }
 
-              if (window.speechSynthesis.speaking) {
-                // Chrome/Edge fix: pause and resume to prevent stopping
-                window.speechSynthesis.pause();
+              // Only intervene if speech is paused (not if it's speaking normally)
+              if (window.speechSynthesis.paused) {
                 window.speechSynthesis.resume();
-              } else if (hasStarted && !hasEnded) {
-                // Speech stopped unexpectedly
-                clearInterval(keepAlive);
-                if (!hasEnded) {
-                  hasEnded = true;
-                  setIsSpeaking(false);
-                  setStatus('✨ Ready! Tap mic to speak.');
-                  resolve();
-                }
               }
-            }, 500);
 
-            // Fallback timeout: if speech doesn't start in 3 seconds, resolve anyway
+              // Check if speech unexpectedly stopped (not paused, not speaking, but should be)
+              if (hasStarted && !window.speechSynthesis.speaking && !window.speechSynthesis.paused && !hasEnded) {
+                // Give it a moment - it might be between utterances
+                setTimeout(() => {
+                  if (!window.speechSynthesis.speaking && !hasEnded) {
+                    hasEnded = true;
+                    cleanup();
+                    setIsSpeaking(false);
+                    setStatus('✨ Ready! Tap mic to speak.');
+                    resolve();
+                  }
+                }, 300);
+              }
+            }, 1000); // Check every 1 second instead of 500ms
+
+            // Fallback timeout: if speech doesn't start in 5 seconds (increased from 3)
             setTimeout(() => {
               if (!hasStarted && !hasEnded) {
                 addDiagnostic('Speech timeout - did not start');
                 hasEnded = true;
+                cleanup();
                 setIsSpeaking(false);
                 setStatus('Voice may not be available. See response above.');
                 resolve();
               }
-            }, 3000);
+            }, 5000);
 
-          }, 100);
+          }, 50); // Reduced delay from 100ms
         } catch (err: any) {
           addDiagnostic(`Speak error: ${err.message}`);
+          cleanup();
           setIsSpeaking(false);
           setStatus('Speech failed. See response above.');
           resolve();
