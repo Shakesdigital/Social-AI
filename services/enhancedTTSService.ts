@@ -38,15 +38,18 @@ const selectMaleVoice = (voices: SpeechSynthesisVoice[], isMobile: boolean): Spe
 
     // 3. Platform Specific Strict Preferences
     if (isMobile) {
-        // Australian Male Priority
-        const auKeywords = ['australia', 'au', 'gordon', 'russell'];
-        for (const word of auKeywords) {
-            const found = voices.find(v => (v.name.toLowerCase().includes(word) || v.lang === 'en-AU') && v.name.toLowerCase().includes('male'));
+        // British Male Priority (en-GB) - More commonly available than Australian
+        const gbKeywords = ['british', 'uk', 'daniel', 'oliver', 'george'];
+        for (const word of gbKeywords) {
+            const found = voices.find(v =>
+                (v.name.toLowerCase().includes(word) || v.lang === 'en-GB') &&
+                isNotFemale(v)
+            );
             if (found) return found;
         }
-        // Specific check for any AU voice if strict male not found (often names don't say 'male')
-        const anyAu = voices.find(v => v.lang === 'en-AU' && isNotFemale(v));
-        if (anyAu) return anyAu;
+        // Any en-GB voice
+        const anyGb = voices.find(v => v.lang === 'en-GB' && isNotFemale(v));
+        if (anyGb) return anyGb;
 
         // iOS Male Voices (Fallback)
         const iosMale = ['alex', 'daniel', 'fred', 'rishi'];
@@ -55,13 +58,10 @@ const selectMaleVoice = (voices: SpeechSynthesisVoice[], isMobile: boolean): Spe
             if (found) return found;
         }
 
-        // Android/Generic Filtered Loop
-        // Try to find ANY English voice that isn't on the female blacklist
+        // Android/Generic - Any English male voice
         const safeVoice = voices.find(v =>
             v.lang.startsWith('en') &&
-            isNotFemale(v) &&
-            // Prefer US English
-            (v.lang === 'en-US' || v.name.includes('US'))
+            isNotFemale(v)
         );
         if (safeVoice) return safeVoice;
     }
@@ -133,22 +133,20 @@ export const speak = async (
             const name = selectedVoice ? selectedVoice.name.toLowerCase() : '';
             const isConfirmedMale = name.includes('male') || name.includes('guy') || name.includes('ryan') || name.includes('david') || name.includes('alex') || name.includes('daniel') || name.includes('fred');
 
-            const isAustralian = selectedVoice?.lang === 'en-AU' || selectedVoice?.name.toLowerCase().includes('australia');
+            const isBritish = selectedVoice?.lang === 'en-GB' || selectedVoice?.name.toLowerCase().includes('british') || selectedVoice?.name.toLowerCase().includes('uk');
 
             if (isMobile) {
                 // MOBILE TUNING
-                if (isAustralian) {
-                    // Native Australian voice - keep natural
+                if (isBritish) {
+                    // Native British voice - keep natural for authentic accent
                     utterance.pitch = 1.0;
                     utterance.rate = 1.0;
                 } else if (isConfirmedMale) {
-                    // Young & Professional Male (Non-AU Fallback)
-                    // Higher pitch = Younger (1.1)
-                    // Normal rate = Clear/Professional (1.0)
+                    // Young & Professional Male (Non-GB Fallback)
                     utterance.pitch = 1.1;
                     utterance.rate = 1.0;
                 } else {
-                    // Fallback
+                    // Generic Fallback
                     utterance.pitch = 1.05;
                     utterance.rate = 1.0;
                 }
