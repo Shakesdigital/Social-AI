@@ -1,12 +1,12 @@
 // Enhanced Text-to-Speech Service with robust fallback chain
-// Priority: Puter.js (FREE unlimited) → ElevenLabs → OpenAI → Browser TTS
+// Priority: ResponsiveVoice (FREE, no login) → ElevenLabs → OpenAI → Browser TTS
 
 import { isElevenLabsConfigured, speakWithElevenLabs, getRecommendedElevenLabsVoice } from './elevenLabsTTSService';
 import { isOpenAITTSConfigured, speakWithOpenAI, getRecommendedVoice } from './openaiTTSService';
-import { speakWithPuter, getRecommendedPuterVoice, loadPuterScript, isPuterLoaded } from './puterTTSService';
+import { speakWithResponsiveVoice, getRecommendedResponsiveVoice, loadResponsiveVoiceScript, isResponsiveVoiceLoaded } from './responsiveVoiceTTSService';
 
 export type VoiceGender = 'female' | 'male';
-export type TTSProvider = 'puter' | 'elevenlabs' | 'openai' | 'browser' | 'none';
+export type TTSProvider = 'responsivevoice' | 'elevenlabs' | 'openai' | 'browser' | 'none';
 
 export interface TTSStatus {
     provider: TTSProvider;
@@ -21,24 +21,24 @@ export interface SpeakResult {
 }
 
 // Get the status of all TTS providers
-export const getTTSStatus = (): { puter: TTSStatus; elevenlabs: TTSStatus; openai: TTSStatus; browser: TTSStatus } => {
+export const getTTSStatus = (): { responsivevoice: TTSStatus; elevenlabs: TTSStatus; openai: TTSStatus; browser: TTSStatus } => {
     const elevenlabsConfigured = isElevenLabsConfigured();
     const openaiConfigured = isOpenAITTSConfigured();
     const browserAvailable = typeof window !== 'undefined' && 'speechSynthesis' in window;
-    // Puter is always "available" - it loads dynamically
-    const puterAvailable = true;
+    // ResponsiveVoice is always available (loads dynamically)
+    const rvAvailable = true;
 
     console.log('[EnhancedTTS] Provider status check:', {
-        puter: puterAvailable,
+        responsivevoice: rvAvailable,
         elevenlabs: elevenlabsConfigured,
         openai: openaiConfigured,
         browser: browserAvailable
     });
 
     return {
-        puter: {
-            provider: 'puter',
-            isConfigured: puterAvailable
+        responsivevoice: {
+            provider: 'responsivevoice',
+            isConfigured: rvAvailable
         },
         elevenlabs: {
             provider: 'elevenlabs',
@@ -57,8 +57,8 @@ export const getTTSStatus = (): { puter: TTSStatus; elevenlabs: TTSStatus; opena
 
 // Get the best available TTS provider
 export const getBestProvider = (): TTSProvider => {
-    // Puter is always first since it's free/unlimited with high quality
-    return 'puter';
+    // ResponsiveVoice is first since it's free and high quality
+    return 'responsivevoice';
 };
 
 // Enhanced browser speech synthesis with better voice selection for ALL devices including mobile
@@ -262,7 +262,7 @@ const speakWithBrowser = async (
 };
 
 // Main speak function with automatic fallback
-// NEW ORDER: Puter.js → ElevenLabs → OpenAI → Browser
+// ORDER: ResponsiveVoice → ElevenLabs → OpenAI → Browser
 export const speak = async (
     text: string,
     gender: VoiceGender = 'female',
@@ -277,26 +277,36 @@ export const speak = async (
 
     console.log('[EnhancedTTS] speak() called with text length:', text.length, 'gender:', gender);
 
-    // TRY PUTER.JS FIRST (FREE & UNLIMITED with OpenAI-quality voices)
-    console.log('[EnhancedTTS] Attempting Puter.js TTS (FREE unlimited)...');
-    callbacks?.onProviderChange?.('puter');
-    callbacks?.onStart?.();
+    // TRY RESPONSIVEVOICE FIRST (FREE & no login required)
+    console.log('[EnhancedTTS] Attempting ResponsiveVoice TTS (FREE)...');
+    callbacks?.onProviderChange?.('responsivevoice');
 
     try {
-        const voice = getRecommendedPuterVoice(gender);
-        const success = await speakWithPuter(text, { voice, speed: 1.0 });
+        const voice = getRecommendedResponsiveVoice(gender);
+        let started = false;
 
-        if (success) {
-            console.log('[EnhancedTTS] Puter.js TTS successful');
-            callbacks?.onEnd?.();
-            return { success: true, provider: 'puter' };
+        const success = await speakWithResponsiveVoice(text, voice, {
+            pitch: 1,
+            rate: 1,
+            volume: 1,
+            onstart: () => {
+                started = true;
+                callbacks?.onStart?.();
+            },
+            onend: () => {
+                callbacks?.onEnd?.();
+            }
+        });
+
+        if (success && started) {
+            console.log('[EnhancedTTS] ResponsiveVoice TTS successful');
+            return { success: true, provider: 'responsivevoice' };
         }
-        console.warn('[EnhancedTTS] Puter.js TTS failed, trying fallbacks...');
+        console.warn('[EnhancedTTS] ResponsiveVoice TTS did not start properly, trying fallbacks...');
     } catch (error: any) {
-        console.error('[EnhancedTTS] Puter.js error:', error.message);
-        callbacks?.onError?.(error.message, 'puter');
+        console.error('[EnhancedTTS] ResponsiveVoice error:', error.message);
+        callbacks?.onError?.(error.message, 'responsivevoice');
     }
-    callbacks?.onEnd?.();
 
     // Try ElevenLabs
     if (status.elevenlabs.isConfigured) {
@@ -371,8 +381,8 @@ export const getTTSStatusMessage = (): string => {
     const provider = getBestProvider();
 
     switch (provider) {
-        case 'puter':
-            return '🎙️ Premium voice (Puter.js - FREE)';
+        case 'responsivevoice':
+            return '🎙️ Natural voice (ResponsiveVoice - FREE)';
         case 'elevenlabs':
             return '🎙️ Premium voice (ElevenLabs)';
         case 'openai':

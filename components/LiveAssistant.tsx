@@ -453,7 +453,7 @@ VOICE CONVERSATION GUIDELINES:
       onProviderChange: (provider) => {
         setCurrentTTSProvider(provider);
         const statusMessages: Record<TTSProvider, string> = {
-          'puter': '🔊 Speaking (Puter - FREE)...',
+          'responsivevoice': '🔊 Speaking (ResponsiveVoice - FREE)...',
           'elevenlabs': '🔊 Speaking (ElevenLabs)...',
           'openai': '🔊 Speaking (OpenAI)...',
           'browser': '🔊 Speaking (Browser)...',
