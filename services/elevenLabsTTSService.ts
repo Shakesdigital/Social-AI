@@ -28,7 +28,14 @@ export interface ElevenLabsTTSOptions {
 
 // Check if ElevenLabs is configured
 export const isElevenLabsConfigured = (): boolean => {
-    return !!ELEVENLABS_API_KEY && ELEVENLABS_API_KEY.length > 0;
+    const isConfigured = !!ELEVENLABS_API_KEY && ELEVENLABS_API_KEY.length > 0;
+    console.log('[ElevenLabs TTS] Configuration check:', {
+        hasKey: !!ELEVENLABS_API_KEY,
+        keyLength: ELEVENLABS_API_KEY?.length || 0,
+        keyPrefix: ELEVENLABS_API_KEY ? ELEVENLABS_API_KEY.substring(0, 10) + '...' : 'none',
+        isConfigured
+    });
+    return isConfigured;
 };
 
 // Generate speech using ElevenLabs API

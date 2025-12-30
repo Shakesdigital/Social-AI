@@ -11,7 +11,14 @@ export interface TTSOptions {
 
 // Check if OpenAI TTS is available
 export const isOpenAITTSConfigured = (): boolean => {
-    return !!OPENAI_API_KEY && OPENAI_API_KEY.length > 0;
+    const isConfigured = !!OPENAI_API_KEY && OPENAI_API_KEY.length > 0;
+    console.log('[OpenAI TTS] Configuration check:', {
+        hasKey: !!OPENAI_API_KEY,
+        keyLength: OPENAI_API_KEY?.length || 0,
+        keyPrefix: OPENAI_API_KEY ? OPENAI_API_KEY.substring(0, 10) + '...' : 'none',
+        isConfigured
+    });
+    return isConfigured;
 };
 
 // Generate speech using OpenAI TTS API
