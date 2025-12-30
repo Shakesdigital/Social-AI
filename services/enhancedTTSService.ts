@@ -1,8 +1,8 @@
-// StreamElements TTS Service (Amazon Polly Voices ONLY)
-// No fallback - focus on making Polly work
+// Browser Native Text-to-Speech Service (Optimized for Natural Sound)
+// Settings tuned per user preference
 
 export type VoiceGender = 'female' | 'male';
-export type TTSProvider = 'streamelements' | 'none';
+export type TTSProvider = 'browser' | 'none';
 
 export interface SpeakResult {
     success: boolean;
@@ -11,68 +11,40 @@ export interface SpeakResult {
 }
 
 export const getTTSStatus = () => ({
-    streamelements: { provider: 'streamelements' as TTSProvider, isConfigured: true }
+    browser: { provider: 'browser' as TTSProvider, isConfigured: true }
 });
 
-export const getBestProvider = (): TTSProvider => 'streamelements';
+export const getBestProvider = (): TTSProvider => 'browser';
 
-// Chunk text for API limits
-const chunkText = (text: string, maxLength: number = 250): string[] => {
-    const chunks: string[] = [];
-    let currentChunk = '';
-    const sentences = text.split(/([.!?]+)/);
+// Smart voice selection - prioritize high-quality voices
+const selectBestVoice = (voices: SpeechSynthesisVoice[], gender: VoiceGender): SpeechSynthesisVoice | null => {
+    // Priority list for natural-sounding voices
+    const femaleKeywords = ['Samantha', 'Karen', 'Moira', 'Tessa', 'Google US English Female', 'Microsoft Aria', 'Microsoft Jenny', 'Zira'];
+    const maleKeywords = ['Daniel', 'Alex', 'Google US English Male', 'Microsoft Guy', 'Microsoft Ryan', 'David'];
 
-    for (const sentence of sentences) {
-        if (currentChunk.length + sentence.length > maxLength) {
-            if (currentChunk.trim()) chunks.push(currentChunk.trim());
-            currentChunk = sentence;
-        } else {
-            currentChunk += sentence;
+    const keywords = gender === 'female' ? femaleKeywords : maleKeywords;
+
+    // Try to find a preferred voice
+    for (const keyword of keywords) {
+        const found = voices.find(v => v.name.includes(keyword) && v.lang.startsWith('en'));
+        if (found) {
+            console.log(`[TTS] Found preferred voice: ${found.name}`);
+            return found;
         }
     }
-    if (currentChunk.trim()) chunks.push(currentChunk.trim());
-    return chunks.length > 0 ? chunks : [text];
+
+    // Fallback: any English voice
+    const englishVoice = voices.find(v => v.lang.startsWith('en'));
+    if (englishVoice) {
+        console.log(`[TTS] Using English voice: ${englishVoice.name}`);
+        return englishVoice;
+    }
+
+    // Last resort: first available
+    return voices[0] || null;
 };
 
-// Play audio from URL with detailed error logging
-const playAudioUrl = (url: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        console.log('[TTS] Loading audio from:', url.substring(0, 80) + '...');
-
-        const audio = new Audio(url);
-
-        const timeout = setTimeout(() => {
-            console.error('[TTS] Audio load timeout after 15s');
-            reject(new Error('Audio timeout'));
-        }, 15000);
-
-        audio.onloadeddata = () => {
-            console.log('[TTS] Audio loaded successfully');
-        };
-
-        audio.onended = () => {
-            console.log('[TTS] Audio playback finished');
-            clearTimeout(timeout);
-            resolve();
-        };
-
-        audio.onerror = (e) => {
-            console.error('[TTS] Audio error:', e);
-            clearTimeout(timeout);
-            reject(new Error('Audio failed to load'));
-        };
-
-        audio.play()
-            .then(() => console.log('[TTS] Audio playback started'))
-            .catch(e => {
-                console.error('[TTS] Audio play() failed:', e);
-                clearTimeout(timeout);
-                reject(e);
-            });
-    });
-};
-
-// Main Speak Function - StreamElements ONLY
+// Main Speak Function
 export const speak = async (
     text: string,
     gender: VoiceGender = 'female',
@@ -84,37 +56,102 @@ export const speak = async (
     }
 ): Promise<SpeakResult> => {
     console.log('[TTS] speak() called:', { textLength: text.length, gender });
-    callbacks?.onProviderChange?.('streamelements');
+    callbacks?.onProviderChange?.('browser');
 
-    try {
-        // Salli = Female, Matthew = Male
-        const voice = gender === 'female' ? 'Salli' : 'Matthew';
-        const chunks = chunkText(text);
-
-        console.log('[TTS] Using StreamElements with voice:', voice);
-        console.log('[TTS] Text chunks:', chunks.length);
-
-        callbacks?.onStart?.();
-
-        for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            console.log(`[TTS] Playing chunk ${i + 1}/${chunks.length}: "${chunk.substring(0, 30)}..."`);
-
-            const url = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(chunk)}`;
-            await playAudioUrl(url);
+    return new Promise((resolve) => {
+        if (!window.speechSynthesis) {
+            const error = 'Speech synthesis not available';
+            console.error('[TTS]', error);
+            callbacks?.onError?.(error, 'none');
+            resolve({ success: false, provider: 'none', error });
+            return;
         }
 
-        console.log('[TTS] All chunks played successfully');
-        callbacks?.onEnd?.();
-        return { success: true, provider: 'streamelements' };
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
 
-    } catch (error: any) {
-        const errorMsg = error.message || 'StreamElements TTS failed';
-        console.error('[TTS] FAILED:', errorMsg);
-        callbacks?.onError?.(errorMsg, 'streamelements');
-        callbacks?.onEnd?.();
-        return { success: false, provider: 'none', error: errorMsg };
-    }
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        // Get voices
+        let voices = window.speechSynthesis.getVoices();
+
+        const configureAndSpeak = () => {
+            voices = window.speechSynthesis.getVoices();
+            console.log('[TTS] Available voices:', voices.map(v => v.name).join(', '));
+
+            // Select best voice
+            const selectedVoice = selectBestVoice(voices, gender);
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+
+            // Detect device
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+            // ========================================
+            // VOICE SETTINGS (User-tuned)
+            // ========================================
+            if (gender === 'female') {
+                // Female: Keep natural, sounds good as-is
+                utterance.rate = isMobile ? 1.0 : 1.0;
+                utterance.pitch = isMobile ? 1.0 : 1.0;
+            } else {
+                // Male: Speed 1.0, Pitch 0.3 (deeper, more natural)
+                utterance.rate = 1.0;
+                utterance.pitch = 0.3;
+            }
+
+            utterance.volume = 1.0;
+
+            console.log(`[TTS] Settings - Rate: ${utterance.rate}, Pitch: ${utterance.pitch}, Voice: ${utterance.voice?.name || 'default'}`);
+
+            // Event handlers
+            utterance.onstart = () => {
+                console.log('[TTS] Speech started');
+                callbacks?.onStart?.();
+            };
+
+            utterance.onend = () => {
+                console.log('[TTS] Speech ended');
+                callbacks?.onEnd?.();
+                resolve({ success: true, provider: 'browser' });
+            };
+
+            utterance.onerror = (e) => {
+                console.error('[TTS] Speech error:', e.error);
+                callbacks?.onEnd?.();
+                resolve({ success: false, provider: 'browser', error: e.error });
+            };
+
+            // Speak!
+            window.speechSynthesis.speak(utterance);
+
+            // Chrome bug fix: keep speech alive on mobile
+            if (isMobile) {
+                const keepAlive = setInterval(() => {
+                    if (!window.speechSynthesis.speaking) {
+                        clearInterval(keepAlive);
+                    } else if (window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                    }
+                }, 5000);
+            }
+        };
+
+        // Handle async voice loading
+        if (voices.length > 0) {
+            configureAndSpeak();
+        } else {
+            window.speechSynthesis.onvoiceschanged = configureAndSpeak;
+            // Fallback timeout
+            setTimeout(() => {
+                if (voices.length === 0) {
+                    voices = window.speechSynthesis.getVoices();
+                }
+                configureAndSpeak();
+            }, 300);
+        }
+    });
 };
 
-export const getTTSStatusMessage = (): string => '🎙️ Amazon Polly';
+export const getTTSStatusMessage = (): string => '🎙️ Browser Voice';
