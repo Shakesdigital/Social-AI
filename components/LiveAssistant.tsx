@@ -668,20 +668,7 @@ VOICE CONVERSATION GUIDELINES:
               </button>
             </div>
             {/* Natural Voice Toggle - Shown if ElevenLabs or OpenAI is configured */}
-            {(isElevenLabsConfigured() || isOpenAITTSConfigured()) && (
-              <button
-                onClick={() => setUseNaturalVoice(!useNaturalVoice)}
-                className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1 transition-all ${useNaturalVoice
-                  ? 'bg-purple-500 text-white shadow'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                title={useNaturalVoice
-                  ? `Using ${isElevenLabsConfigured() ? 'ElevenLabs' : 'OpenAI'} voice`
-                  : 'Using browser voice'}
-              >
-                <Sparkles size={12} /> {useNaturalVoice ? 'AI Voice' : 'Basic'}
-              </button>
-            )}
+            {/* Natural Voice Toggle replaced by ResponsiveVoice defaults */}
             <button
               onClick={testSpeech}
               disabled={!speechReady || isSpeaking}
