@@ -1,9 +1,17 @@
-// Native Browser Text-to-Speech Service (Optimized)
-// Reliability: 100%
-// Quality: Best available on device (Varies by OS)
+// ResponsiveVoice Text-to-Speech Service (with Native Fallback)
+// Primary: ResponsiveVoice (High Quality, Cross-Platform)
+// Fallback: Native Browser TTS (Reliable)
+
+import {
+    speakWithResponsiveVoice,
+    getRecommendedResponsiveVoice,
+    loadResponsiveVoiceScript,
+    isResponsiveVoiceLoaded,
+    ResponsiveVoiceName
+} from './responsiveVoiceTTSService';
 
 export type VoiceGender = 'female' | 'male';
-export type TTSProvider = 'browser' | 'none';
+export type TTSProvider = 'responsivevoice' | 'browser' | 'none';
 
 export interface SpeakResult {
     success: boolean;
@@ -13,35 +21,13 @@ export interface SpeakResult {
 
 export const getTTSStatus = () => {
     return {
-        browser: { provider: 'browser' as TTSProvider, isConfigured: true }
+        responsivevoice: { provider: 'responsivevoice' as TTSProvider, isConfigured: true }
     };
 };
 
-export const getBestProvider = (): TTSProvider => 'browser';
+export const getBestProvider = (): TTSProvider => 'responsivevoice';
 
-// Smart Voice Selection
-const selectBestVoice = (voices: SpeechSynthesisVoice[], gender: VoiceGender) => {
-    // 1. Apple/Microsoft Neural Voices (High Quality)
-    const neuralKeywords = gender === 'female'
-        ? ['Samantha', 'Karen', 'Tessa', 'Moira', 'Rishi', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny']
-        : ['Daniel', 'Fred', 'Alex', 'Rishi', 'Microsoft Guy', 'Microsoft Ryan'];
-
-    for (const keyword of neuralKeywords) {
-        const found = voices.find(v => v.name.includes(keyword));
-        if (found) return found;
-    }
-
-    // 2. Gender matching based on name (if marked)
-    const genderMatch = voices.find(v =>
-        v.lang.startsWith('en') &&
-        v.name.toLowerCase().includes(gender)
-    );
-    if (genderMatch) return genderMatch;
-
-    // 3. Fallback: First English voice
-    return voices.find(v => v.lang.startsWith('en')) || voices[0];
-};
-
+// Main Speak Function
 export const speak = async (
     text: string,
     gender: VoiceGender = 'female',
@@ -53,91 +39,73 @@ export const speak = async (
     }
 ): Promise<SpeakResult> => {
     console.log('[TTS] speak() called with:', { textLength: text.length, gender });
-    callbacks?.onProviderChange?.('browser');
 
-    return new Promise((resolve) => {
-        if (!window.speechSynthesis) {
-            const err = 'SpeechSynthesis API missing';
-            callbacks?.onError?.(err, 'none');
-            resolve({ success: false, provider: 'none', error: err });
-            return;
-        }
+    // 1. Try ResponsiveVoice (Primary)
+    try {
+        callbacks?.onProviderChange?.('responsivevoice');
+        console.log('[TTS] Attempting ResponsiveVoice...');
 
-        // Must cancel previous speech
-        window.speechSynthesis.cancel();
+        // Ensure script is loaded
+        await loadResponsiveVoiceScript();
 
-        const utterance = new SpeechSynthesisUtterance(text);
+        const voice = getRecommendedResponsiveVoice(gender);
+        const success = await speakWithResponsiveVoice(text, voice, {
+            pitch: 1, rate: 1, volume: 1,
+            onstart: callbacks?.onStart,
+            onend: callbacks?.onEnd,
+            onerror: (err) => console.error('[TTS] ResponsiveVoice internal error:', err)
+        });
 
-        // Get voices (handling async loading behavior)
-        let voices = window.speechSynthesis.getVoices();
+        if (success) return { success: true, provider: 'responsivevoice' };
 
-        const trySpeak = () => {
-            console.log('[TTS] Available voices:', voices.map(v => v.name).join(', '));
+        console.warn('[TTS] ResponsiveVoice returned false, trying fallback...');
 
-            const selectedVoice = selectBestVoice(voices, gender);
-            if (selectedVoice) {
-                console.log(`[TTS] Selected voice: "${selectedVoice.name}" for ${gender}`);
-                utterance.voice = selectedVoice;
+    } catch (error) {
+        console.warn('[TTS] ResponsiveVoice failed (likely blocked), falling back to browser:', error);
+    }
+
+    // 2. Fallback to Native Browser
+    try {
+        callbacks?.onProviderChange?.('browser');
+        console.log('[TTS] Attempting Native Browser Fallback...');
+
+        await new Promise<void>((resolve) => {
+            if (!window.speechSynthesis) {
+                resolve();
+                return;
             }
+            window.speechSynthesis.cancel();
 
-            // Tune parameters for less robotic sound
-            // Mobile (Android/iOS) tends to be too slow, so speed it up slightly
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+
+            const preferredVoice = voices.find(v =>
+                v.lang.startsWith('en') &&
+                (gender === 'female'
+                    ? ['Samantha', 'Google US English Female', 'Microsoft Aria'].some(k => v.name.includes(k))
+                    : ['Daniel', 'Google US English Male', 'Microsoft Guy'].some(k => v.name.includes(k)))
+            ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+
+            if (preferredVoice) utterance.voice = preferredVoice;
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            utterance.rate = isMobile ? 1.1 : 1.0;
 
-            utterance.rate = isMobile ? 1.1 : 1.0; // Speed up mobile
-            utterance.pitch = gender === 'female' ? 1.05 : 1.0;
-            utterance.volume = 1.0;
-
-            utterance.onstart = () => {
-                console.log('[TTS] Speech started');
-                callbacks?.onStart?.();
-            };
-
-            utterance.onend = () => {
-                console.log('[TTS] Speech ended');
-                callbacks?.onEnd?.();
-                resolve({ success: true, provider: 'browser' });
-            };
-
-            utterance.onerror = (e) => {
-                console.error('[TTS] Browser speech error:', e);
-                // On error, we still resolve to avoid hanging, but log it
-                callbacks?.onEnd?.();
-                resolve({ success: false, provider: 'browser', error: 'Speech failed' });
-            };
+            utterance.onstart = () => callbacks?.onStart?.();
+            utterance.onend = () => { callbacks?.onEnd?.(); resolve(); };
+            utterance.onerror = () => { callbacks?.onEnd?.(); resolve(); };
 
             window.speechSynthesis.speak(utterance);
+        });
 
-            // Chrome bug fix: Infinite callback loop to keep speech alive
-            if (isMobile) {
-                const fixInterval = setInterval(() => {
-                    if (!window.speechSynthesis.speaking) {
-                        clearInterval(fixInterval);
-                    } else {
-                        window.speechSynthesis.pause();
-                        window.speechSynthesis.resume();
-                    }
-                }, 14000); // Resume every 14s
-            }
-        };
+        return { success: true, provider: 'browser' };
 
-        if (voices.length > 0) {
-            trySpeak();
-        } else {
-            window.speechSynthesis.onvoiceschanged = () => {
-                voices = window.speechSynthesis.getVoices();
-                trySpeak();
-            };
-            // Fallback if event never fires
-            setTimeout(() => {
-                voices = window.speechSynthesis.getVoices();
-                if (voices.length === 0) console.warn('[TTS] No voices loaded even after wait');
-                trySpeak();
-            }, 500);
-        }
-    });
+    } catch (e: any) {
+        const msg = e.message || 'All providers failed';
+        callbacks?.onError?.(msg, 'none');
+        return { success: false, provider: 'none', error: msg };
+    }
 };
 
 export const getTTSStatusMessage = (): string => {
-    return '🎙️ Browser Voice';
+    return '🎙️ AI Voice';
 };
