@@ -3,8 +3,6 @@ import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, 
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
-import { isOpenAITTSConfigured, speakWithOpenAI, getRecommendedVoice } from '../services/openaiTTSService';
-import { isElevenLabsConfigured, speakWithElevenLabs, getRecommendedElevenLabsVoice } from '../services/elevenLabsTTSService';
 import { speak as enhancedSpeak, getTTSStatus, getBestProvider, getTTSStatusMessage, TTSProvider } from '../services/enhancedTTSService';
 
 interface LiveAssistantProps {
@@ -37,11 +35,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [currentTTSProvider, setCurrentTTSProvider] = useState<TTSProvider>(() => getBestProvider());
-  // Check for natural voice: prefer ElevenLabs (free) over OpenAI
-  const [useNaturalVoice, setUseNaturalVoice] = useState(() =>
-    isElevenLabsConfigured() || isOpenAITTSConfigured()
-  );
+  const [currentTTSProvider, setCurrentTTSProvider] = useState<TTSProvider>('responsivevoice');
 
   // Detect mobile device
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -437,14 +431,12 @@ VOICE CONVERSATION GUIDELINES:
 
   const speak = async (text: string): Promise<void> => {
     addDiagnostic(`Starting speech with ${text.length} characters`);
-
-    // Log TTS status for debugging
-    const ttsStatus = getTTSStatus();
-    addDiagnostic(`TTS Status - Puter: available, ElevenLabs: ${ttsStatus.elevenlabs.isConfigured}, OpenAI: ${ttsStatus.openai.isConfigured}, Browser: ${ttsStatus.browser.isConfigured}`);
+    addDiagnostic('Using ResponsiveVoice TTS');
 
     const result = await enhancedSpeak(text, voicePreference, {
       onStart: () => {
         setIsSpeaking(true);
+        setStatus('🔊 Speaking...');
       },
       onEnd: () => {
         setIsSpeaking(false);
@@ -452,26 +444,18 @@ VOICE CONVERSATION GUIDELINES:
       },
       onProviderChange: (provider) => {
         setCurrentTTSProvider(provider);
-        const statusMessages: Record<TTSProvider, string> = {
-          'responsivevoice': '🔊 Speaking (ResponsiveVoice - FREE)...',
-          'elevenlabs': '🔊 Speaking (ElevenLabs)...',
-          'openai': '🔊 Speaking (OpenAI)...',
-          'browser': '🔊 Speaking (Browser)...',
-          'none': '❌ No voice available'
-        };
-        setStatus(statusMessages[provider]);
-        addDiagnostic(`Using TTS provider: ${provider}`);
+        addDiagnostic(`TTS provider: ${provider}`);
       },
       onError: (error, provider) => {
-        addDiagnostic(`${provider} error: ${error}`);
+        addDiagnostic(`TTS error: ${error}`);
       }
     });
 
     if (!result.success) {
-      addDiagnostic(`TTS failed with provider: ${result.provider}, error: ${result.error}`);
+      addDiagnostic(`TTS failed: ${result.error}`);
       setStatus('Voice not available. See response above.');
     } else {
-      addDiagnostic(`TTS completed successfully with: ${result.provider}`);
+      addDiagnostic('Speech completed successfully');
     }
   };
 
