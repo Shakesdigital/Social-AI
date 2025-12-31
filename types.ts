@@ -6,6 +6,18 @@ export interface CompanyProfile {
   targetAudience: string;
   brandVoice: string;
   goals: string;
+  // Website & Social Media
+  website?: string;
+  socialMedia?: {
+    instagram?: string;
+    facebook?: string;
+    twitter?: string;
+    linkedin?: string;
+    tiktok?: string;
+    youtube?: string;
+    pinterest?: string;
+    threads?: string;
+  };
 }
 
 export interface ResearchReport {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw } from 'lucide-react';
+import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw, Globe, Link } from 'lucide-react';
 import { CompanyProfile } from '../types';
 
 interface ProfileSettingsProps {
@@ -22,6 +22,17 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // Handle nested social media fields
+    const handleSocialChange = (platform: string, value: string) => {
+        setFormData({
+            ...formData,
+            socialMedia: {
+                ...formData.socialMedia,
+                [platform]: value
+            }
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -131,6 +142,105 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                                 This helps our assistant generate more relevant marketing content for your business.
                             </p>
                         </div>
+                    </div>
+
+                    {/* Website & Social Media Section */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
+                        <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <Globe size={20} className="text-brand-600" />
+                            Website & Social Media
+                        </h2>
+                        <p className="text-sm text-slate-500 mb-4">
+                            Connect your website and social profiles to enable analytics tracking and auto-publishing.
+                        </p>
+
+                        {/* Website */}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                Business Website
+                            </label>
+                            <input
+                                name="website"
+                                value={formData.website || ''}
+                                onChange={handleChange}
+                                className="w-full border border-slate-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                placeholder="https://www.yourcompany.com"
+                            />
+                        </div>
+
+                        {/* Social Media Profiles */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    Instagram
+                                </label>
+                                <input
+                                    value={formData.socialMedia?.instagram || ''}
+                                    onChange={(e) => handleSocialChange('instagram', e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                    placeholder="https://instagram.com/yourhandle"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    Facebook
+                                </label>
+                                <input
+                                    value={formData.socialMedia?.facebook || ''}
+                                    onChange={(e) => handleSocialChange('facebook', e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                    placeholder="https://facebook.com/yourpage"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    Twitter / X
+                                </label>
+                                <input
+                                    value={formData.socialMedia?.twitter || ''}
+                                    onChange={(e) => handleSocialChange('twitter', e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                    placeholder="https://x.com/yourhandle"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    LinkedIn
+                                </label>
+                                <input
+                                    value={formData.socialMedia?.linkedin || ''}
+                                    onChange={(e) => handleSocialChange('linkedin', e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                    placeholder="https://linkedin.com/company/yourcompany"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    TikTok
+                                </label>
+                                <input
+                                    value={formData.socialMedia?.tiktok || ''}
+                                    onChange={(e) => handleSocialChange('tiktok', e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                    placeholder="https://tiktok.com/@yourhandle"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    YouTube
+                                </label>
+                                <input
+                                    value={formData.socialMedia?.youtube || ''}
+                                    onChange={(e) => handleSocialChange('youtube', e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                                    placeholder="https://youtube.com/@yourchannel"
+                                />
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 mt-3">
+                            🔒 Your social media links are stored securely. Future updates will enable analytics tracking and scheduled auto-publishing.
+                        </p>
                     </div>
 
                     {/* Target Audience Section */}
