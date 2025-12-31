@@ -389,7 +389,7 @@ const ResearchView: React.FC<{
     if (!report) runResearch();
   }, []);
 
-  if (loading) return <div className="p-4 sm:p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse text-sm sm:text-base">Analysing market with AI...</div></div>;
+  if (loading) return <div className="p-4 sm:p-8 flex items-center justify-center h-full"><div className="text-brand-600 font-semibold animate-pulse text-sm sm:text-base">Analyzing the Market......</div></div>;
   return (
     <div className="p-4 sm:p-6 md:p-8 h-full overflow-y-auto">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
