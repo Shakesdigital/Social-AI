@@ -21,7 +21,7 @@ export interface SpeakResult {
 
 let groqRateLimited = false;
 let rateLimitTime: number = 0;
-const RATE_LIMIT_RECOVERY = 60000;
+const RATE_LIMIT_RECOVERY = 10000; // 10 seconds - recover quickly
 
 // Web Audio API context - more reliable on mobile
 let audioContext: AudioContext | null = null;
@@ -207,7 +207,7 @@ const playAudioBuffer = async (arrayBuffer: ArrayBuffer): Promise<void> => {
     });
 };
 
-// Groq TTS with chunking
+// Groq TTS with chunking - with delays to avoid rate limiting
 const speakWithGroq = async (
     text: string,
     voice: string,
@@ -215,17 +215,35 @@ const speakWithGroq = async (
     onEnd?: () => void
 ): Promise<boolean> => {
     const chunks = chunkText(text);
-    console.log('[TTS] Groq:', chunks.length, 'chunks');
+    console.log('[TTS] Groq: starting with', chunks.length, 'chunks');
 
     let started = false;
+    let successCount = 0;
 
     for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        console.log(`[TTS] Chunk ${i + 1}/${chunks.length}: "${chunk.slice(0, 25)}..."`);
+        console.log(`[TTS] Chunk ${i + 1}/${chunks.length}`);
 
-        const audioData = await fetchGroqAudio(chunk, voice);
+        // Add delay between chunks to avoid rate limiting
+        if (i > 0) {
+            console.log('[TTS] Waiting 500ms before next chunk...');
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // Try up to 2 times per chunk
+        let audioData: ArrayBuffer | null = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            audioData = await fetchGroqAudio(chunk, voice);
+            if (audioData) break;
+
+            if (attempt < 2 && !groqRateLimited) {
+                console.log('[TTS] Retrying chunk in 1s...');
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
         if (!audioData) {
-            console.error('[TTS] Failed to fetch chunk', i + 1);
+            console.error('[TTS] Failed to fetch chunk', i + 1, 'after retries');
             continue;
         }
 
@@ -237,8 +255,10 @@ const speakWithGroq = async (
         }
 
         await playAudioBuffer(audioData);
+        successCount++;
     }
 
+    console.log('[TTS] Groq finished:', successCount, '/', chunks.length, 'chunks played');
     onEnd?.();
     return started;
 };
