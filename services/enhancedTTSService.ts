@@ -4,15 +4,15 @@
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
+const GROQ_MAX_CHARS = 180; // Groq limit is 200, use 180 for safety
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
 
 // Groq Orpheus voices (canopylabs/orpheus-v1-english)
-// Available: austin, troy, hannah, etc.
 const GROQ_VOICES = {
-    male: 'austin',     // Natural male voice
-    female: 'hannah'    // Natural female voice
+    male: 'austin',
+    female: 'hannah'
 };
 
 export interface SpeakResult {
@@ -21,12 +21,11 @@ export interface SpeakResult {
     error?: string;
 }
 
-// Track API availability for automatic recovery
+// Track API availability
 let groqAvailable = true;
 let lastGroqError: number = 0;
-const GROQ_RECOVERY_TIME = 60000; // Try Groq again after 1 minute
+const GROQ_RECOVERY_TIME = 60000;
 
-// Check if Groq API is configured
 export const isGroqTTSConfigured = (): boolean => {
     return !!GROQ_API_KEY && GROQ_API_KEY.length > 10;
 };
@@ -41,16 +40,62 @@ export const getBestProvider = (): TTSProvider => {
     return 'browser';
 };
 
-// Groq TTS API call
-const speakWithGroq = async (
-    text: string,
-    voice: string,
-    onStart?: () => void,
-    onEnd?: () => void
-): Promise<boolean> => {
-    try {
-        console.log('[TTS] Calling Groq Orpheus API with voice:', voice);
+// Split text into chunks that fit within Groq's character limit
+const chunkText = (text: string, maxLength: number = GROQ_MAX_CHARS): string[] => {
+    const chunks: string[] = [];
 
+    // Split by sentences first
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    let currentChunk = '';
+
+    for (const sentence of sentences) {
+        // If single sentence is too long, split by commas or spaces
+        if (sentence.length > maxLength) {
+            if (currentChunk) {
+                chunks.push(currentChunk.trim());
+                currentChunk = '';
+            }
+            // Split long sentence by commas
+            const parts = sentence.split(/(?<=,)\s*/);
+            for (const part of parts) {
+                if (part.length > maxLength) {
+                    // Split by spaces as last resort
+                    const words = part.split(' ');
+                    let wordChunk = '';
+                    for (const word of words) {
+                        if ((wordChunk + ' ' + word).length > maxLength) {
+                            if (wordChunk) chunks.push(wordChunk.trim());
+                            wordChunk = word;
+                        } else {
+                            wordChunk = wordChunk ? wordChunk + ' ' + word : word;
+                        }
+                    }
+                    if (wordChunk) chunks.push(wordChunk.trim());
+                } else if ((currentChunk + part).length > maxLength) {
+                    if (currentChunk) chunks.push(currentChunk.trim());
+                    currentChunk = part;
+                } else {
+                    currentChunk += part;
+                }
+            }
+        } else if ((currentChunk + ' ' + sentence).length > maxLength) {
+            if (currentChunk) chunks.push(currentChunk.trim());
+            currentChunk = sentence;
+        } else {
+            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        }
+    }
+
+    if (currentChunk.trim()) {
+        chunks.push(currentChunk.trim());
+    }
+
+    return chunks.filter(c => c.length > 0);
+};
+
+// Fetch single audio chunk from Groq
+const fetchGroqAudio = async (text: string, voice: string): Promise<Blob | null> => {
+    try {
         const response = await fetch(GROQ_TTS_URL, {
             method: 'POST',
             headers: {
@@ -58,74 +103,90 @@ const speakWithGroq = async (
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'canopylabs/orpheus-v1-english',  // Correct model name
+                model: 'canopylabs/orpheus-v1-english',
                 input: text,
                 voice: voice,
-                response_format: 'wav'  // Default format
+                response_format: 'wav'
             })
         });
 
-        // Handle rate limiting
         if (response.status === 429) {
-            console.warn('[TTS] Groq rate limited (429)');
+            console.warn('[TTS] Groq rate limited');
             groqAvailable = false;
             lastGroqError = Date.now();
-            return false;
+            return null;
         }
 
-        // Handle other errors
         if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            console.error('[TTS] Groq API error:', response.status, errorText);
-            groqAvailable = false;
-            lastGroqError = Date.now();
-            return false;
+            const errorText = await response.text().catch(() => '');
+            console.error('[TTS] Groq error:', response.status, errorText);
+            return null;
         }
 
-        // Get audio blob
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        console.log('[TTS] Groq audio received, size:', audioBlob.size, 'bytes');
-
-        // Play the audio
-        return new Promise((resolve) => {
-            const audio = new Audio(audioUrl);
-
-            audio.onloadeddata = () => {
-                console.log('[TTS] Groq audio loaded');
-            };
-
-            audio.onplay = () => {
-                console.log('[TTS] Groq audio playing');
-                onStart?.();
-            };
-
-            audio.onended = () => {
-                console.log('[TTS] Groq audio finished');
-                URL.revokeObjectURL(audioUrl);
-                onEnd?.();
-                resolve(true);
-            };
-
-            audio.onerror = (e) => {
-                console.error('[TTS] Groq audio playback error:', e);
-                URL.revokeObjectURL(audioUrl);
-                onEnd?.();
-                resolve(false);
-            };
-
-            audio.play().catch(e => {
-                console.error('[TTS] Groq audio play() failed:', e);
-                onEnd?.();
-                resolve(false);
-            });
-        });
-
+        return await response.blob();
     } catch (error: any) {
         console.error('[TTS] Groq fetch error:', error.message);
-        groqAvailable = false;
-        lastGroqError = Date.now();
+        return null;
+    }
+};
+
+// Play audio blob
+const playAudioBlob = (blob: Blob): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+
+        audio.onended = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+        };
+
+        audio.onerror = (e) => {
+            URL.revokeObjectURL(url);
+            reject(e);
+        };
+
+        audio.play().catch(reject);
+    });
+};
+
+// Groq TTS with chunking
+const speakWithGroq = async (
+    text: string,
+    voice: string,
+    onStart?: () => void,
+    onEnd?: () => void
+): Promise<boolean> => {
+    try {
+        const chunks = chunkText(text);
+        console.log('[TTS] Groq: Processing', chunks.length, 'chunks');
+
+        let started = false;
+
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            console.log(`[TTS] Groq chunk ${i + 1}/${chunks.length}: "${chunk.slice(0, 30)}..." (${chunk.length} chars)`);
+
+            const audioBlob = await fetchGroqAudio(chunk, voice);
+
+            if (!audioBlob) {
+                console.error('[TTS] Groq chunk failed');
+                return false;
+            }
+
+            if (!started) {
+                started = true;
+                onStart?.();
+            }
+
+            await playAudioBlob(audioBlob);
+        }
+
+        onEnd?.();
+        return true;
+
+    } catch (error: any) {
+        console.error('[TTS] Groq error:', error.message);
         return false;
     }
 };
@@ -145,53 +206,26 @@ const speakWithBrowser = async (
 
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-
-        // Get voices
         const voices = window.speechSynthesis.getVoices();
 
-        // Select best available voice
         const preferredVoice = voices.find(v =>
             v.lang === 'en-GB' &&
             (gender === 'male' ? !v.name.toLowerCase().includes('female') : true)
-        ) || voices.find(v =>
-            v.lang.startsWith('en') &&
-            (gender === 'male'
-                ? ['guy', 'david', 'daniel', 'alex', 'male'].some(k => v.name.toLowerCase().includes(k))
-                : ['aria', 'jenny', 'samantha', 'female'].some(k => v.name.toLowerCase().includes(k)))
         ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
 
-        if (preferredVoice) {
-            utterance.voice = preferredVoice;
-            console.log('[TTS] Browser using voice:', preferredVoice.name);
-        }
-
-        // Natural settings
+        if (preferredVoice) utterance.voice = preferredVoice;
         utterance.rate = 1.0;
         utterance.pitch = gender === 'male' ? 0.95 : 1.0;
-        utterance.volume = 1.0;
 
-        utterance.onstart = () => {
-            console.log('[TTS] Browser speech started');
-            onStart?.();
-        };
-
-        utterance.onend = () => {
-            console.log('[TTS] Browser speech ended');
-            onEnd?.();
-            resolve(true);
-        };
-
-        utterance.onerror = (e) => {
-            console.error('[TTS] Browser speech error:', e);
-            onEnd?.();
-            resolve(false);
-        };
+        utterance.onstart = () => onStart?.();
+        utterance.onend = () => { onEnd?.(); resolve(true); };
+        utterance.onerror = () => { onEnd?.(); resolve(false); };
 
         window.speechSynthesis.speak(utterance);
     });
 };
 
-// Main speak function with automatic failover
+// Main speak function
 export const speak = async (
     text: string,
     gender: VoiceGender = 'male',
@@ -202,49 +236,34 @@ export const speak = async (
         onError?: (error: string, provider: TTSProvider) => void;
     }
 ): Promise<SpeakResult> => {
-    console.log('[TTS] speak() called:', { textLength: text.length, gender });
+    console.log('[TTS] speak():', { chars: text.length, gender });
 
-    // Check if Groq should be tried again after recovery period
+    // Recovery check
     if (!groqAvailable && Date.now() - lastGroqError > GROQ_RECOVERY_TIME) {
-        console.log('[TTS] Attempting Groq recovery...');
         groqAvailable = true;
     }
 
-    // 1. Try Groq TTS (Primary)
+    // 1. Try Groq
     if (isGroqTTSConfigured() && groqAvailable) {
         callbacks?.onProviderChange?.('groq');
-        console.log('[TTS] Using Groq Orpheus TTS API');
-
         const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
-        const success = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
 
-        if (success) {
+        if (await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd)) {
             return { success: true, provider: 'groq' };
         }
-
-        // Groq failed, continue to fallback
-        console.warn('[TTS] Groq failed, switching to browser fallback');
+        console.warn('[TTS] Groq failed, trying browser');
     }
 
-    // 2. Browser Fallback (Seamless)
+    // 2. Browser fallback
     callbacks?.onProviderChange?.('browser');
-    console.log('[TTS] Using Browser speech synthesis (fallback)');
-
-    const browserSuccess = await speakWithBrowser(text, gender, callbacks?.onStart, callbacks?.onEnd);
-
-    if (browserSuccess) {
+    if (await speakWithBrowser(text, gender, callbacks?.onStart, callbacks?.onEnd)) {
         return { success: true, provider: 'browser' };
     }
 
-    // 3. Complete failure
-    const errorMsg = 'All TTS providers failed';
-    callbacks?.onError?.(errorMsg, 'none');
-    return { success: false, provider: 'none', error: errorMsg };
+    callbacks?.onError?.('All TTS failed', 'none');
+    return { success: false, provider: 'none', error: 'All TTS failed' };
 };
 
 export const getTTSStatusMessage = (): string => {
-    if (isGroqTTSConfigured() && groqAvailable) {
-        return '🎙️ Groq AI Voice';
-    }
-    return '🎙️ Browser Voice';
+    return isGroqTTSConfigured() && groqAvailable ? '🎙️ Groq AI' : '🎙️ Browser';
 };
