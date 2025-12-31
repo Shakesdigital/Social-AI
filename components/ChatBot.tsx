@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Volume2, VolumeX, Square } from 'lucide-react';
+import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Mic, MicOff } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
@@ -25,29 +25,86 @@ export const ChatBot: React.FC = () => {
   const [isResearching, setIsResearching] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [speakingMessageIndex, setSpeakingMessageIndex] = useState<number | null>(null);
+  const recognitionRef = useRef<any>(null);
 
-  // Read aloud function for AI messages
-  const handleReadAloud = async (text: string, messageIndex: number) => {
-    // If already speaking this message, stop it
-    if (speakingMessageIndex === messageIndex) {
-      window.speechSynthesis?.cancel();
-      setSpeakingMessageIndex(null);
+  // Voice input state
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
+
+  // Start/stop voice recording
+  const toggleVoiceInput = () => {
+    if (isRecording) {
+      // Stop recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsRecording(false);
       return;
     }
 
-    // Stop any current speech
-    window.speechSynthesis?.cancel();
-    setSpeakingMessageIndex(messageIndex);
+    // Start recording
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Voice input is not supported in this browser. Please use Chrome or Safari.');
+      return;
+    }
 
-    try {
-      await ttsSpeak(text, 'female', {
-        onEnd: () => setSpeakingMessageIndex(null),
-        onError: () => setSpeakingMessageIndex(null)
-      });
-    } catch (e) {
-      console.error('[ChatBot] TTS error:', e);
-      setSpeakingMessageIndex(null);
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    let finalTranscript = '';
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+      setInput('🎤 Listening...');
+    };
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      setInput(finalTranscript || interim || '🎤 Listening...');
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      if (finalTranscript.trim()) {
+        setInput(finalTranscript.trim());
+        // Auto-send if voice mode is enabled
+        if (voiceModeEnabled) {
+          setTimeout(() => handleSend(finalTranscript.trim()), 100);
+        }
+      } else {
+        setInput('');
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('[Voice] Error:', event.error);
+      setIsRecording(false);
+      setInput('');
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  // Speak AI response when voice mode is on
+  const speakResponse = async (text: string) => {
+    if (voiceModeEnabled) {
+      try {
+        await ttsSpeak(text, 'female', {});
+      } catch (e) {
+        console.error('[ChatBot] TTS error:', e);
+      }
     }
   };
 
@@ -206,6 +263,9 @@ COMMUNICATION STYLE:
       addToConversation('assistant', response.text);
 
       setMessages(prev => [...prev, { role: 'model', text: response.text }]);
+
+      // Speak response if voice mode is enabled
+      speakResponse(response.text);
     } catch (e: any) {
       console.error('Chat error:', e);
 
@@ -340,29 +400,6 @@ Give specific, actionable advice. Be concise but comprehensive.`,
                 : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                 }`}>
                 <div className="whitespace-pre-wrap">{m.text}</div>
-                {/* Read Aloud button for AI messages */}
-                {m.role === 'model' && (
-                  <button
-                    onClick={() => handleReadAloud(m.text, i)}
-                    className={`mt-2 flex items-center gap-1.5 text-xs transition-colors ${speakingMessageIndex === i
-                      ? 'text-brand-600 font-medium'
-                      : 'text-slate-400 hover:text-brand-500'
-                      }`}
-                    title={speakingMessageIndex === i ? 'Stop reading' : 'Read aloud'}
-                  >
-                    {speakingMessageIndex === i ? (
-                      <>
-                        <Square size={12} className="fill-current" />
-                        <span>Stop</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 size={12} />
-                        <span>Read aloud</span>
-                      </>
-                    )}
-                  </button>
-                )}
               </div>
             </div>
           ))}
@@ -392,7 +429,34 @@ Give specific, actionable advice. Be concise but comprehensive.`,
 
         {/* Input Area */}
         <div className="p-4 bg-white border-t border-slate-100 sm:rounded-b-2xl">
+          {/* Voice Mode Toggle */}
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => setVoiceModeEnabled(!voiceModeEnabled)}
+              className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full transition-colors ${voiceModeEnabled
+                ? 'bg-brand-100 text-brand-700 font-medium'
+                : 'text-slate-400 hover:text-slate-600'
+                }`}
+            >
+              {voiceModeEnabled ? <Mic size={12} /> : <MicOff size={12} />}
+              <span>{voiceModeEnabled ? 'Voice Mode ON' : 'Voice Mode OFF'}</span>
+            </button>
+          </div>
+
           <div className="flex gap-2 items-end bg-slate-50 border border-slate-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-400 transition-all">
+            {/* Mic Button */}
+            <button
+              onClick={toggleVoiceInput}
+              disabled={isLoading}
+              className={`p-2.5 rounded-lg transition-all mb-0.5 ${isRecording
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'bg-slate-200 text-slate-600 hover:bg-brand-100 hover:text-brand-600'
+                } disabled:opacity-50`}
+              title={isRecording ? 'Stop recording' : 'Voice input'}
+            >
+              {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+
             <textarea
               ref={textareaRef}
               value={input}
@@ -403,10 +467,11 @@ Give specific, actionable advice. Be concise but comprehensive.`,
                   handleSend();
                 }
               }}
-              placeholder="Ask me anything about marketing..."
+              placeholder={isRecording ? '🎤 Listening...' : 'Ask me anything about marketing...'}
               className="flex-1 bg-transparent border-none text-sm focus:ring-0 resize-none max-h-32 py-2 px-1 outline-none"
               rows={1}
               style={{ minHeight: '24px' }}
+              disabled={isRecording}
             />
             <button
               onClick={() => handleSend()}
