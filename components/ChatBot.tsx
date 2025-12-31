@@ -3,7 +3,7 @@ import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Use
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
-import { speak as ttsSpeak } from '../services/enhancedTTSService';
+import { speak as ttsSpeak, stopSpeaking as ttsStopSpeaking, unlockMobileAudio } from '../services/enhancedTTSService';
 
 interface Message {
   role: 'user' | 'model';
@@ -30,6 +30,20 @@ export const ChatBot: React.FC = () => {
   // Voice input state
   const [isRecording, setIsRecording] = useState(false);
   const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Toggle voice mode - stops speaking when disabled
+  const toggleVoiceMode = () => {
+    if (voiceModeEnabled) {
+      // Turning OFF - stop any speaking
+      ttsStopSpeaking();
+      setIsSpeaking(false);
+    } else {
+      // Turning ON - unlock mobile audio
+      unlockMobileAudio();
+    }
+    setVoiceModeEnabled(!voiceModeEnabled);
+  };
 
   // Start/stop voice recording
   const toggleVoiceInput = () => {
@@ -97,12 +111,9 @@ export const ChatBot: React.FC = () => {
     recognition.start();
   };
 
-  // Track if AI is speaking
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
   // Stop AI from speaking
   const stopSpeaking = () => {
-    window.speechSynthesis?.cancel();
+    ttsStopSpeaking();
     setIsSpeaking(false);
   };
 
@@ -446,7 +457,7 @@ Give specific, actionable advice. Be concise but comprehensive.`,
           {/* Voice Mode Toggle */}
           <div className="flex items-center justify-between mb-2">
             <button
-              onClick={() => setVoiceModeEnabled(!voiceModeEnabled)}
+              onClick={toggleVoiceMode}
               className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full transition-colors ${voiceModeEnabled
                 ? 'bg-brand-100 text-brand-700 font-medium'
                 : 'text-slate-400 hover:text-slate-600'

@@ -28,6 +28,35 @@ const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 let audioContext: AudioContext | null = null;
 let isAudioUnlocked = false;
 
+// Track current audio for stopping
+let currentAudioElement: HTMLAudioElement | null = null;
+let currentAudioSource: AudioBufferSourceNode | null = null;
+let isStopped = false;
+
+// Stop any ongoing speech
+export const stopSpeaking = (): void => {
+    console.log('[TTS] Stopping speech...');
+    isStopped = true;
+
+    // Stop HTML5 Audio
+    if (currentAudioElement) {
+        currentAudioElement.pause();
+        currentAudioElement.currentTime = 0;
+        currentAudioElement = null;
+    }
+
+    // Stop Web Audio API source
+    if (currentAudioSource) {
+        try {
+            currentAudioSource.stop();
+        } catch (e) { /* Already stopped */ }
+        currentAudioSource = null;
+    }
+
+    // Stop browser TTS
+    window.speechSynthesis?.cancel();
+};
+
 export const unlockMobileAudio = (): void => {
     if (!isMobile() || isAudioUnlocked) return;
 
@@ -131,27 +160,39 @@ const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer 
 // DESKTOP: Simple HTML5 Audio playback (fast, works great)
 const playAudioDesktop = (arrayBuffer: ArrayBuffer): Promise<void> => {
     return new Promise((resolve) => {
+        if (isStopped) { resolve(); return; }
+
         const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
 
+        // Track for stopping
+        currentAudioElement = audio;
+
         audio.onended = () => {
             URL.revokeObjectURL(url);
+            currentAudioElement = null;
             resolve();
         };
 
         audio.onerror = () => {
             URL.revokeObjectURL(url);
+            currentAudioElement = null;
             resolve();
         };
 
-        audio.play().catch(() => resolve());
+        audio.play().catch(() => {
+            currentAudioElement = null;
+            resolve();
+        });
     });
 };
 
 // MOBILE: Web Audio API playback (handles restrictions)
 const playAudioMobile = async (arrayBuffer: ArrayBuffer): Promise<void> => {
     return new Promise(async (resolve) => {
+        if (isStopped) { resolve(); return; }
+
         try {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -165,7 +206,15 @@ const playAudioMobile = async (arrayBuffer: ArrayBuffer): Promise<void> => {
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(audioContext.destination);
-            source.onended = () => resolve();
+
+            // Track for stopping
+            currentAudioSource = source;
+
+            source.onended = () => {
+                currentAudioSource = null;
+                resolve();
+            };
+
             source.start(0);
 
         } catch (e) {
@@ -283,6 +332,9 @@ export const speak = async (
 ): Promise<SpeakResult> => {
     const mobile = isMobile();
     console.log('[TTS] speak():', { chars: text.length, gender, mobile });
+
+    // Reset stop flag for new speech
+    isStopped = false;
 
     // Rate limit recovery
     if (groqRateLimited && Date.now() - rateLimitTime > RATE_LIMIT_RECOVERY) {
