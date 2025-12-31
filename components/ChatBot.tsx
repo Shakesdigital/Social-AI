@@ -283,14 +283,14 @@ COMMUNICATION STYLE:
         temperature: 0.75
       });
 
+      // Start speaking IMMEDIATELY (don't wait for state updates)
+      speakResponse(response.text);
+
       // Store in memory for future context
       addToConversation('user', messageText);
       addToConversation('assistant', response.text);
 
       setMessages(prev => [...prev, { role: 'model', text: response.text }]);
-
-      // Speak response if voice mode is enabled
-      speakResponse(response.text);
     } catch (e: any) {
       console.error('Chat error:', e);
 

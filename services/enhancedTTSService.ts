@@ -239,9 +239,11 @@ const speakWithGroqDesktop = async (
     let started = false;
 
     for (let i = 0; i < chunks.length; i++) {
-        // Small delay between chunks to avoid rate limiting
+        if (isStopped) break;
+
+        // Small delay ONLY between chunks (not before first one)
         if (i > 0) {
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise(r => setTimeout(r, 100)); // Reduced from 200ms
         }
 
         const audioData = await fetchGroqAudio(chunks[i], voice);
@@ -268,18 +270,21 @@ const speakWithGroqMobile = async (
     let started = false;
 
     for (let i = 0; i < chunks.length; i++) {
-        // Delay between chunks for mobile
+        if (isStopped) break;
+
+        // Reduced delay between chunks for mobile
         if (i > 0) {
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 200)); // Reduced from 500ms
         }
 
-        // Retry logic
+        // Retry logic (faster)
         let audioData: ArrayBuffer | null = null;
         for (let attempt = 1; attempt <= 2; attempt++) {
+            if (isStopped) break;
             audioData = await fetchGroqAudio(chunks[i], voice);
             if (audioData) break;
             if (attempt < 2 && !groqRateLimited) {
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => setTimeout(r, 500)); // Reduced from 1000ms
             }
         }
 
