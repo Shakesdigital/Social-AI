@@ -282,14 +282,37 @@ export const speak = async (
 
     // Check rate limit recovery
     if (groqRateLimited && Date.now() - rateLimitTime > RATE_LIMIT_RECOVERY) {
-        console.log('[TTS] Rate limit cleared, trying Groq again');
+        console.log('[TTS] Rate limit cleared');
         groqRateLimited = false;
     }
 
-    // Always try Groq first (for both desktop and mobile)
+    // MOBILE: Use browser TTS as primary (more reliable with audio restrictions)
+    if (isMobile) {
+        console.log('[TTS] Mobile detected - using browser TTS for reliability');
+        callbacks?.onProviderChange?.('browser');
+
+        const success = await speakWithBrowser(text, gender, callbacks?.onStart, callbacks?.onEnd);
+        if (success) {
+            return { success: true, provider: 'browser' };
+        }
+
+        // If browser fails, try Groq as fallback
+        console.log('[TTS] Browser failed on mobile, trying Groq');
+        if (isGroqTTSConfigured() && !groqRateLimited) {
+            callbacks?.onProviderChange?.('groq');
+            const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
+            const groqSuccess = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
+            if (groqSuccess) return { success: true, provider: 'groq' };
+        }
+
+        callbacks?.onError?.('Mobile TTS failed', 'none');
+        return { success: false, provider: 'none', error: 'Mobile TTS failed' };
+    }
+
+    // DESKTOP: Use Groq as primary (high quality)
     if (isGroqTTSConfigured() && !groqRateLimited) {
         callbacks?.onProviderChange?.('groq');
-        console.log('[TTS] Using Groq TTS (unified for desktop/mobile)');
+        console.log('[TTS] Desktop - using Groq TTS');
 
         const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
         const success = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
@@ -309,6 +332,8 @@ export const speak = async (
 };
 
 export const getTTSStatusMessage = (): string => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) return '🎙️ Voice';
     if (isGroqTTSConfigured() && !groqRateLimited) return '🎙️ Groq AI';
     return '🎙️ Browser';
 };
