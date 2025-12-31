@@ -103,6 +103,11 @@ const chunkText = (text: string, maxLength: number = GROQ_MAX_CHARS): string[] =
 
 // Fetch audio from Groq
 const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer | null> => {
+    console.log('[TTS] fetchGroqAudio starting...');
+    console.log('[TTS] Text:', text.slice(0, 50));
+    console.log('[TTS] Voice:', voice);
+    console.log('[TTS] Rate limited?', groqRateLimited);
+
     try {
         const response = await fetch(GROQ_TTS_URL, {
             method: 'POST',
@@ -118,21 +123,28 @@ const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer 
             })
         });
 
+        console.log('[TTS] Groq response status:', response.status);
+
         if (response.status === 429) {
+            console.error('[TTS] RATE LIMITED!');
             groqRateLimited = true;
             rateLimitTime = Date.now();
             return null;
         }
 
         if (!response.ok) {
-            console.error('[TTS] Groq error:', response.status);
+            const errorBody = await response.text().catch(() => 'unknown');
+            console.error('[TTS] Groq error:', response.status, errorBody);
             return null;
         }
 
-        return await response.arrayBuffer();
+        const buffer = await response.arrayBuffer();
+        console.log('[TTS] Got ArrayBuffer:', buffer.byteLength, 'bytes');
+        return buffer;
 
     } catch (error: any) {
-        console.error('[TTS] Groq fetch error:', error.message);
+        console.error('[TTS] Groq FETCH EXCEPTION:', error.message);
+        console.error('[TTS] Error details:', error);
         return null;
     }
 };
