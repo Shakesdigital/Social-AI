@@ -3,7 +3,7 @@ import { Mic, MicOff, Volume2, X, Sparkles, Globe, Loader, MessageCircle, Send, 
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
-import { speak as enhancedSpeak, getTTSStatus, getBestProvider, getTTSStatusMessage, TTSProvider } from '../services/enhancedTTSService';
+import { speak as enhancedSpeak, getTTSStatus, getBestProvider, getTTSStatusMessage, TTSProvider, unlockMobileAudio } from '../services/enhancedTTSService';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -562,6 +562,9 @@ VOICE CONVERSATION GUIDELINES:
     } catch (e) {
       // Ignore
     }
+
+    // 4. Unlock Groq TTS persistent audio element
+    unlockMobileAudio();
 
     setAudioUnlocked(true);
     addDiagnostic('Audio unlocked for mobile');
