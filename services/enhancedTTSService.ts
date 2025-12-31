@@ -1,9 +1,18 @@
-// Browser Native Text-to-Speech Service
-// MALE VOICE ONLY - STRICT ENFORCEMENT
-// Optimized for Mobile (iOS/Android) and Desktop
+// Groq TTS Service with Browser Fallback
+// Primary: Groq /audio/speech API (PlayAI voices)
+// Fallback: Browser Web Speech API (on rate limit or API failure)
+
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
+const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
 
 export type VoiceGender = 'female' | 'male';
-export type TTSProvider = 'browser' | 'none';
+export type TTSProvider = 'groq' | 'browser' | 'none';
+
+// Groq PlayAI voices
+const GROQ_VOICES = {
+    male: 'Fritz-PlayAI',      // Natural male voice
+    female: 'Celeste-PlayAI'   // Natural female voice
+};
 
 export interface SpeakResult {
     success: boolean;
@@ -11,80 +20,181 @@ export interface SpeakResult {
     error?: string;
 }
 
+// Track API availability for automatic recovery
+let groqAvailable = true;
+let lastGroqError: number = 0;
+const GROQ_RECOVERY_TIME = 60000; // Try Groq again after 1 minute
+
+// Check if Groq API is configured
+export const isGroqTTSConfigured = (): boolean => {
+    return !!GROQ_API_KEY && GROQ_API_KEY.length > 10;
+};
+
 export const getTTSStatus = () => ({
+    groq: { provider: 'groq' as TTSProvider, isConfigured: isGroqTTSConfigured() },
     browser: { provider: 'browser' as TTSProvider, isConfigured: true }
 });
 
-export const getBestProvider = (): TTSProvider => 'browser';
-
-// Strict Male Voice Selection
-const selectMaleVoice = (voices: SpeechSynthesisVoice[], isMobile: boolean): SpeechSynthesisVoice | null => {
-
-    // 1. Filter out known female voices to avoid accidental selection
-    const femaleBlacklist = ['female', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'jenny', 'aria', 'zira', 'salli', 'joanna', 'ivy', 'kendra', 'kimberly'];
-
-    // Helper to check if voice is "safe" (not strictly female)
-    const isNotFemale = (v: SpeechSynthesisVoice) => !femaleBlacklist.some(name => v.name.toLowerCase().includes(name));
-
-    // 2. Look for Explicit "Male" in name
-    const maleVoice = voices.find(v =>
-        v.name.toLowerCase().includes('male') &&
-        v.lang.startsWith('en')
-    );
-    if (maleVoice) {
-        console.log(`[TTS] Found explicit male voice: ${maleVoice.name}`);
-        return maleVoice;
-    }
-
-    // 3. Platform Specific Strict Preferences
-    if (isMobile) {
-        // British Male Priority (en-GB) - More commonly available than Australian
-        const gbKeywords = ['british', 'uk', 'daniel', 'oliver', 'george'];
-        for (const word of gbKeywords) {
-            const found = voices.find(v =>
-                (v.name.toLowerCase().includes(word) || v.lang === 'en-GB') &&
-                isNotFemale(v)
-            );
-            if (found) return found;
-        }
-        // Any en-GB voice
-        const anyGb = voices.find(v => v.lang === 'en-GB' && isNotFemale(v));
-        if (anyGb) return anyGb;
-
-        // iOS Male Voices (Fallback)
-        const iosMale = ['alex', 'daniel', 'fred', 'rishi'];
-        for (const name of iosMale) {
-            const found = voices.find(v => v.name.toLowerCase().includes(name) && v.lang.startsWith('en'));
-            if (found) return found;
-        }
-
-        // Android/Generic - Any English male voice
-        const safeVoice = voices.find(v =>
-            v.lang.startsWith('en') &&
-            isNotFemale(v)
-        );
-        if (safeVoice) return safeVoice;
-    }
-
-    // 4. Desktop Preferences (Microsoft)
-    const msMale = ['microsoft guy', 'microsoft ryan', 'microsoft david', 'microsoft mark'];
-    for (const name of msMale) {
-        const found = voices.find(v => v.name.toLowerCase().includes(name));
-        if (found) return found;
-    }
-
-    // 5. Last Resort: First English voice that is NOT female named
-    const anySafeEnglish = voices.find(v => v.lang.startsWith('en') && isNotFemale(v));
-    if (anySafeEnglish) return anySafeEnglish;
-
-    // 6. Absolute Last Resort: Just picking the first English voice available
-    // (Even if it might be female, we will pitch shift it heavily)
-    return voices.find(v => v.lang.startsWith('en')) || voices[0] || null;
+export const getBestProvider = (): TTSProvider => {
+    if (isGroqTTSConfigured() && groqAvailable) return 'groq';
+    return 'browser';
 };
 
+// Groq TTS API call
+const speakWithGroq = async (
+    text: string,
+    voice: string,
+    onStart?: () => void,
+    onEnd?: () => void
+): Promise<boolean> => {
+    try {
+        console.log('[TTS] Calling Groq API with voice:', voice);
+
+        const response = await fetch(GROQ_TTS_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'playai-tts',
+                input: text,
+                voice: voice,
+                response_format: 'mp3',
+                speed: 1.0
+            })
+        });
+
+        // Handle rate limiting
+        if (response.status === 429) {
+            console.warn('[TTS] Groq rate limited (429)');
+            groqAvailable = false;
+            lastGroqError = Date.now();
+            return false;
+        }
+
+        // Handle other errors
+        if (!response.ok) {
+            console.error('[TTS] Groq API error:', response.status, response.statusText);
+            groqAvailable = false;
+            lastGroqError = Date.now();
+            return false;
+        }
+
+        // Get audio blob
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        // Play the audio
+        return new Promise((resolve) => {
+            const audio = new Audio(audioUrl);
+
+            audio.onloadeddata = () => {
+                console.log('[TTS] Groq audio loaded');
+            };
+
+            audio.onplay = () => {
+                console.log('[TTS] Groq audio playing');
+                onStart?.();
+            };
+
+            audio.onended = () => {
+                console.log('[TTS] Groq audio finished');
+                URL.revokeObjectURL(audioUrl);
+                onEnd?.();
+                resolve(true);
+            };
+
+            audio.onerror = (e) => {
+                console.error('[TTS] Groq audio playback error:', e);
+                URL.revokeObjectURL(audioUrl);
+                onEnd?.();
+                resolve(false);
+            };
+
+            audio.play().catch(e => {
+                console.error('[TTS] Groq audio play() failed:', e);
+                onEnd?.();
+                resolve(false);
+            });
+        });
+
+    } catch (error: any) {
+        console.error('[TTS] Groq fetch error:', error.message);
+        groqAvailable = false;
+        lastGroqError = Date.now();
+        return false;
+    }
+};
+
+// Browser fallback
+const speakWithBrowser = async (
+    text: string,
+    gender: VoiceGender,
+    onStart?: () => void,
+    onEnd?: () => void
+): Promise<boolean> => {
+    return new Promise((resolve) => {
+        if (!window.speechSynthesis) {
+            resolve(false);
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        // Get voices
+        const voices = window.speechSynthesis.getVoices();
+
+        // Select best available voice
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        // British English priority for quality
+        const preferredVoice = voices.find(v =>
+            v.lang === 'en-GB' &&
+            (gender === 'male' ? !v.name.toLowerCase().includes('female') : true)
+        ) || voices.find(v =>
+            v.lang.startsWith('en') &&
+            (gender === 'male'
+                ? ['guy', 'david', 'daniel', 'alex', 'male'].some(k => v.name.toLowerCase().includes(k))
+                : ['aria', 'jenny', 'samantha', 'female'].some(k => v.name.toLowerCase().includes(k)))
+        ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+            console.log('[TTS] Browser using voice:', preferredVoice.name);
+        }
+
+        // Natural settings
+        utterance.rate = 1.0;
+        utterance.pitch = gender === 'male' ? 0.95 : 1.0;
+        utterance.volume = 1.0;
+
+        utterance.onstart = () => {
+            console.log('[TTS] Browser speech started');
+            onStart?.();
+        };
+
+        utterance.onend = () => {
+            console.log('[TTS] Browser speech ended');
+            onEnd?.();
+            resolve(true);
+        };
+
+        utterance.onerror = (e) => {
+            console.error('[TTS] Browser speech error:', e);
+            onEnd?.();
+            resolve(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
+    });
+};
+
+// Main speak function with automatic failover
 export const speak = async (
     text: string,
-    gender: VoiceGender = 'female', // Ignored
+    gender: VoiceGender = 'male',
     callbacks?: {
         onStart?: () => void;
         onEnd?: () => void;
@@ -92,105 +202,49 @@ export const speak = async (
         onError?: (error: string, provider: TTSProvider) => void;
     }
 ): Promise<SpeakResult> => {
-    console.log('[TTS] speak() called - Enforcing MALE voice');
+    console.log('[TTS] speak() called:', { textLength: text.length, gender });
+
+    // Check if Groq should be tried again after recovery period
+    if (!groqAvailable && Date.now() - lastGroqError > GROQ_RECOVERY_TIME) {
+        console.log('[TTS] Attempting Groq recovery...');
+        groqAvailable = true;
+    }
+
+    // 1. Try Groq TTS (Primary)
+    if (isGroqTTSConfigured() && groqAvailable) {
+        callbacks?.onProviderChange?.('groq');
+        console.log('[TTS] Using Groq TTS API');
+
+        const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
+        const success = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
+
+        if (success) {
+            return { success: true, provider: 'groq' };
+        }
+
+        // Groq failed, continue to fallback
+        console.warn('[TTS] Groq failed, switching to browser fallback');
+    }
+
+    // 2. Browser Fallback (Seamless)
     callbacks?.onProviderChange?.('browser');
+    console.log('[TTS] Using Browser speech synthesis (fallback)');
 
-    return new Promise((resolve) => {
-        if (!window.speechSynthesis) {
-            const error = 'Speech synthesis not available';
-            callbacks?.onError?.(error, 'none');
-            resolve({ success: false, provider: 'none', error });
-            return;
-        }
+    const browserSuccess = await speakWithBrowser(text, gender, callbacks?.onStart, callbacks?.onEnd);
 
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
+    if (browserSuccess) {
+        return { success: true, provider: 'browser' };
+    }
 
-        let voices = window.speechSynthesis.getVoices();
-
-        const configureAndSpeak = () => {
-            voices = window.speechSynthesis.getVoices();
-
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-            console.log('[TTS] Voices loaded:', voices.length);
-            // Debug log of all names to help diagnosis
-            if (voices.length < 10) console.log('[TTS] Names:', voices.map(v => v.name).join(', '));
-
-            const selectedVoice = selectMaleVoice(voices, isMobile);
-            if (selectedVoice) {
-                utterance.voice = selectedVoice;
-                console.log(`[TTS] Selected Voice: "${selectedVoice.name}" (${selectedVoice.lang})`);
-            } else {
-                console.warn('[TTS] No specific male voice found, using system default + pitch shift');
-            }
-
-            // ========================================
-            // VOICE SETTINGS - HEAVY MALE ENFORCEMENT
-            // ========================================
-
-            // Check if we selected a known "Male" voice
-            const name = selectedVoice ? selectedVoice.name.toLowerCase() : '';
-            const isConfirmedMale = name.includes('male') || name.includes('guy') || name.includes('ryan') || name.includes('david') || name.includes('alex') || name.includes('daniel') || name.includes('fred');
-
-            const isBritish = selectedVoice?.lang === 'en-GB' || selectedVoice?.name.toLowerCase().includes('british') || selectedVoice?.name.toLowerCase().includes('uk');
-
-            if (isMobile) {
-                // MOBILE TUNING
-                if (isBritish) {
-                    // Native British voice - keep natural for authentic accent
-                    utterance.pitch = 1.0;
-                    utterance.rate = 1.0;
-                } else if (isConfirmedMale) {
-                    // Young & Professional Male (Non-GB Fallback)
-                    utterance.pitch = 1.1;
-                    utterance.rate = 1.0;
-                } else {
-                    // Generic Fallback
-                    utterance.pitch = 1.05;
-                    utterance.rate = 1.0;
-                }
-            } else {  // DESKTOP TUNING
-                if (isConfirmedMale) {
-                    utterance.rate = 1.0;
-                    utterance.pitch = 0.95; // Slight adjustment
-                } else {
-                    utterance.pitch = 0.5; // Force drop if unsure
-                }
-            }
-
-            utterance.volume = 1.0;
-
-            console.log(`[TTS] Applied Settings - Rate: ${utterance.rate}, Pitch: ${utterance.pitch}`);
-
-            utterance.onstart = () => callbacks?.onStart?.();
-            utterance.onend = () => { callbacks?.onEnd?.(); resolve({ success: true, provider: 'browser' }); };
-            utterance.onerror = (e) => {
-                console.error('[TTS] Error:', e);
-                callbacks?.onEnd?.();
-                resolve({ success: false, provider: 'browser', error: String(e) });
-            };
-
-            window.speechSynthesis.speak(utterance);
-
-            if (isMobile) {
-                const keepAlive = setInterval(() => {
-                    if (!window.speechSynthesis.speaking) clearInterval(keepAlive);
-                    else if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-                }, 5000);
-            }
-        };
-
-        if (voices.length > 0) {
-            configureAndSpeak();
-        } else {
-            window.speechSynthesis.onvoiceschanged = configureAndSpeak;
-            setTimeout(() => {
-                voices = window.speechSynthesis.getVoices();
-                configureAndSpeak();
-            }, 500);
-        }
-    });
+    // 3. Complete failure
+    const errorMsg = 'All TTS providers failed';
+    callbacks?.onError?.(errorMsg, 'none');
+    return { success: false, provider: 'none', error: errorMsg };
 };
 
-export const getTTSStatusMessage = (): string => '🎙️ Voice Assistant';
+export const getTTSStatusMessage = (): string => {
+    if (isGroqTTSConfigured() && groqAvailable) {
+        return '🎙️ Groq AI Voice';
+    }
+    return '🎙️ Browser Voice';
+};
