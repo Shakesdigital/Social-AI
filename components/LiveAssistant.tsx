@@ -45,6 +45,11 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const voicePreferenceRef = useRef(voicePreference);
+
+  useEffect(() => {
+    voicePreferenceRef.current = voicePreference;
+  }, [voicePreference]);
 
   const addDiagnostic = (msg: string) => {
     const time = new Date().toLocaleTimeString();
@@ -149,7 +154,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       // Setup audio visualization
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
+      analyserRef.current.fftSize = 2048; // Higher resolution for pitch detection
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
 
@@ -158,7 +163,14 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
         const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        setAudioLevel(Math.min(100, avg * 2.5));
+        const vol = Math.min(100, avg * 2.5);
+        setAudioLevel(vol);
+
+        // Detect pitch if volume is sufficient
+        if (vol > 10) {
+          detectVoicePitch();
+        }
+
         animationFrameRef.current = requestAnimationFrame(updateLevel);
       };
       updateLevel();
@@ -172,6 +184,59 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       addDiagnostic(`Microphone error: ${err.message}`);
       setError('Microphone access denied. Allow permission and reload.');
       setIsConnected(true);
+    }
+  };
+
+  // Detect voice pitch to determine gender
+  const detectVoicePitch = () => {
+    if (!analyserRef.current || !audioContextRef.current) return;
+
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyserRef.current.getByteTimeDomainData(dataArray);
+
+    // Simple zero-crossing detection
+    let zeroCrossings = 0;
+    let prevValue = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+      const value = dataArray[i] - 128;
+      if ((prevValue < 0 && value >= 0) || (prevValue > 0 && value <= 0)) {
+        zeroCrossings++;
+      }
+      prevValue = value;
+    }
+
+    // Calculate frequency
+    const nyquist = audioContextRef.current.sampleRate / 2;
+    // Zero crossings is 2 * starts of cycles roughly
+    // Roughly: freq = (zeroCrossings / 2) / (bufferLength / sampleRate)
+    // freq = zeroCrossings * sampleRate / (2 * bufferLength)
+
+    const calculatedFreq = (zeroCrossings * audioContextRef.current.sampleRate) / (2 * bufferLength);
+
+    // Human voice range logic
+    // Male: ~85-180Hz
+    // Female: ~165-255Hz
+    // Overlap area: 165-180Hz
+
+    // Only update if we have a strong signal
+    if (audioLevel > 20 && calculatedFreq > 70 && calculatedFreq < 300) {
+      addDiagnostic(`Detected pitch: ${Math.round(calculatedFreq)}Hz`);
+
+      if (calculatedFreq < 165) {
+        // Likely Male
+        if (voicePreference !== 'male') {
+          setVoicePreference('male');
+          addDiagnostic('Voice detected: Male -> Switching to Male response');
+        }
+      } else if (calculatedFreq > 175) {
+        // Likely Female
+        if (voicePreference !== 'female') {
+          setVoicePreference('female');
+          addDiagnostic('Voice detected: Female -> Switching to Female response');
+        }
+      }
     }
   };
 
@@ -497,10 +562,10 @@ VOICE CONVERSATION GUIDELINES:
     addDiagnostic(`Starting speech with ${text.length} characters`);
     addDiagnostic('Using ResponsiveVoice TTS');
 
-    const result = await enhancedSpeak(text, voicePreference, {
+    const result = await enhancedSpeak(text, voicePreferenceRef.current, {
       onStart: () => {
         setIsSpeaking(true);
-        setStatus('🔊 Speaking...');
+        // Don't show "Speaking..." status as requested, keep previous status or clear
       },
       onEnd: () => {
         setIsSpeaking(false);
