@@ -324,8 +324,8 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
           </div>
         </div>
 
-        {/* Live Consultant CTA */}
-        <div className="bg-brand-900 rounded-xl sm:rounded-2xl p-5 sm:p-6 md:p-8 text-white relative overflow-hidden">
+        {/* Live Consultant CTA - DISABLED until better TTS solution */}
+        {/* <div className="bg-brand-900 rounded-xl sm:rounded-2xl p-5 sm:p-6 md:p-8 text-white relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2">Need real-time advice?</h2>
             <p className="mb-4 sm:mb-6 opacity-90 max-w-lg text-xs sm:text-sm md:text-base">Talk directly to your marketing assistant powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>.</p>
@@ -334,7 +334,7 @@ const Dashboard: React.FC<{ profile: CompanyProfile, onNavigate: (view: AppView)
             </button>
           </div>
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent hidden sm:block"></div>
-        </div>
+        </div> */}
       </div>
 
       {/* Footer */}
@@ -904,9 +904,10 @@ export default function App() {
             <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
           </nav>
           <div className="p-4 border-t border-slate-100 space-y-3">
-            <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
+            {/* Live Consultant button - DISABLED until better TTS solution */}
+            {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
               <Mic size={18} className="animate-pulse" /> Live Consultant
-            </button>
+            </button> */}
             <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
               <Settings size={16} /> LLM Diagnostics
             </button>

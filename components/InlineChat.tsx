@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, MessageCircle, ChevronDown, ChevronUp, Loader, Sparkles } from 'lucide-react';
+import { Send, MessageCircle, ChevronDown, ChevronUp, Loader, Sparkles, Volume2, Square } from 'lucide-react';
 import { callLLM } from '../services/freeLLMService';
 import { getStoredProfile } from '../services/contextMemoryService';
+import { speak as ttsSpeak } from '../services/enhancedTTSService';
 import ReactMarkdown from 'react-markdown';
 
 interface InlineChatProps {
@@ -26,6 +27,25 @@ export const InlineChat: React.FC<InlineChatProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+
+    const handleReadAloud = async (text: string, index: number) => {
+        if (speakingIndex === index) {
+            window.speechSynthesis?.cancel();
+            setSpeakingIndex(null);
+            return;
+        }
+        window.speechSynthesis?.cancel();
+        setSpeakingIndex(index);
+        try {
+            await ttsSpeak(text, 'female', {
+                onEnd: () => setSpeakingIndex(null),
+                onError: () => setSpeakingIndex(null)
+            });
+        } catch (e) {
+            setSpeakingIndex(null);
+        }
+    };
 
     const profile = getStoredProfile();
 
@@ -198,14 +218,26 @@ Provide a helpful, specific response that addresses their question about the ${c
                                 >
                                     <div
                                         className={`max-w-[85%] px-4 py-2.5 rounded-2xl ${msg.role === 'user'
-                                                ? 'bg-brand-600 text-white rounded-br-md'
-                                                : 'bg-white border border-slate-200 rounded-bl-md'
+                                            ? 'bg-brand-600 text-white rounded-br-md'
+                                            : 'bg-white border border-slate-200 rounded-bl-md'
                                             }`}
                                     >
                                         {msg.role === 'assistant' ? (
-                                            <div className="prose prose-sm prose-slate max-w-none">
-                                                <ReactMarkdown>{msg.text}</ReactMarkdown>
-                                            </div>
+                                            <>
+                                                <div className="prose prose-sm prose-slate max-w-none">
+                                                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleReadAloud(msg.text, i)}
+                                                    className={`mt-2 flex items-center gap-1.5 text-xs ${speakingIndex === i ? 'text-brand-600 font-medium' : 'text-slate-400 hover:text-brand-500'}`}
+                                                >
+                                                    {speakingIndex === i ? (
+                                                        <><Square size={12} className="fill-current" /><span>Stop</span></>
+                                                    ) : (
+                                                        <><Volume2 size={12} /><span>Read aloud</span></>
+                                                    )}
+                                                </button>
+                                            </>
                                         ) : (
                                             <p className="text-sm">{msg.text}</p>
                                         )}

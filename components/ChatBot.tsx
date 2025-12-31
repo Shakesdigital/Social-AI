@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb } from 'lucide-react';
+import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Volume2, VolumeX, Square } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
+import { speak as ttsSpeak } from '../services/enhancedTTSService';
 
 interface Message {
   role: 'user' | 'model';
@@ -24,6 +25,31 @@ export const ChatBot: React.FC = () => {
   const [isResearching, setIsResearching] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [speakingMessageIndex, setSpeakingMessageIndex] = useState<number | null>(null);
+
+  // Read aloud function for AI messages
+  const handleReadAloud = async (text: string, messageIndex: number) => {
+    // If already speaking this message, stop it
+    if (speakingMessageIndex === messageIndex) {
+      window.speechSynthesis?.cancel();
+      setSpeakingMessageIndex(null);
+      return;
+    }
+
+    // Stop any current speech
+    window.speechSynthesis?.cancel();
+    setSpeakingMessageIndex(messageIndex);
+
+    try {
+      await ttsSpeak(text, 'female', {
+        onEnd: () => setSpeakingMessageIndex(null),
+        onError: () => setSpeakingMessageIndex(null)
+      });
+    } catch (e) {
+      console.error('[ChatBot] TTS error:', e);
+      setSpeakingMessageIndex(null);
+    }
+  };
 
   const quickActions: QuickAction[] = [
     { icon: <TrendingUp size={14} />, label: 'Trending Topics', prompt: 'What are the top marketing trends right now?' },
@@ -314,6 +340,29 @@ Give specific, actionable advice. Be concise but comprehensive.`,
                 : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                 }`}>
                 <div className="whitespace-pre-wrap">{m.text}</div>
+                {/* Read Aloud button for AI messages */}
+                {m.role === 'model' && (
+                  <button
+                    onClick={() => handleReadAloud(m.text, i)}
+                    className={`mt-2 flex items-center gap-1.5 text-xs transition-colors ${speakingMessageIndex === i
+                      ? 'text-brand-600 font-medium'
+                      : 'text-slate-400 hover:text-brand-500'
+                      }`}
+                    title={speakingMessageIndex === i ? 'Stop reading' : 'Read aloud'}
+                  >
+                    {speakingMessageIndex === i ? (
+                      <>
+                        <Square size={12} className="fill-current" />
+                        <span>Stop</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={12} />
+                        <span>Read aloud</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           ))}
