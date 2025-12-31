@@ -203,11 +203,15 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       addDiagnostic('Cannot start: no SpeechRecognition');
+      setStatus('Speech recognition not supported in this browser.');
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
+
+      // Browser compatibility: Some browsers (Brave, Firefox) don't support continuous well
+      // We'll handle restarts manually
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
@@ -216,7 +220,11 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       let fullTranscript = '';
       let silenceTimeout: NodeJS.Timeout | null = null;
       let lastSpeechTime = Date.now();
-      const SILENCE_THRESHOLD = 1500; // 1.5 seconds of silence triggers processing
+      let intentionallyStopped = false;
+      let hasReceivedSpeech = false;
+
+      // Increased threshold for Brave/Firefox compatibility  
+      const SILENCE_THRESHOLD = 2500; // 2.5 seconds of silence
 
       // Function to reset silence timer
       const resetSilenceTimer = () => {
@@ -226,6 +234,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
           // Auto-stop after silence if we have transcript
           if (fullTranscript.trim() || transcript.trim()) {
             addDiagnostic('Auto-stopping after silence');
+            intentionallyStopped = true;
             recognition.stop();
           }
         }, SILENCE_THRESHOLD);
@@ -237,10 +246,13 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         setTranscript('');
         setStatus('🎤 Listening... (will auto-detect when you\'re done)');
         fullTranscript = '';
-        resetSilenceTimer();
+        hasReceivedSpeech = false;
+        // Don't start silence timer until we get first speech
+        // This prevents early termination in Brave
       };
 
       recognition.onresult = (event: any) => {
+        hasReceivedSpeech = true;
         let interim = '';
         let final = '';
         for (let i = 0; i < event.results.length; i++) {
@@ -262,10 +274,21 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       recognition.onerror = (event: any) => {
         addDiagnostic(`Recognition error: ${event.error}`);
         if (silenceTimeout) clearTimeout(silenceTimeout);
+
+        // Handle specific errors
         if (event.error === 'network') {
-          setStatus('Network issue. Try again or use text.');
+          setStatus('Network issue. Try again or use text input.');
         } else if (event.error === 'no-speech') {
-          setStatus('No speech detected. Tap mic and speak.');
+          // Don't show error immediately - Brave triggers this quickly
+          // Just restart if we haven't intentionally stopped
+          if (!intentionallyStopped) {
+            addDiagnostic('No speech - waiting for user...');
+            setStatus('🎤 Still listening... speak when ready.');
+          }
+        } else if (event.error === 'not-allowed') {
+          setStatus('Microphone access denied. Please allow microphone access.');
+        } else if (event.error === 'service-not-available') {
+          setStatus('Speech service unavailable. Try using text input.');
         } else if (event.error !== 'aborted') {
           setStatus(`Error: ${event.error}`);
         }
@@ -274,13 +297,28 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
       recognition.onend = () => {
         addDiagnostic('Recording ended');
         if (silenceTimeout) clearTimeout(silenceTimeout);
-        setIsRecording(false);
-        if (fullTranscript.trim()) {
-          handleUserInput(fullTranscript.trim());
-        } else if (transcript.trim()) {
-          handleUserInput(transcript.trim());
+
+        // If we stopped intentionally or have a transcript, process it
+        if (intentionallyStopped || fullTranscript.trim() || transcript.trim()) {
+          setIsRecording(false);
+          if (fullTranscript.trim()) {
+            handleUserInput(fullTranscript.trim());
+          } else if (transcript.trim()) {
+            handleUserInput(transcript.trim());
+          } else {
+            setStatus('No speech captured. Tap mic to try again.');
+          }
         } else {
-          setStatus('No speech captured. Tap mic to try again.');
+          // Browser ended recognition unexpectedly (common in Brave)
+          // Try to restart if user hasn't explicitly stopped
+          addDiagnostic('Recognition ended unexpectedly - restarting...');
+          try {
+            recognition.start();
+          } catch (e) {
+            // If restart fails, just show ready status
+            setIsRecording(false);
+            setStatus('Ready. Tap mic to speak.');
+          }
         }
       };
 
