@@ -1,6 +1,4 @@
-// Groq TTS Service - Mobile-Optimized with Web Audio API
-// Uses Web Audio API context to bypass mobile restrictions
-
+// Groq TTS Service - Desktop optimized, Mobile with special handling
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
 const GROQ_MAX_CHARS = 180;
@@ -21,40 +19,33 @@ export interface SpeakResult {
 
 let groqRateLimited = false;
 let rateLimitTime: number = 0;
-const RATE_LIMIT_RECOVERY = 10000; // 10 seconds - recover quickly
+const RATE_LIMIT_RECOVERY = 10000;
 
-// Web Audio API context - more reliable on mobile
+// Mobile detection
+const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// Web Audio API for mobile
 let audioContext: AudioContext | null = null;
 let isAudioUnlocked = false;
 
-// Initialize Web Audio context (call on first user gesture)
 export const unlockMobileAudio = (): void => {
-    if (isAudioUnlocked) return;
+    if (!isMobile() || isAudioUnlocked) return;
 
-    console.log('[TTS] Unlocking mobile audio with Web Audio API...');
-
+    console.log('[TTS] Unlocking mobile audio...');
     try {
-        // Create or resume AudioContext
         audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
         if (audioContext.state === 'suspended') {
-            audioContext.resume().then(() => {
-                console.log('[TTS] AudioContext resumed');
-            });
+            audioContext.resume();
         }
-
-        // Create and play a tiny buffer to fully unlock
         const buffer = audioContext.createBuffer(1, 1, 22050);
         const source = audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(audioContext.destination);
         source.start(0);
-
         isAudioUnlocked = true;
-        console.log('[TTS] Web Audio unlocked!');
-
+        console.log('[TTS] Mobile audio unlocked!');
     } catch (e) {
-        console.warn('[TTS] Web Audio unlock failed:', e);
+        console.warn('[TTS] Mobile audio unlock failed:', e);
     }
 };
 
@@ -103,11 +94,6 @@ const chunkText = (text: string, maxLength: number = GROQ_MAX_CHARS): string[] =
 
 // Fetch audio from Groq
 const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer | null> => {
-    console.log('[TTS] fetchGroqAudio starting...');
-    console.log('[TTS] Text:', text.slice(0, 50));
-    console.log('[TTS] Voice:', voice);
-    console.log('[TTS] Rate limited?', groqRateLimited);
-
     try {
         const response = await fetch(GROQ_TTS_URL, {
             method: 'POST',
@@ -123,37 +109,50 @@ const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer 
             })
         });
 
-        console.log('[TTS] Groq response status:', response.status);
-
         if (response.status === 429) {
-            console.error('[TTS] RATE LIMITED!');
+            console.warn('[TTS] Rate limited');
             groqRateLimited = true;
             rateLimitTime = Date.now();
             return null;
         }
 
         if (!response.ok) {
-            const errorBody = await response.text().catch(() => 'unknown');
-            console.error('[TTS] Groq error:', response.status, errorBody);
+            console.error('[TTS] Groq error:', response.status);
             return null;
         }
 
-        const buffer = await response.arrayBuffer();
-        console.log('[TTS] Got ArrayBuffer:', buffer.byteLength, 'bytes');
-        return buffer;
-
+        return await response.arrayBuffer();
     } catch (error: any) {
-        console.error('[TTS] Groq FETCH EXCEPTION:', error.message);
-        console.error('[TTS] Error details:', error);
+        console.error('[TTS] Groq fetch error:', error.message);
         return null;
     }
 };
 
-// Play audio using Web Audio API (mobile-safe)
-const playAudioBuffer = async (arrayBuffer: ArrayBuffer): Promise<void> => {
+// DESKTOP: Simple HTML5 Audio playback (fast, works great)
+const playAudioDesktop = (arrayBuffer: ArrayBuffer): Promise<void> => {
+    return new Promise((resolve) => {
+        const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+
+        audio.onended = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+        };
+
+        audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+        };
+
+        audio.play().catch(() => resolve());
+    });
+};
+
+// MOBILE: Web Audio API playback (handles restrictions)
+const playAudioMobile = async (arrayBuffer: ArrayBuffer): Promise<void> => {
     return new Promise(async (resolve) => {
         try {
-            // Ensure audio context is ready
             if (!audioContext) {
                 audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             }
@@ -162,103 +161,80 @@ const playAudioBuffer = async (arrayBuffer: ArrayBuffer): Promise<void> => {
                 await audioContext.resume();
             }
 
-            // Decode the audio data
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-
-            // Create and play source
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(audioContext.destination);
-
-            source.onended = () => {
-                console.log('[TTS] Audio chunk finished');
-                resolve();
-            };
-
+            source.onended = () => resolve();
             source.start(0);
-            console.log('[TTS] Playing via Web Audio API');
 
-        } catch (e: any) {
-            console.error('[TTS] Web Audio playback error:', e.message);
-            // Fallback to HTML5 Audio
-            try {
-                const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
-                const url = URL.createObjectURL(blob);
-                const audio = new Audio(url);
-
-                audio.onended = () => {
-                    URL.revokeObjectURL(url);
-                    resolve();
-                };
-
-                audio.onerror = () => {
-                    URL.revokeObjectURL(url);
-                    resolve();
-                };
-
-                await audio.play();
-                console.log('[TTS] Fallback to HTML5 Audio');
-
-            } catch (e2) {
-                console.error('[TTS] HTML5 Audio fallback failed:', e2);
-                resolve();
-            }
+        } catch (e) {
+            console.error('[TTS] Mobile audio error:', e);
+            // Fallback to HTML5
+            await playAudioDesktop(arrayBuffer);
+            resolve();
         }
     });
 };
 
-// Groq TTS with chunking - with delays to avoid rate limiting
-const speakWithGroq = async (
+// DESKTOP: Fast Groq TTS (no delays)
+const speakWithGroqDesktop = async (
     text: string,
     voice: string,
     onStart?: () => void,
     onEnd?: () => void
 ): Promise<boolean> => {
     const chunks = chunkText(text);
-    console.log('[TTS] Groq: starting with', chunks.length, 'chunks');
+    console.log('[TTS] Desktop: Playing', chunks.length, 'chunks');
 
     let started = false;
-    let successCount = 0;
 
     for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        console.log(`[TTS] Chunk ${i + 1}/${chunks.length}`);
+        const audioData = await fetchGroqAudio(chunks[i], voice);
+        if (!audioData) continue;
 
-        // Add delay between chunks to avoid rate limiting
+        if (!started) { started = true; onStart?.(); }
+        await playAudioDesktop(audioData);
+    }
+
+    onEnd?.();
+    return started;
+};
+
+// MOBILE: Groq TTS with delays and retries
+const speakWithGroqMobile = async (
+    text: string,
+    voice: string,
+    onStart?: () => void,
+    onEnd?: () => void
+): Promise<boolean> => {
+    const chunks = chunkText(text);
+    console.log('[TTS] Mobile: Processing', chunks.length, 'chunks');
+
+    let started = false;
+
+    for (let i = 0; i < chunks.length; i++) {
+        // Delay between chunks for mobile
         if (i > 0) {
-            console.log('[TTS] Waiting 500ms before next chunk...');
             await new Promise(r => setTimeout(r, 500));
         }
 
-        // Try up to 2 times per chunk
+        // Retry logic
         let audioData: ArrayBuffer | null = null;
         for (let attempt = 1; attempt <= 2; attempt++) {
-            audioData = await fetchGroqAudio(chunk, voice);
+            audioData = await fetchGroqAudio(chunks[i], voice);
             if (audioData) break;
-
             if (attempt < 2 && !groqRateLimited) {
-                console.log('[TTS] Retrying chunk in 1s...');
                 await new Promise(r => setTimeout(r, 1000));
             }
         }
 
-        if (!audioData) {
-            console.error('[TTS] Failed to fetch chunk', i + 1, 'after retries');
-            continue;
-        }
+        if (!audioData) continue;
 
-        console.log('[TTS] Got audio:', audioData.byteLength, 'bytes');
-
-        if (!started) {
-            started = true;
-            onStart?.();
-        }
-
-        await playAudioBuffer(audioData);
-        successCount++;
+        if (!started) { started = true; onStart?.(); }
+        await playAudioMobile(audioData);
     }
 
-    console.log('[TTS] Groq finished:', successCount, '/', chunks.length, 'chunks played');
     onEnd?.();
     return started;
 };
@@ -271,15 +247,11 @@ const speakWithBrowser = (
     onEnd?: () => void
 ): Promise<boolean> => {
     return new Promise((resolve) => {
-        if (!window.speechSynthesis) {
-            resolve(false);
-            return;
-        }
+        if (!window.speechSynthesis) { resolve(false); return; }
 
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         const voices = window.speechSynthesis.getVoices();
-
         const voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
         if (voice) utterance.voice = voice;
         utterance.rate = 1.0;
@@ -293,7 +265,7 @@ const speakWithBrowser = (
     });
 };
 
-// Main speak function
+// Main speak function - routes to desktop or mobile
 export const speak = async (
     text: string,
     gender: VoiceGender = 'male',
@@ -304,20 +276,24 @@ export const speak = async (
         onError?: (error: string, provider: TTSProvider) => void;
     }
 ): Promise<SpeakResult> => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    console.log('[TTS] speak():', { chars: text.length, gender, isMobile, unlocked: isAudioUnlocked });
+    const mobile = isMobile();
+    console.log('[TTS] speak():', { chars: text.length, gender, mobile });
 
     // Rate limit recovery
     if (groqRateLimited && Date.now() - rateLimitTime > RATE_LIMIT_RECOVERY) {
         groqRateLimited = false;
     }
 
-    // Try Groq first
+    // Try Groq
     if (isGroqTTSConfigured() && !groqRateLimited) {
         callbacks?.onProviderChange?.('groq');
 
         const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
-        const success = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
+
+        // Use different implementations for desktop vs mobile
+        const success = mobile
+            ? await speakWithGroqMobile(text, voice, callbacks?.onStart, callbacks?.onEnd)
+            : await speakWithGroqDesktop(text, voice, callbacks?.onStart, callbacks?.onEnd);
 
         if (success) {
             return { success: true, provider: 'groq' };
