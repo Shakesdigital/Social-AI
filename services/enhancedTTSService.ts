@@ -1,5 +1,5 @@
 // Groq TTS Service with Browser Fallback
-// Primary: Groq /audio/speech API (PlayAI voices)
+// Primary: Groq Orpheus TTS API (Natural voices)
 // Fallback: Browser Web Speech API (on rate limit or API failure)
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
@@ -8,10 +8,11 @@ const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
 
-// Groq PlayAI voices
+// Groq Orpheus voices (canopylabs/orpheus-v1-english)
+// Available: austin, troy, hannah, etc.
 const GROQ_VOICES = {
-    male: 'Fritz-PlayAI',      // Natural male voice
-    female: 'Celeste-PlayAI'   // Natural female voice
+    male: 'austin',     // Natural male voice
+    female: 'hannah'    // Natural female voice
 };
 
 export interface SpeakResult {
@@ -48,7 +49,7 @@ const speakWithGroq = async (
     onEnd?: () => void
 ): Promise<boolean> => {
     try {
-        console.log('[TTS] Calling Groq API with voice:', voice);
+        console.log('[TTS] Calling Groq Orpheus API with voice:', voice);
 
         const response = await fetch(GROQ_TTS_URL, {
             method: 'POST',
@@ -57,11 +58,10 @@ const speakWithGroq = async (
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'playai-tts',
+                model: 'canopylabs/orpheus-v1-english',  // Correct model name
                 input: text,
                 voice: voice,
-                response_format: 'mp3',
-                speed: 1.0
+                response_format: 'wav'  // Default format
             })
         });
 
@@ -75,7 +75,8 @@ const speakWithGroq = async (
 
         // Handle other errors
         if (!response.ok) {
-            console.error('[TTS] Groq API error:', response.status, response.statusText);
+            const errorText = await response.text().catch(() => 'Unknown error');
+            console.error('[TTS] Groq API error:', response.status, errorText);
             groqAvailable = false;
             lastGroqError = Date.now();
             return false;
@@ -84,6 +85,8 @@ const speakWithGroq = async (
         // Get audio blob
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
+
+        console.log('[TTS] Groq audio received, size:', audioBlob.size, 'bytes');
 
         // Play the audio
         return new Promise((resolve) => {
@@ -147,9 +150,6 @@ const speakWithBrowser = async (
         const voices = window.speechSynthesis.getVoices();
 
         // Select best available voice
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        // British English priority for quality
         const preferredVoice = voices.find(v =>
             v.lang === 'en-GB' &&
             (gender === 'male' ? !v.name.toLowerCase().includes('female') : true)
@@ -213,7 +213,7 @@ export const speak = async (
     // 1. Try Groq TTS (Primary)
     if (isGroqTTSConfigured() && groqAvailable) {
         callbacks?.onProviderChange?.('groq');
-        console.log('[TTS] Using Groq TTS API');
+        console.log('[TTS] Using Groq Orpheus TTS API');
 
         const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
         const success = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
