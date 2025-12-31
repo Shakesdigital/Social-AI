@@ -2,6 +2,7 @@ import { CompanyProfile, Lead, LeadSearchCriteria } from '../types';
 import { callLLM, parseJSONFromLLM, LLMOptions } from './freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, researchCompetitors, isWebResearchConfigured } from './webResearchService';
 import { getBusinessContext, getLeadsToAvoid, addGeneratedLeads, incrementGeneratedCount, trackAction } from './contextMemoryService';
+import { validateUrls, checkUrlActive } from './urlValidationService';
 
 /**
  * Generate leads with real-time web research enhancement
@@ -159,7 +160,7 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
         return [];
     }
 
-    const leads = parsed.map((item, index) => ({
+    let leads: Lead[] = parsed.map((item, index) => ({
         id: `lead-${Date.now()}-${index}`,
         companyName: item.companyName || 'Unknown Company',
         industry: item.industry || criteria.industry,
@@ -172,13 +173,51 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
         summary: item.summary || '',
         outreachPotential: item.outreachPotential?.split(' ')[0] || 'Medium',
         createdAt: new Date(),
-        notes: ''
+        notes: '',
+        isVerified: false // Will be updated after validation
     }));
+
+    // Step 4: Validate website URLs to ensure they are active
+    console.log('[Leads] Validating website URLs...');
+    const websiteUrls = leads
+        .map(l => l.website)
+        .filter((url): url is string => !!url && url.startsWith('http'));
+
+    if (websiteUrls.length > 0) {
+        try {
+            const urlStatus = await validateUrls(websiteUrls, 5);
+
+            // Update leads with validation status and filter inactive ones
+            leads = leads.map(lead => {
+                if (lead.website && urlStatus.has(lead.website)) {
+                    const isActive = urlStatus.get(lead.website);
+                    return {
+                        ...lead,
+                        isVerified: isActive,
+                        // Mark inactive leads in notes
+                        notes: isActive ? '' : '⚠️ Website may be inactive'
+                    };
+                }
+                return lead;
+            });
+
+            // Filter to only keep leads with active websites (or no website)
+            const activeLeads = leads.filter(lead => {
+                if (!lead.website) return true; // Keep leads without websites
+                return lead.isVerified !== false; // Keep verified or unknown status
+            });
+
+            console.log(`[Leads] URL Validation: ${activeLeads.length}/${leads.length} leads have active websites`);
+            leads = activeLeads;
+        } catch (e) {
+            console.warn('[Leads] URL validation failed, returning unvalidated leads:', e);
+        }
+    }
 
     // Track in memory to avoid future duplicates
     addGeneratedLeads(leads);
     incrementGeneratedCount('leads', leads.length);
-    trackAction(`Generated ${leads.length} leads for ${criteria.industry}`);
+    trackAction(`Generated ${leads.length} verified leads for ${criteria.industry}`);
 
     return leads;
 }

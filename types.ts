@@ -48,6 +48,7 @@ export interface Lead {
   outreachPotential: 'High' | 'Medium' | 'Low';
   createdAt: Date;
   notes?: string;
+  isVerified?: boolean; // Whether website URL has been validated as active
 }
 
 export interface LeadSearchCriteria {
