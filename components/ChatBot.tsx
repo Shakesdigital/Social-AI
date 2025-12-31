@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Mic, MicOff } from 'lucide-react';
+import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Mic, MicOff, Square } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
@@ -97,13 +97,27 @@ export const ChatBot: React.FC = () => {
     recognition.start();
   };
 
+  // Track if AI is speaking
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Stop AI from speaking
+  const stopSpeaking = () => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  };
+
   // Speak AI response when voice mode is on
   const speakResponse = async (text: string) => {
     if (voiceModeEnabled) {
+      setIsSpeaking(true);
       try {
-        await ttsSpeak(text, 'female', {});
+        await ttsSpeak(text, 'female', {
+          onEnd: () => setIsSpeaking(false),
+          onError: () => setIsSpeaking(false)
+        });
       } catch (e) {
         console.error('[ChatBot] TTS error:', e);
+        setIsSpeaking(false);
       }
     }
   };
@@ -441,6 +455,17 @@ Give specific, actionable advice. Be concise but comprehensive.`,
               {voiceModeEnabled ? <Mic size={12} /> : <MicOff size={12} />}
               <span>{voiceModeEnabled ? 'Voice Mode ON' : 'Voice Mode OFF'}</span>
             </button>
+
+            {/* Stop Speaking button - appears when AI is speaking */}
+            {isSpeaking && (
+              <button
+                onClick={stopSpeaking}
+                className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors animate-pulse"
+              >
+                <Square size={10} className="fill-current" />
+                <span>Stop Speaking</span>
+              </button>
+            )}
           </div>
 
           <div className="flex gap-2 items-end bg-slate-50 border border-slate-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-400 transition-all">
