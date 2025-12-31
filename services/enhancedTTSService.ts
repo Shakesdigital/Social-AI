@@ -1,7 +1,7 @@
 // Groq TTS Service - Desktop optimized, Mobile with special handling
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
-const GROQ_MAX_CHARS = 180;
+const GROQ_MAX_CHARS = 195; // Groq limit is 200, maximize to reduce API calls
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
@@ -19,7 +19,7 @@ export interface SpeakResult {
 
 let groqRateLimited = false;
 let rateLimitTime: number = 0;
-const RATE_LIMIT_RECOVERY = 10000;
+const RATE_LIMIT_RECOVERY = 30000; // 30 seconds - Groq TTS has strict limits
 
 // Mobile detection
 const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -177,7 +177,7 @@ const playAudioMobile = async (arrayBuffer: ArrayBuffer): Promise<void> => {
     });
 };
 
-// DESKTOP: Fast Groq TTS (no delays)
+// DESKTOP: Groq TTS (with small delay to avoid rate limits)
 const speakWithGroqDesktop = async (
     text: string,
     voice: string,
@@ -190,6 +190,11 @@ const speakWithGroqDesktop = async (
     let started = false;
 
     for (let i = 0; i < chunks.length; i++) {
+        // Small delay between chunks to avoid rate limiting
+        if (i > 0) {
+            await new Promise(r => setTimeout(r, 200));
+        }
+
         const audioData = await fetchGroqAudio(chunks[i], voice);
         if (!audioData) continue;
 
