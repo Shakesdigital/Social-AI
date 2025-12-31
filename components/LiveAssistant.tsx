@@ -166,11 +166,6 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ isOpen, onClose })
         const vol = Math.min(100, avg * 2.5);
         setAudioLevel(vol);
 
-        // Detect pitch if volume is sufficient
-        if (vol > 10) {
-          detectVoicePitch();
-        }
-
         animationFrameRef.current = requestAnimationFrame(updateLevel);
       };
       updateLevel();
