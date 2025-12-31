@@ -121,40 +121,74 @@ const fetchGroqAudio = async (text: string, voice: string, retries = 2): Promise
     return null;
 };
 
-// Play audio blob (mobile-compatible)
+// Play audio blob (mobile-compatible with multiple fallbacks)
 const playAudioBlob = (blob: Blob): Promise<void> => {
     return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(blob);
         const audio = new Audio();
+        let hasPlayed = false;
+        let hasResolved = false;
 
-        // Mobile compatibility
-        audio.preload = 'auto';
-        audio.src = url;
+        const cleanup = () => {
+            if (!hasResolved) {
+                hasResolved = true;
+                URL.revokeObjectURL(url);
+            }
+        };
 
         audio.onended = () => {
-            URL.revokeObjectURL(url);
+            console.log('[TTS] Audio chunk completed');
+            cleanup();
             resolve();
         };
 
         audio.onerror = (e) => {
-            console.error('[TTS] Audio playback error:', e);
-            URL.revokeObjectURL(url);
-            reject(new Error('Audio playback failed'));
+            console.error('[TTS] Audio error:', e);
+            cleanup();
+            // Don't reject - try to continue
+            resolve();
         };
 
         audio.oncanplaythrough = () => {
-            audio.play().catch(e => {
-                console.error('[TTS] Audio play() error:', e);
-                reject(e);
-            });
+            if (!hasPlayed) {
+                hasPlayed = true;
+                audio.play().catch(e => {
+                    console.error('[TTS] Play failed:', e);
+                    cleanup();
+                    resolve(); // Continue even on error
+                });
+            }
         };
 
-        // Fallback if oncanplaythrough doesn't fire
-        setTimeout(() => {
-            if (audio.paused) {
-                audio.play().catch(() => { });
+        // Mobile: set properties and try immediate play
+        audio.preload = 'auto';
+        audio.autoplay = true;
+        audio.muted = false;
+        audio.volume = 1.0;
+        audio.src = url;
+
+        // Load and try to play
+        audio.load();
+
+        // Fallback: if canplaythrough doesn't fire, try after load
+        audio.onloadeddata = () => {
+            if (!hasPlayed) {
+                hasPlayed = true;
+                audio.play().catch(() => {
+                    cleanup();
+                    resolve();
+                });
             }
-        }, 500);
+        };
+
+        // Ultimate fallback: resolve after timeout
+        setTimeout(() => {
+            if (!hasResolved) {
+                console.warn('[TTS] Audio timeout - continuing');
+                cleanup();
+                resolve();
+            }
+        }, 15000); // 15 second timeout
     });
 };
 

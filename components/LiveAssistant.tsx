@@ -533,7 +533,7 @@ VOICE CONVERSATION GUIDELINES:
   const unlockAudio = () => {
     if (audioUnlocked) return;
 
-    // Create and play a silent audio to unlock
+    // 1. Unlock browser speechSynthesis
     if (window.speechSynthesis) {
       const utterance = new SpeechSynthesisUtterance('');
       utterance.volume = 0;
@@ -541,9 +541,26 @@ VOICE CONVERSATION GUIDELINES:
       window.speechSynthesis.cancel();
     }
 
-    // Resume audio context
+    // 2. Resume audio context
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
+    }
+
+    // 3. Unlock HTML5 Audio for Groq TTS
+    // Creating and playing a silent audio element unlocks Audio on iOS/Android
+    try {
+      const silentAudio = new Audio();
+      silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      silentAudio.volume = 0;
+      silentAudio.play().then(() => {
+        silentAudio.pause();
+        silentAudio.remove();
+        console.log('[Audio] HTML5 Audio unlocked');
+      }).catch(() => {
+        // Ignore errors - just an unlock attempt
+      });
+    } catch (e) {
+      // Ignore
     }
 
     setAudioUnlocked(true);
