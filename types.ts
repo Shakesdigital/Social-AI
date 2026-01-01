@@ -140,6 +140,7 @@ export enum AppView {
   LEADS = 'LEADS',
   EMAIL = 'EMAIL',
   BLOG = 'BLOG',
+  ANALYTICS = 'ANALYTICS',
   SETTINGS = 'SETTINGS',
 }
 
@@ -189,4 +190,67 @@ export interface LLMResponse {
   text: string;
   provider: LLMProvider;
   tokensUsed?: number;
+}
+
+// ============================================
+// SOCIAL MEDIA CONNECTION TYPES
+// ============================================
+
+export type SocialPlatform = 'instagram' | 'facebook' | 'twitter' | 'linkedin' | 'tiktok' | 'youtube' | 'pinterest' | 'threads';
+
+export interface SocialConnection {
+  platform: SocialPlatform;
+  isConnected: boolean;
+  profileUrl?: string;
+  profileName?: string;
+  accessToken?: string; // Stored securely
+  refreshToken?: string;
+  tokenExpiry?: Date;
+  lastSync?: Date;
+  followerCount?: number;
+}
+
+// ============================================
+// ANALYTICS TYPES
+// ============================================
+
+export interface AnalyticsData {
+  period: 'day' | 'week' | 'month' | 'year';
+  startDate: Date;
+  endDate: Date;
+  website?: {
+    visitors: number;
+    pageViews: number;
+    bounceRate: number;
+    avgSessionDuration: number;
+    topPages: { page: string; views: number }[];
+  };
+  social?: {
+    platform: SocialPlatform;
+    followers: number;
+    followersGrowth: number;
+    impressions: number;
+    engagement: number;
+    engagementRate: number;
+    posts: number;
+    topPosts: { id: string; engagement: number }[];
+  }[];
+  leads?: {
+    generated: number;
+    converted: number;
+    conversionRate: number;
+  };
+}
+
+// ============================================
+// SCHEDULED POST TYPES
+// ============================================
+
+export interface ScheduledPost extends SocialPost {
+  scheduledTime: Date;
+  platforms: SocialPlatform[];
+  autoPublish: boolean;
+  publishedAt?: Date;
+  publishError?: string;
+  retryCount?: number;
 }

@@ -19,7 +19,8 @@ import {
   Users,
   Mail,
   FileText,
-  LogIn
+  LogIn,
+  BarChart3
 } from 'lucide-react';
 import { AppView, CompanyProfile, ResearchReport, SocialPost, AutoPilotConfig, Lead } from './types';
 import { LiveAssistant } from './components/LiveAssistant';
@@ -30,6 +31,7 @@ import { EmailView } from './components/EmailView';
 import { BlogView } from './components/BlogView';
 import { CalendarView } from './components/CalendarView';
 import { ProfileSettings } from './components/ProfileSettings';
+import { AnalyticsView } from './components/AnalyticsView';
 import { LLMDiagnostics } from './components/LLMDiagnostics';
 import { AuthPage } from './components/AuthPage';
 import { UserMenu } from './components/UserMenu';
@@ -820,6 +822,7 @@ export default function App() {
       case AppView.LEADS: return <LeadsView profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
       case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
       case AppView.BLOG: return <BlogView profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
+      case AppView.ANALYTICS: return <AnalyticsView profile={profile!} />;
       case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => { setProfile(updatedProfile); localStorage.setItem('socialai_profile', JSON.stringify(updatedProfile)); }} onBack={() => setView(AppView.DASHBOARD)} />;
       default: return <div>Not Implemented</div>;
     }
@@ -900,6 +903,7 @@ export default function App() {
             <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
             <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
             <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
+            <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
             <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
             <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
           </nav>

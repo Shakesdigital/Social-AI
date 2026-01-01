@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw, Globe, Link } from 'lucide-react';
-import { CompanyProfile } from '../types';
+import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw, Globe, Link, Instagram, Facebook, Twitter, Linkedin, Youtube, Unlink } from 'lucide-react';
+import { CompanyProfile, SocialPlatform } from '../types';
+import { getSocialConnections, isConnected, simulateConnect, disconnectPlatform } from '../services/socialPublishingService';
 
 interface ProfileSettingsProps {
     profile: CompanyProfile;
@@ -33,6 +34,31 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                 [platform]: value
             }
         });
+    };
+
+    // Social Connections State
+    const [connectedPlatforms, setConnectedPlatforms] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        // Load initial connections
+        const initialConnections: Record<string, boolean> = {};
+        const storedConnections = getSocialConnections();
+        storedConnections.forEach(c => {
+            if (c.isConnected) initialConnections[c.platform] = true;
+        });
+        setConnectedPlatforms(initialConnections);
+    }, []);
+
+    const handleConnect = (platform: SocialPlatform) => {
+        // In a real app, this would trigger OAuth flow
+        // For demo, we simulate a successful connection
+        simulateConnect(platform);
+        setConnectedPlatforms(prev => ({ ...prev, [platform]: true }));
+    };
+
+    const handleDisconnect = (platform: SocialPlatform) => {
+        disconnectPlatform(platform);
+        setConnectedPlatforms(prev => ({ ...prev, [platform]: false }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -155,7 +181,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                         </p>
 
                         {/* Website */}
-                        <div className="mb-4">
+                        <div className="mb-6">
                             <label className="block text-sm font-medium text-slate-700 mb-1.5">
                                 Business Website
                             </label>
@@ -168,79 +194,159 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                             />
                         </div>
 
-                        {/* Social Media Profiles */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    Instagram
-                                </label>
-                                <input
-                                    value={formData.socialMedia?.instagram || ''}
-                                    onChange={(e) => handleSocialChange('instagram', e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                                    placeholder="https://instagram.com/yourhandle"
-                                />
+                        {/* Social Media Connections */}
+                        <h3 className="text-sm font-semibold text-slate-700 mb-3">Connect Your Accounts</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Instagram */}
+                            <div className={`flex items-center justify-between p-3 rounded-lg border ${connectedPlatforms.instagram ? 'border-green-200 bg-green-50' : 'border-slate-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                                        <Instagram size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">Instagram</div>
+                                        <div className="text-xs text-slate-500">
+                                            {connectedPlatforms.instagram ? '✓ Connected' : 'Not connected'}
+                                        </div>
+                                    </div>
+                                </div>
+                                {connectedPlatforms.instagram ? (
+                                    <button onClick={() => handleDisconnect('instagram')} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleConnect('instagram')} className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                                        Connect
+                                    </button>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    Facebook
-                                </label>
-                                <input
-                                    value={formData.socialMedia?.facebook || ''}
-                                    onChange={(e) => handleSocialChange('facebook', e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                                    placeholder="https://facebook.com/yourpage"
-                                />
+
+                            {/* Facebook */}
+                            <div className={`flex items-center justify-between p-3 rounded-lg border ${connectedPlatforms.facebook ? 'border-green-200 bg-green-50' : 'border-slate-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+                                        <Facebook size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">Facebook</div>
+                                        <div className="text-xs text-slate-500">
+                                            {connectedPlatforms.facebook ? '✓ Connected' : 'Not connected'}
+                                        </div>
+                                    </div>
+                                </div>
+                                {connectedPlatforms.facebook ? (
+                                    <button onClick={() => handleDisconnect('facebook')} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleConnect('facebook')} className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                                        Connect
+                                    </button>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    Twitter / X
-                                </label>
-                                <input
-                                    value={formData.socialMedia?.twitter || ''}
-                                    onChange={(e) => handleSocialChange('twitter', e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                                    placeholder="https://x.com/yourhandle"
-                                />
+
+                            {/* Twitter/X */}
+                            <div className={`flex items-center justify-between p-3 rounded-lg border ${connectedPlatforms.twitter ? 'border-green-200 bg-green-50' : 'border-slate-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center">
+                                        <Twitter size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">Twitter / X</div>
+                                        <div className="text-xs text-slate-500">
+                                            {connectedPlatforms.twitter ? '✓ Connected' : 'Not connected'}
+                                        </div>
+                                    </div>
+                                </div>
+                                {connectedPlatforms.twitter ? (
+                                    <button onClick={() => handleDisconnect('twitter')} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleConnect('twitter')} className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                                        Connect
+                                    </button>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    LinkedIn
-                                </label>
-                                <input
-                                    value={formData.socialMedia?.linkedin || ''}
-                                    onChange={(e) => handleSocialChange('linkedin', e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                                    placeholder="https://linkedin.com/company/yourcompany"
-                                />
+
+                            {/* LinkedIn */}
+                            <div className={`flex items-center justify-between p-3 rounded-lg border ${connectedPlatforms.linkedin ? 'border-green-200 bg-green-50' : 'border-slate-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-blue-700 flex items-center justify-center">
+                                        <Linkedin size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">LinkedIn</div>
+                                        <div className="text-xs text-slate-500">
+                                            {connectedPlatforms.linkedin ? '✓ Connected' : 'Not connected'}
+                                        </div>
+                                    </div>
+                                </div>
+                                {connectedPlatforms.linkedin ? (
+                                    <button onClick={() => handleDisconnect('linkedin')} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleConnect('linkedin')} className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                                        Connect
+                                    </button>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    TikTok
-                                </label>
-                                <input
-                                    value={formData.socialMedia?.tiktok || ''}
-                                    onChange={(e) => handleSocialChange('tiktok', e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                                    placeholder="https://tiktok.com/@yourhandle"
-                                />
+
+                            {/* TikTok */}
+                            <div className={`flex items-center justify-between p-3 rounded-lg border ${connectedPlatforms.tiktok ? 'border-green-200 bg-green-50' : 'border-slate-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+                                        <span className="text-white font-bold text-sm">TT</span>
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">TikTok</div>
+                                        <div className="text-xs text-slate-500">
+                                            {connectedPlatforms.tiktok ? '✓ Connected' : 'Not connected'}
+                                        </div>
+                                    </div>
+                                </div>
+                                {connectedPlatforms.tiktok ? (
+                                    <button onClick={() => handleDisconnect('tiktok')} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleConnect('tiktok')} className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                                        Connect
+                                    </button>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    YouTube
-                                </label>
-                                <input
-                                    value={formData.socialMedia?.youtube || ''}
-                                    onChange={(e) => handleSocialChange('youtube', e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                                    placeholder="https://youtube.com/@yourchannel"
-                                />
+
+                            {/* YouTube */}
+                            <div className={`flex items-center justify-between p-3 rounded-lg border ${connectedPlatforms.youtube ? 'border-green-200 bg-green-50' : 'border-slate-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-red-600 flex items-center justify-center">
+                                        <Youtube size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">YouTube</div>
+                                        <div className="text-xs text-slate-500">
+                                            {connectedPlatforms.youtube ? '✓ Connected' : 'Not connected'}
+                                        </div>
+                                    </div>
+                                </div>
+                                {connectedPlatforms.youtube ? (
+                                    <button onClick={() => handleDisconnect('youtube')} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleConnect('youtube')} className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+                                        Connect
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        <p className="text-xs text-slate-400 mt-3">
-                            🔒 Your social media links are stored securely. Future updates will enable analytics tracking and scheduled auto-publishing.
-                        </p>
+                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-xs text-amber-800">
+                                ⚠️ <strong>Demo Mode:</strong> Click "Connect" to simulate a connection. In production, this would launch the official OAuth flow for each platform.
+                            </p>
+                        </div>
                     </div>
 
                     {/* Target Audience Section */}
