@@ -3,7 +3,11 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d9488" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Market MI - Marketing Assistant</title>
   <script>
     // Polyfill process for browser environment to prevent ReferenceError on Netlify/Vite
@@ -40,8 +44,18 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* Base styles */
     body {
       font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* Fix iOS 100vh issue */
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+
+    html {
+      height: -webkit-fill-available;
     }
 
     /* Custom Scrollbar for nicer UI */
@@ -62,6 +76,164 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+
+    /* ========================================
+       MOBILE-FIRST RESPONSIVE IMPROVEMENTS
+       ======================================== */
+
+    /* Touch-friendly tap targets (min 44x44px) */
+    button,
+    a,
+    [role="button"],
+    input[type="checkbox"],
+    input[type="radio"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Allow smaller buttons with explicit class */
+    .btn-sm {
+      min-height: 36px;
+      min-width: 36px;
+    }
+
+    /* Safe area padding for notched phones (iPhone X+) */
+    .safe-area-top {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    .safe-area-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .safe-area-all {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+
+    /* Improve text readability on mobile */
+    @media (max-width: 640px) {
+      html {
+        font-size: 16px;
+        /* Prevent zoom on input focus */
+      }
+
+      /* Prevent text from being too small */
+      body {
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      /* Ensure inputs don't zoom on focus in iOS */
+      input,
+      textarea,
+      select {
+        font-size: 16px !important;
+      }
+
+      /* Better spacing for mobile content */
+      .mobile-spacing {
+        padding: 1rem;
+      }
+
+      /* Stack buttons on mobile */
+      .mobile-stack {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .mobile-stack>* {
+        width: 100%;
+      }
+    }
+
+    /* Smooth scrolling */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Prevent pull-to-refresh on Chrome mobile */
+    body {
+      overscroll-behavior-y: contain;
+    }
+
+    /* Better focus states for accessibility */
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: 2px solid #0d9488;
+      outline-offset: 2px;
+    }
+
+    /* Touch action improvements */
+    .touch-pan-y {
+      touch-action: pan-y;
+    }
+
+    .touch-pan-x {
+      touch-action: pan-x;
+    }
+
+    /* Prevent text selection on interactive elements */
+    button,
+    [role="button"] {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Haptic feedback simulation on tap */
+    button:active,
+    [role="button"]:active {
+      transform: scale(0.98);
+    }
+
+    /* Hide scrollbar on mobile but keep functionality */
+    @media (max-width: 768px) {
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+
+    /* Cross-browser flexbox fixes */
+    .flex-fix {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: -ms-flexbox;
+      display: flex;
+    }
+
+    /* Animation for mobile */
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Loading state cursor */
+    .loading {
+      cursor: wait;
+    }
+
+    /* Fix for iOS button styling */
+    button {
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 0;
+    }
   </style>
   <script type="importmap">
 {
@@ -77,7 +249,7 @@
 </script>
 </head>
 
-<body class="bg-slate-50 text-slate-900 h-screen overflow-hidden">
+<body class="bg-slate-50 text-slate-900 h-screen overflow-hidden safe-area-all antialiased">
   <div id="root" class="h-full flex flex-col"></div>
   <!-- CRITICAL: Entry point for the React Application -->
   <script type="module" src="./index.tsx"></script>
