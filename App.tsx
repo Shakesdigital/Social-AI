@@ -697,7 +697,22 @@ export default function App() {
   const [oauthHandled, setOauthHandled] = useState(false);
 
   // Track auth mode: 'signin' for NEW users (go to onboarding), 'login' for EXISTING users (go to dashboard)
-  const [authMode, setAuthMode] = useState<'signin' | 'login' | null>(null);
+  // Persist to localStorage so it survives OAuth redirect
+  const [authMode, setAuthMode] = useState<'signin' | 'login' | null>(() => {
+    try {
+      const saved = localStorage.getItem('socialai_auth_mode');
+      return saved as 'signin' | 'login' | null;
+    } catch { return null; }
+  });
+
+  // Save authMode to localStorage when it changes
+  useEffect(() => {
+    if (authMode) {
+      localStorage.setItem('socialai_auth_mode', authMode);
+    } else {
+      localStorage.removeItem('socialai_auth_mode');
+    }
+  }, [authMode]);
 
   // Handle auth state changes (including OAuth callback)
   useEffect(() => {
