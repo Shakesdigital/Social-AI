@@ -1321,7 +1321,7 @@ export default function App() {
 
       {/* Modals and Overlays */}
       <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
-      {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
+      {view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH && <ChatBot />}
       {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
     </div >
   );
