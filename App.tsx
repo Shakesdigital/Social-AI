@@ -656,6 +656,13 @@ export default function App() {
 
   const [view, setView] = useState<AppView>(() => {
     try {
+      // Check if this is an OAuth callback - if so, we need to handle auth
+      const isOAuthCallback = window.location.hash.includes('access_token');
+      if (isOAuthCallback) {
+        // Start in AUTH view so handleAuthChange will be triggered
+        return AppView.AUTH;
+      }
+
       // Check if user has a profile and is not logged out
       const hasProfile = !!localStorage.getItem('socialai_profile');
       const isLoggedOut = localStorage.getItem('socialai_logged_out') === 'true';
@@ -969,12 +976,40 @@ export default function App() {
           onSignIn={() => {
             // NEW user flow - will go to onboarding after auth
             setAuthMode('signin');
-            setView(AppView.AUTH);
+
+            // If already authenticated, go directly to onboarding
+            if (isAuthenticated && user) {
+              console.log('[Landing] Already authenticated, going to onboarding');
+              localStorage.removeItem('socialai_logged_out');
+              setView(AppView.ONBOARDING);
+            } else {
+              // Need to authenticate first
+              setView(AppView.AUTH);
+            }
           }}
           onLogIn={() => {
             // EXISTING user flow - will go to dashboard after auth
             setAuthMode('login');
-            setView(AppView.AUTH);
+
+            // If already authenticated, check for profile and route accordingly
+            if (isAuthenticated && user) {
+              console.log('[Landing] Already authenticated, checking for profile');
+              localStorage.removeItem('socialai_logged_out');
+
+              // If has profile, go to dashboard; otherwise go to onboarding
+              if (profile || allProfiles.length > 0) {
+                if (!activeProfileId && allProfiles.length > 0) {
+                  setActiveProfileId(allProfiles[0].id);
+                }
+                setView(AppView.DASHBOARD);
+              } else {
+                // No profile - need to complete onboarding first
+                setView(AppView.ONBOARDING);
+              }
+            } else {
+              // Need to authenticate first
+              setView(AppView.AUTH);
+            }
           }}
           onContinueAsUser={(p) => {
             // Find this profile in allProfiles or add it
