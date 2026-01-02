@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Zap,
     PlusCircle,
@@ -7,7 +7,8 @@ import {
     XCircle,
     CheckCircle,
     Image as LucideImage,
-    Sparkles
+    Sparkles,
+    Upload
 } from 'lucide-react';
 import { CompanyProfile, SocialPost, AutoPilotConfig } from '../types';
 import {
@@ -829,7 +830,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
 
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Image Prompt</label>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Image Prompt (for AI generation)</label>
                                         <textarea
                                             value={creatorState.imagePrompt}
                                             onChange={(e) => setCreatorState({ ...creatorState, imagePrompt: e.target.value })}
@@ -840,11 +841,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
 
                                     <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl h-56 flex items-center justify-center relative overflow-hidden">
                                         {creatorState.generatedImage ? (
-                                            <img src={creatorState.generatedImage} className="w-full h-full object-cover" alt="Preview" />
+                                            <>
+                                                <img src={creatorState.generatedImage} className="w-full h-full object-cover" alt="Preview" />
+                                                <button
+                                                    onClick={() => setCreatorState({ ...creatorState, generatedImage: '' })}
+                                                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-all"
+                                                    title="Remove image"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </>
                                         ) : (
                                             <div className="text-center">
                                                 <LucideImage size={48} className="mx-auto mb-2 text-slate-200" />
-                                                <p className="text-xs text-slate-400 font-medium">No image generated yet</p>
+                                                <p className="text-xs text-slate-400 font-medium">No image yet</p>
+                                                <p className="text-[10px] text-slate-300 mt-1">Generate with AI or upload your own</p>
                                             </div>
                                         )}
                                         {creatorState.loadingImage && (
@@ -854,13 +865,34 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                         )}
                                     </div>
 
-                                    <button
-                                        onClick={handleGenImage}
-                                        disabled={creatorState.loadingImage}
-                                        className="w-full py-4 bg-brand-50 text-brand-700 rounded-2xl font-bold text-sm border-2 border-brand-100 hover:bg-brand-100 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <LucideImage size={18} /> {creatorState.generatedImage ? 'Regenerate Image' : 'Generate Image'}
-                                    </button>
+                                    {/* Image action buttons */}
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={handleGenImage}
+                                            disabled={creatorState.loadingImage}
+                                            className="flex-1 py-3 bg-brand-50 text-brand-700 rounded-xl font-bold text-sm border-2 border-brand-100 hover:bg-brand-100 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <LucideImage size={16} /> {creatorState.loadingImage ? 'Generating...' : 'Generate with AI'}
+                                        </button>
+                                        <label className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                                            <Upload size={16} /> Upload Image
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            setCreatorState(prev => ({ ...prev, generatedImage: reader.result as string }));
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
