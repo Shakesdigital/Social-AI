@@ -3,12 +3,14 @@ import { Mail, Lock, User, ArrowRight, Loader, AlertCircle, Eye, EyeOff, ArrowLe
 import { useAuth } from '../contexts/AuthContext';
 
 interface AuthPageProps {
+    authMode?: 'signin' | 'login' | null; // signin = new user, login = existing user
     onSuccess: () => void;
     onBack: () => void;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onBack }) => {
-    const [mode, setMode] = useState<'login' | 'signup'>('login');
+export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack }) => {
+    // Default to signup mode if authMode is 'signin' (new user), otherwise login mode
+    const [mode, setMode] = useState<'login' | 'signup'>(authMode === 'signin' ? 'signup' : 'login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');

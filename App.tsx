@@ -696,6 +696,9 @@ export default function App() {
   // Track if we've already handled an OAuth callback this session
   const [oauthHandled, setOauthHandled] = useState(false);
 
+  // Track auth mode: 'signin' for NEW users (go to onboarding), 'login' for EXISTING users (go to dashboard)
+  const [authMode, setAuthMode] = useState<'signin' | 'login' | null>(null);
+
   // Handle auth state changes (including OAuth callback)
   useEffect(() => {
     if (authLoading) return; // Wait for auth to initialize
@@ -753,19 +756,30 @@ export default function App() {
             console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
           }
 
-          setView(AppView.DASHBOARD);
-        } else if (currentLocalProfiles.length > 0 && !isDifferentUser) {
-          // No cloud profile but has local profiles AND same user - use the first one
-          console.log('[Auth] Using existing local profiles');
+          // If user clicked "Sign In" (new user flow), go to onboarding anyway
+          // If user clicked "Log In" (existing user flow), go to dashboard
+          if (authMode === 'signin') {
+            console.log('[Auth] Sign In mode - going to onboarding even with existing profile');
+            setView(AppView.ONBOARDING);
+          } else {
+            console.log('[Auth] Log In mode - going to dashboard');
+            setView(AppView.DASHBOARD);
+          }
+        } else if (currentLocalProfiles.length > 0 && !isDifferentUser && authMode === 'login') {
+          // No cloud profile but has local profiles AND same user AND logging in - use the first one
+          console.log('[Auth] Log In mode - using existing local profiles');
           if (!activeProfileId || !currentLocalProfiles.find(p => p.id === activeProfileId)) {
             setActiveProfileId(currentLocalProfiles[0].id);
           }
           setView(AppView.DASHBOARD);
         } else {
-          // No profile anywhere OR different user with no cloud profile - go to onboarding
-          console.log('[Auth] New user or different user with no profile - going to onboarding');
+          // No profile anywhere OR user specifically clicked "Sign In" - go to onboarding
+          console.log('[Auth] Going to onboarding (new user or sign in mode)');
           setView(AppView.ONBOARDING);
         }
+
+        // Clear auth mode after handling
+        setAuthMode(null);
       }
     };
 
@@ -937,8 +951,16 @@ export default function App() {
     if (view === AppView.LANDING) {
       return (
         <LandingPage
-          onGetStarted={() => setView(AppView.AUTH)}
-          onLogin={() => setView(AppView.AUTH)}
+          onSignIn={() => {
+            // NEW user flow - will go to onboarding after auth
+            setAuthMode('signin');
+            setView(AppView.AUTH);
+          }}
+          onLogIn={() => {
+            // EXISTING user flow - will go to dashboard after auth
+            setAuthMode('login');
+            setView(AppView.AUTH);
+          }}
           onContinueAsUser={(p) => {
             // Find this profile in allProfiles or add it
             const existingProfile = allProfiles.find(
@@ -960,13 +982,17 @@ export default function App() {
       case AppView.AUTH:
         return (
           <AuthPage
+            authMode={authMode}
             onSuccess={() => {
               // After login, the useEffect will handle navigation based on profile existence
               // This is called for email/password login (not OAuth)
               // The auth state change will trigger handleAuthChange
               console.log('[AuthPage] Login success, waiting for auth state to update...');
             }}
-            onBack={() => setView(AppView.LANDING)}
+            onBack={() => {
+              setAuthMode(null);
+              setView(AppView.LANDING);
+            }}
           />
         );
       case AppView.ONBOARDING:

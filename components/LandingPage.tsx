@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Zap, Globe, MessageSquare, BarChart3, Shield, Mic, Calendar, CheckCircle, Search, Lightbulb, LayoutDashboard, User, LogIn } from 'lucide-react';
+import { ArrowRight, Zap, Globe, MessageSquare, BarChart3, Shield, Mic, Calendar, CheckCircle, Search, Lightbulb, LayoutDashboard, User, LogIn, UserPlus } from 'lucide-react';
 import { CompanyProfile } from '../types';
 
 interface LandingPageProps {
-  onGetStarted: () => void;
+  onSignIn: () => void;  // For NEW users - goes to auth then onboarding
+  onLogIn: () => void;   // For EXISTING users - goes to auth then dashboard
   onContinueAsUser?: (profile: CompanyProfile) => void;
-  onLogin?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContinueAsUser, onLogin }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onContinueAsUser }) => {
   const [existingProfile, setExistingProfile] = useState<CompanyProfile | null>(null);
   const [showLoginOption, setShowLoginOption] = useState(false);
 
@@ -63,23 +63,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Sign In button for returning users */}
-              {onLogin && (
-                <button
-                  onClick={onLogin}
-                  className="hidden sm:flex bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all items-center gap-2 text-xs sm:text-sm"
-                >
-                  <LogIn size={14} className="sm:w-4 sm:h-4" />
-                  <span>Sign In</span>
-                </button>
-              )}
-              {/* Get Started button - goes to auth page */}
+              {/* Log In button for EXISTING users - goes to dashboard */}
               <button
-                onClick={onLogin || onGetStarted}
+                onClick={onLogIn}
+                className="hidden sm:flex bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all items-center gap-2 text-xs sm:text-sm"
+              >
+                <LogIn size={14} className="sm:w-4 sm:h-4" />
+                <span>Log In</span>
+              </button>
+              {/* Sign In button for NEW users - goes to onboarding */}
+              <button
+                onClick={onSignIn}
                 className="bg-brand-600 hover:bg-brand-700 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
               >
-                <span>Get Started</span>
-                <ArrowRight size={14} className="sm:w-4 sm:h-4" />
+                <UserPlus size={14} className="sm:w-4 sm:h-4" />
+                <span>Sign In</span>
               </button>
             </div>
           </div>
@@ -137,13 +135,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4 sm:px-0">
             <button
-              onClick={onGetStarted}
+              onClick={onSignIn}
               className="px-6 sm:px-8 py-3 sm:py-4 bg-brand-600 text-white rounded-xl font-bold text-base sm:text-lg hover:bg-brand-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-[0.98]"
             >
-              {showLoginOption ? 'Create New Profile' : 'Start Free Trial'} <ArrowRight size={18} />
+              <UserPlus size={18} /> Sign In - New User
             </button>
-            <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-slate-700 border-2 border-slate-200 rounded-xl font-bold text-base sm:text-lg hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-[0.98]">
-              View Demo
+            <button
+              onClick={onLogIn}
+              className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-slate-700 border-2 border-slate-200 rounded-xl font-bold text-base sm:text-lg hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <LogIn size={18} /> Log In - Existing User
             </button>
           </div>
 
