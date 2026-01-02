@@ -1156,15 +1156,15 @@ export default function App() {
             <AppFooter />
           </div>
         );
-      case AppView.DASHBOARD: return <Dashboard profile={profile!} onNavigate={setView} />;
-      case AppView.RESEARCH: return <ResearchView profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
-      case AppView.STRATEGY: return <div className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
-      case AppView.CALENDAR: return <CalendarView profile={profile!} savedState={calendarState} onStateChange={setCalendarState} />;
-      case AppView.LEADS: return <LeadsView profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
-      case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
-      case AppView.BLOG: return <BlogView profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
-      case AppView.ANALYTICS: return <AnalyticsView profile={profile!} />;
-      case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
+      case AppView.DASHBOARD: return <Dashboard key={activeProfileId} profile={profile!} onNavigate={setView} />;
+      case AppView.RESEARCH: return <ResearchView key={activeProfileId} profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
+      case AppView.STRATEGY: return <div key={activeProfileId} className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
+      case AppView.CALENDAR: return <CalendarView key={activeProfileId} profile={profile!} savedState={calendarState} onStateChange={setCalendarState} />;
+      case AppView.LEADS: return <LeadsView key={activeProfileId} profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
+      case AppView.EMAIL: return <EmailView key={activeProfileId} profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
+      case AppView.BLOG: return <BlogView key={activeProfileId} profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
+      case AppView.ANALYTICS: return <AnalyticsView key={activeProfileId} profile={profile!} />;
+      case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
       default: return <div>Not Implemented</div>;
     }
   };
