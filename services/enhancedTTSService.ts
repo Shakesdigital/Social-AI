@@ -1,7 +1,7 @@
 // Groq TTS Service - Desktop optimized, Mobile with special handling
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
-const GROQ_MAX_CHARS = 1000; // Increased to 1000 to drastically reduce API calls and prevent rate limiting
+const GROQ_MAX_CHARS = 1000; // Large chunks for fluency
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
@@ -19,68 +19,55 @@ export interface SpeakResult {
 
 let groqRateLimited = false;
 let rateLimitTime: number = 0;
-const RATE_LIMIT_RECOVERY = 30000; // 30 seconds - Groq TTS has strict limits
+const RATE_LIMIT_RECOVERY = 30000; // 30 seconds
 
 // Mobile detection
 const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// Web Audio API for mobile
+// Web Audio API
 let audioContext: AudioContext | null = null;
 let isAudioUnlocked = false;
 
-// Track current audio for stopping
+// Audio State
 let currentAudioElement: HTMLAudioElement | null = null;
 let currentAudioSource: AudioBufferSourceNode | null = null;
 let isStopped = false;
 
-// Stop any ongoing speech
+// --- Helper Functions ---
+
 export const stopSpeaking = (): void => {
     console.log('[TTS] Stopping speech...');
     isStopped = true;
 
-    // Stop HTML5 Audio
     if (currentAudioElement) {
         currentAudioElement.pause();
         currentAudioElement.currentTime = 0;
         currentAudioElement = null;
     }
 
-    // Stop Web Audio API source
     if (currentAudioSource) {
-        try {
-            currentAudioSource.stop();
-        } catch (e) { /* Already stopped */ }
+        try { currentAudioSource.stop(); } catch (e) { }
         currentAudioSource = null;
     }
 
-    // Stop browser TTS
     window.speechSynthesis?.cancel();
 };
 
 export const unlockMobileAudio = (): void => {
     if (!isMobile() || isAudioUnlocked) return;
-
-    console.log('[TTS] Unlocking mobile audio...');
     try {
         audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
+        if (audioContext.state === 'suspended') audioContext.resume();
         const buffer = audioContext.createBuffer(1, 1, 22050);
         const source = audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(audioContext.destination);
         source.start(0);
         isAudioUnlocked = true;
-        console.log('[TTS] Mobile audio unlocked!');
-    } catch (e) {
-        console.warn('[TTS] Mobile audio unlock failed:', e);
-    }
+    } catch (e) { console.warn('[TTS] Unlock failed:', e); }
 };
 
-export const isGroqTTSConfigured = (): boolean => {
-    return !!GROQ_API_KEY && GROQ_API_KEY.length > 10;
-};
+export const isGroqTTSConfigured = (): boolean => !!GROQ_API_KEY && GROQ_API_KEY.length > 10;
 
 export const getTTSStatus = () => ({
     groq: { provider: 'groq' as TTSProvider, isConfigured: isGroqTTSConfigured() },
@@ -92,15 +79,47 @@ export const getBestProvider = (): TTSProvider => {
     return 'browser';
 };
 
-// Text chunking
+// --- Chunking Logic ---
+
+// Improved sentence splitter that ignores common abbreviations
+const splitIntoSentences = (text: string): string[] => {
+    // Look for . ! ? followed by whitespace, BUT NOT preceded by Mr|Mrs|Ms|Dr|Vs|etc
+    // regex: (?<!\b(Mr|Mrs|Ms|Dr|Jr|Sr|Vs)\.)[.!?]\s+
+    const sentenceRegex = /(?<!\b(?:Mr|Mrs|Ms|Dr|Jr|Sr|Vs))\s*[.!?]+\s+/g;
+
+    // We split manually to keep the delimiters attached if possible or just careful splitting
+    // Actually, simpler approach: split and rejoin if short?
+    // Let's use a robust regex split.
+
+    const tokens = text.split(sentenceRegex);
+    // The split consumes the delimiter. We might want to keep it.
+    // Ideally we want to match the sentence.
+    // Let's use match instead.
+
+    const sentences = text.match(/[^.!?]+[.!?]+(\s+|$)/g) || [text];
+
+    // Filter out obvious bad splits from regex (hard to do perfectly with simple regex)
+    // The splitter used before was: text.split(/(?<=[.!?])\s+/)
+    // That looked-behind for .!?
+
+    // Let's use the look-behind but add negative look-behind for abbreviations
+    // JS supports lookbehind in modern browsers.
+
+    const smartRegex = /(?<!\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs))\s*(?<=[.!?])\s+/;
+
+    return text.split(smartRegex).filter(s => s.trim().length > 0);
+};
+
 const chunkText = (text: string, maxLength: number = GROQ_MAX_CHARS): string[] => {
     const chunks: string[] = [];
-    const sentences = text.split(/(?<=[.!?])\s+/);
+    const sentences = splitIntoSentences(text);
     let current = '';
 
     for (const sentence of sentences) {
         if (sentence.length > maxLength) {
+            // Force split long sentence
             if (current) { chunks.push(current.trim()); current = ''; }
+            // Split by comma or space
             const parts = sentence.split(/(?<=,)\s*|(?<=\s)/);
             for (const part of parts) {
                 if ((current + part).length > maxLength) {
@@ -118,42 +137,34 @@ const chunkText = (text: string, maxLength: number = GROQ_MAX_CHARS): string[] =
         }
     }
     if (current.trim()) chunks.push(current.trim());
-    return chunks.filter(c => c.length > 0);
-};
-
-// Smart chunking helper
-const getSmartChunks = (text: string): string[] => {
-    // 1. Isolate the first sentence (or first ~150 chars) for low-latency start
-    // Match first sentence ending with punctuation followed by space or end of string
-    const firstSentenceRegex = /^(.+?[.!?])(\s+|$)/s;
-    const match = text.match(firstSentenceRegex);
-
-    let firstChunk = '';
-    let remainingText = '';
-
-    if (match && match[1].length < 200) {
-        // If first sentence is reasonable length, use it as first chunk
-        firstChunk = match[1];
-        remainingText = text.substring(match[0].length);
-    } else {
-        // Fallback: just take first 150 chars roughly if no clear sentence or too long
-        if (text.length <= 200) return [text];
-        const splitPos = text.lastIndexOf(' ', 150);
-        const cutIndex = splitPos > 0 ? splitPos : 150;
-        firstChunk = text.substring(0, cutIndex);
-        remainingText = text.substring(cutIndex);
-    }
-
-    const chunks = [firstChunk];
-    if (remainingText.trim()) {
-        // Chunk the rest with LARGE chunks to avoid rate limits
-        chunks.push(...chunkText(remainingText, GROQ_MAX_CHARS));
-    }
-
     return chunks;
 };
 
-// Fetch audio from Groq
+const getSmartChunks = (text: string): string[] => {
+    const sentences = splitIntoSentences(text);
+    if (sentences.length === 0) return [text];
+
+    const firstSentence = sentences[0];
+
+    // Use first sentence if it's not too long
+    if (firstSentence.length < 250) {
+        const firstChunk = firstSentence;
+        const remainingText = text.substring(firstChunk.length).trim();
+
+        const chunks = [firstChunk];
+        if (remainingText) {
+            chunks.push(...chunkText(remainingText, GROQ_MAX_CHARS));
+        }
+        return chunks;
+    }
+
+    // Fallback if first sentence is huge
+    return chunkText(text, GROQ_MAX_CHARS);
+};
+
+
+// --- Groq Audio Fetcher ---
+
 const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer | null> => {
     try {
         const response = await fetch(GROQ_TTS_URL, {
@@ -171,34 +182,24 @@ const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer 
         });
 
         if (response.status === 429) {
-            console.warn('[TTS] Rate limited');
             groqRateLimited = true;
             rateLimitTime = Date.now();
             return null;
         }
-
-        if (!response.ok) {
-            console.error('[TTS] Groq error:', response.status);
-            return null;
-        }
-
+        if (!response.ok) return null;
         return await response.arrayBuffer();
-    } catch (error: any) {
-        console.error('[TTS] Groq fetch error:', error.message);
-        return null;
-    }
+    } catch (error) { return null; }
 };
 
-// DESKTOP: Simple HTML5 Audio playback (fast, works great)
+
+// --- Playback ---
+
 const playAudioDesktop = (arrayBuffer: ArrayBuffer): Promise<void> => {
     return new Promise((resolve) => {
         if (isStopped) { resolve(); return; }
-
         const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
-
-        // Track for stopping
         currentAudioElement = audio;
 
         audio.onended = () => {
@@ -206,13 +207,11 @@ const playAudioDesktop = (arrayBuffer: ArrayBuffer): Promise<void> => {
             currentAudioElement = null;
             resolve();
         };
-
         audio.onerror = () => {
             URL.revokeObjectURL(url);
             currentAudioElement = null;
             resolve();
         };
-
         audio.play().catch(() => {
             currentAudioElement = null;
             resolve();
@@ -220,63 +219,47 @@ const playAudioDesktop = (arrayBuffer: ArrayBuffer): Promise<void> => {
     });
 };
 
-// MOBILE: Web Audio API playback (handles restrictions)
 const playAudioMobile = async (arrayBuffer: ArrayBuffer): Promise<void> => {
     return new Promise(async (resolve) => {
         if (isStopped) { resolve(); return; }
-
         try {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            }
-
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
-            }
+            if (!audioContext) audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (audioContext.state === 'suspended') await audioContext.resume();
 
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(audioContext.destination);
-
-            // Track for stopping
             currentAudioSource = source;
 
-            source.onended = () => {
-                currentAudioSource = null;
-                resolve();
-            };
-
+            source.onended = () => { currentAudioSource = null; resolve(); };
             source.start(0);
-
         } catch (e) {
-            console.error('[TTS] Mobile audio error:', e);
-            // Fallback to HTML5
             await playAudioDesktop(arrayBuffer);
             resolve();
         }
     });
 };
 
-// DESKTOP: Groq TTS with PRE-FETCHING for seamless playback
-const speakWithGroqDesktop = async (
+// --- Streaming Speaker ---
+
+const speakWithGroq = async (
     text: string,
     voice: string,
     onStart?: () => void,
     onEnd?: () => void
 ): Promise<boolean> => {
     const chunks = getSmartChunks(text);
-    console.log('[TTS] Desktop: Playing', chunks.length, 'chunks (Smart Split)');
+    console.log(`[TTS] Groq (${isMobile() ? 'Mobile' : 'Desktop'}): processing ${chunks.length} chunks`);
 
     let started = false;
     let nextAudioPromise: Promise<ArrayBuffer | null> | null = null;
+    const playFn = isMobile() ? playAudioMobile : playAudioDesktop;
 
     for (let i = 0; i < chunks.length; i++) {
         if (isStopped) break;
 
-        // Get current audio (either from pre-fetch or new fetch)
         let audioData: ArrayBuffer | null = null;
-
         if (nextAudioPromise) {
             audioData = await nextAudioPromise;
             nextAudioPromise = null;
@@ -284,7 +267,6 @@ const speakWithGroqDesktop = async (
             audioData = await fetchGroqAudio(chunks[i], voice);
         }
 
-        // Pre-fetch NEXT chunk while current one plays
         if (i + 1 < chunks.length && !isStopped) {
             nextAudioPromise = fetchGroqAudio(chunks[i + 1], voice);
         }
@@ -292,85 +274,35 @@ const speakWithGroqDesktop = async (
         if (!audioData) continue;
 
         if (!started) { started = true; onStart?.(); }
-        await playAudioDesktop(audioData);
+        await playFn(audioData);
     }
 
     onEnd?.();
     return started;
 };
 
-// MOBILE: Groq TTS with PRE-FETCHING for seamless playback (no lag between sentences)
-const speakWithGroqMobile = async (
-    text: string,
-    voice: string,
-    onStart?: () => void,
-    onEnd?: () => void
-): Promise<boolean> => {
-    const chunks = getSmartChunks(text);
-    console.log('[TTS] Mobile: Processing', chunks.length, 'chunks (Smart Split)');
 
-    let started = false;
-    let nextAudioPromise: Promise<ArrayBuffer | null> | null = null;
+// --- Browser Fallback ---
 
-    for (let i = 0; i < chunks.length; i++) {
-        if (isStopped) break;
-
-        // Get current audio (either from pre-fetch or new fetch)
-        let audioData: ArrayBuffer | null = null;
-
-        if (nextAudioPromise) {
-            // Use pre-fetched audio
-            audioData = await nextAudioPromise;
-            nextAudioPromise = null;
-        } else {
-            // First chunk - fetch directly
-            audioData = await fetchGroqAudio(chunks[i], voice);
-        }
-
-        // Pre-fetch NEXT chunk while current one plays
-        if (i + 1 < chunks.length && !isStopped) {
-            nextAudioPromise = fetchGroqAudio(chunks[i + 1], voice);
-        }
-
-        if (!audioData) continue;
-
-        if (!started) { started = true; onStart?.(); }
-
-        // Play current audio (next is already being fetched)
-        await playAudioMobile(audioData);
-    }
-
-    onEnd?.();
-    return started;
-};
-
-// Browser TTS fallback
-const speakWithBrowser = (
-    text: string,
-    gender: VoiceGender,
-    onStart?: () => void,
-    onEnd?: () => void
-): Promise<boolean> => {
+const speakWithBrowser = (text: string, gender: VoiceGender, onStart?: () => void, onEnd?: () => void): Promise<boolean> => {
     return new Promise((resolve) => {
         if (!window.speechSynthesis) { resolve(false); return; }
-
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         const voices = window.speechSynthesis.getVoices();
         const voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
         if (voice) utterance.voice = voice;
-        utterance.rate = 1.0;
         utterance.pitch = gender === 'male' ? 0.95 : 1.0;
-
         utterance.onstart = () => onStart?.();
         utterance.onend = () => { onEnd?.(); resolve(true); };
         utterance.onerror = () => { onEnd?.(); resolve(false); };
-
         window.speechSynthesis.speak(utterance);
     });
 };
 
-// Main speak function - routes to desktop or mobile
+
+// --- Main Export ---
+
 export const speak = async (
     text: string,
     gender: VoiceGender = 'male',
@@ -381,10 +313,6 @@ export const speak = async (
         onError?: (error: string, provider: TTSProvider) => void;
     }
 ): Promise<SpeakResult> => {
-    const mobile = isMobile();
-    console.log('[TTS] speak():', { chars: text.length, gender, mobile });
-
-    // Reset stop flag for new speech
     isStopped = false;
 
     // Rate limit recovery
@@ -395,14 +323,9 @@ export const speak = async (
     // Try Groq
     if (isGroqTTSConfigured() && !groqRateLimited) {
         callbacks?.onProviderChange?.('groq');
-
         const voice = gender === 'male' ? GROQ_VOICES.male : GROQ_VOICES.female;
 
-        // Use different implementations for desktop vs mobile
-        const success = mobile
-            ? await speakWithGroqMobile(text, voice, callbacks?.onStart, callbacks?.onEnd)
-            : await speakWithGroqDesktop(text, voice, callbacks?.onStart, callbacks?.onEnd);
-
+        const success = await speakWithGroq(text, voice, callbacks?.onStart, callbacks?.onEnd);
         if (success) {
             return { success: true, provider: 'groq' };
         }
