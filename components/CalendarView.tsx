@@ -8,7 +8,10 @@ import {
     CheckCircle,
     Image as LucideImage,
     Sparkles,
-    Upload
+    Upload,
+    ArrowLeft,
+    Clock,
+    Timer
 } from 'lucide-react';
 import { CompanyProfile, SocialPost, AutoPilotConfig } from '../types';
 import {
@@ -66,8 +69,57 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
             Pinterest: 3,
             Threads: 2
         },
-        autoApprove: false
+        autoApprove: false,
+        isScheduled: false,
+        nextGenerationTime: undefined,
+        intervalHours: 24 // Default: generate new content every 24 hours
     });
+
+    // Timer countdown state
+    const [timeUntilNext, setTimeUntilNext] = useState<string>('');
+
+    // Update countdown timer
+    useEffect(() => {
+        if (!autoPilotConfig.isScheduled || !autoPilotConfig.nextGenerationTime) {
+            setTimeUntilNext('');
+            return;
+        }
+
+        const updateCountdown = () => {
+            const now = new Date().getTime();
+            const target = new Date(autoPilotConfig.nextGenerationTime!).getTime();
+            const diff = target - now;
+
+            if (diff <= 0) {
+                // Time to generate!
+                console.log('[AutoPilot] Scheduled generation triggered');
+                handleRunAutoPilot();
+                // Schedule next generation
+                const nextTime = new Date(Date.now() + (autoPilotConfig.intervalHours || 24) * 60 * 60 * 1000);
+                setAutoPilotConfig(prev => ({
+                    ...prev,
+                    nextGenerationTime: nextTime.toISOString()
+                }));
+                return;
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            if (hours > 0) {
+                setTimeUntilNext(`${hours}h ${minutes}m`);
+            } else if (minutes > 0) {
+                setTimeUntilNext(`${minutes}m ${seconds}s`);
+            } else {
+                setTimeUntilNext(`${seconds}s`);
+            }
+        };
+
+        updateCountdown();
+        const interval = setInterval(updateCountdown, 1000);
+        return () => clearInterval(interval);
+    }, [autoPilotConfig.isScheduled, autoPilotConfig.nextGenerationTime, autoPilotConfig.intervalHours]);
 
     // Connected social accounts
     const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>(() => {
@@ -486,15 +538,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                         </button>
 
                         <div className="p-8 space-y-6">
-                            {/* Header */}
-                            <div className="flex items-center gap-3">
-                                <div className="bg-indigo-100 text-indigo-600 p-2 rounded-lg">
-                                    <Zap size={24} />
+                            {/* Header with Back Button */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setShowAutoPilotSettings(false)}
+                                        className="p-2 hover:bg-slate-100 rounded-lg transition-all text-slate-400 hover:text-slate-600"
+                                    >
+                                        <ArrowLeft size={20} />
+                                    </button>
+                                    <div className="bg-indigo-100 text-indigo-600 p-2 rounded-lg">
+                                        <Zap size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-slate-900">Auto-Pilot Mode</h2>
+                                        <p className="text-sm text-slate-500">Configure assistant-powered content scheduling.</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-slate-900">Auto-Pilot Mode</h2>
-                                    <p className="text-sm text-slate-500">Configure assistant-powered content scheduling across all your channels.</p>
-                                </div>
+                                {autoPilotConfig.isScheduled && timeUntilNext && (
+                                    <div className="bg-green-50 border border-green-200 px-4 py-2 rounded-xl flex items-center gap-2">
+                                        <Timer size={16} className="text-green-600" />
+                                        <span className="text-sm font-semibold text-green-700">Next: {timeUntilNext}</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Connected Accounts Status */}
@@ -594,6 +660,82 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                     <p className="text-sm font-semibold text-slate-800">Auto-Approve & Publish</p>
                                     <p className="text-xs text-slate-500">Posts will be scheduled and published automatically without review.</p>
                                 </div>
+                            </div>
+
+                            {/* Scheduled Generation Settings */}
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-indigo-100 p-2 rounded-lg">
+                                            <Clock size={20} className="text-indigo-600" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-800">Scheduled Auto-Generation</p>
+                                            <p className="text-xs text-slate-500">Automatically generate new content at set intervals</p>
+                                        </div>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={autoPilotConfig.isScheduled}
+                                            onChange={(e) => {
+                                                const isScheduled = e.target.checked;
+                                                if (isScheduled) {
+                                                    // Set next generation time
+                                                    const nextTime = new Date(Date.now() + (autoPilotConfig.intervalHours || 24) * 60 * 60 * 1000);
+                                                    setAutoPilotConfig({
+                                                        ...autoPilotConfig,
+                                                        isScheduled: true,
+                                                        nextGenerationTime: nextTime.toISOString()
+                                                    });
+                                                } else {
+                                                    setAutoPilotConfig({
+                                                        ...autoPilotConfig,
+                                                        isScheduled: false,
+                                                        nextGenerationTime: undefined
+                                                    });
+                                                }
+                                            }}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                    </label>
+                                </div>
+
+                                {autoPilotConfig.isScheduled && (
+                                    <div className="pl-11 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-medium text-slate-700">Generate every:</label>
+                                            <select
+                                                value={autoPilotConfig.intervalHours || 24}
+                                                onChange={(e) => {
+                                                    const hours = parseInt(e.target.value);
+                                                    const nextTime = new Date(Date.now() + hours * 60 * 60 * 1000);
+                                                    setAutoPilotConfig({
+                                                        ...autoPilotConfig,
+                                                        intervalHours: hours,
+                                                        nextGenerationTime: nextTime.toISOString()
+                                                    });
+                                                }}
+                                                className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            >
+                                                <option value={1}>1 hour</option>
+                                                <option value={6}>6 hours</option>
+                                                <option value={12}>12 hours</option>
+                                                <option value={24}>24 hours (Daily)</option>
+                                                <option value={72}>3 days</option>
+                                                <option value={168}>Weekly</option>
+                                            </select>
+                                        </div>
+                                        {timeUntilNext && (
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Timer size={14} className="text-green-600" />
+                                                <span className="text-slate-600">Next generation in:</span>
+                                                <span className="font-bold text-green-600">{timeUntilNext}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Warning about connections */}

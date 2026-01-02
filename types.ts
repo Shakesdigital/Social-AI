@@ -178,6 +178,10 @@ export interface AutoPilotConfig {
     [key: string]: number; // Allow dynamic platform access
   };
   autoApprove: boolean;
+  // Scheduled generation settings
+  isScheduled?: boolean;
+  nextGenerationTime?: string; // ISO date string for persistence
+  intervalHours?: number; // Hours between auto-generations
 }
 
 // ============================================
