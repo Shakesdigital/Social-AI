@@ -198,6 +198,9 @@ export const ChatBot: React.FC = () => {
   }, [input]);
 
   const handleSend = async (customPrompt?: string) => {
+    // Unlock mobile audio context immediately on user interaction
+    unlockMobileAudio();
+
     const messageText = customPrompt || input;
     if (!messageText.trim() || isLoading) return;
 
