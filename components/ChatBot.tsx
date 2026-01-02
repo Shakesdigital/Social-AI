@@ -321,7 +321,8 @@ COMMUNICATION STYLE:
 - Reference industry benchmarks, best practices, or case studies when relevant
 - If you have research data, cite it naturally and explain its implications
 - Challenge assumptions politely when you see potential issues
-- End responses with clear next steps when appropriate`,
+- End responses with clear next steps when appropriate
+- Do not use decorative stars (✨) or markdown asterisks (like **text**) for bolding. Keep text clean and plain.`,
         temperature: 0.75
       });
 
@@ -351,7 +352,7 @@ COMMUNICATION STYLE:
               type: 'fast',
               systemPrompt: `You are Market MI Assistant - a brilliant, friendly marketing consultant who gives practical advice.
 ${profile ? `You are helping ${profile.name} in the ${profile.industry} industry.` : ''}
-Give specific, actionable advice. Be concise but comprehensive.`,
+Give specific, actionable advice. Be concise but comprehensive. Do not use asterisks or decorative formatting.`,
               temperature: 0.8
             });
 

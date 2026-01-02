@@ -1,7 +1,7 @@
 // Groq TTS Service - Desktop optimized, Mobile with special handling
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
-const GROQ_MAX_CHARS = 500; // Increased from 195 to reduce API calls and lag
+const GROQ_MAX_CHARS = 150; // Reduced from 500 to 150 to minimize first-chunk latency
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
