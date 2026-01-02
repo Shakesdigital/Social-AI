@@ -321,7 +321,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onC
           <p className="text-slate-300 text-xl mb-10 max-w-2xl mx-auto">Join thousands of businesses using Market MI to save time and grow faster.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={onGetStarted}
+              onClick={onSignIn}
               className="px-8 py-4 bg-brand-600 text-white rounded-md font-bold text-lg shadow-xl hover:bg-brand-500 transition-all hover:-translate-y-1"
             >
               Start Free Trial
