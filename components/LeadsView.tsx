@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Users, Building, MapPin, Loader, AlertTriangle, Plus, Mail, ExternalLink } from 'lucide-react';
+import { Search, Download, Users, Building, MapPin, Loader, AlertTriangle, Plus, Mail, ExternalLink, Trash2 } from 'lucide-react';
 import { CompanyProfile, Lead, LeadSearchCriteria } from '../types';
 import { generateLeads, downloadCSV, getGDPRDisclaimer } from '../services/leadService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
@@ -136,6 +136,33 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
             case 'Medium': return 'bg-yellow-100 text-yellow-700';
             case 'Low': return 'bg-slate-100 text-slate-600';
             default: return 'bg-slate-100 text-slate-600';
+        }
+    };
+
+    // Delete lead handlers
+    const handleDeleteLead = (id: string) => {
+        setLeads(prev => prev.filter(l => l.id !== id));
+        setSelectedLeads(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedLeads.size === 0) return;
+        const confirm = window.confirm(`Delete ${selectedLeads.size} selected lead(s)?`);
+        if (confirm) {
+            setLeads(prev => prev.filter(l => !selectedLeads.has(l.id)));
+            setSelectedLeads(new Set());
+        }
+    };
+
+    const handleClearAll = () => {
+        const confirm = window.confirm('Delete all leads? This cannot be undone.');
+        if (confirm) {
+            setLeads([]);
+            setSelectedLeads(new Set());
         }
     };
 
@@ -327,15 +354,36 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
                                     />
                                     Select All ({selectedLeads.size} selected)
                                 </label>
-                                {selectedLeads.size > 0 && onAddToEmailCampaign && (
-                                    <button
-                                        onClick={handleAddToEmail}
-                                        className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 transition-all"
-                                    >
-                                        <Mail size={16} />
-                                        Add to Email Campaign
-                                    </button>
-                                )}
+                                <div className="flex gap-2">
+                                    {selectedLeads.size > 0 && (
+                                        <button
+                                            onClick={handleDeleteSelected}
+                                            className="px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-2 text-xs sm:text-sm active:scale-95 transition-all"
+                                        >
+                                            <Trash2 size={14} />
+                                            Delete Selected
+                                        </button>
+                                    )}
+                                    {selectedLeads.size > 0 && onAddToEmailCampaign && (
+                                        <button
+                                            onClick={handleAddToEmail}
+                                            className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 transition-all"
+                                        >
+                                            <Mail size={16} />
+                                            Add to Email Campaign
+                                        </button>
+                                    )}
+                                    {leads.length > 0 && (
+                                        <button
+                                            onClick={handleClearAll}
+                                            className="px-3 py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 text-xs transition-all"
+                                            title="Clear all leads"
+                                        >
+                                            <Trash2 size={14} />
+                                            <span className="hidden sm:inline">Clear All</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Lead Cards */}
@@ -371,9 +419,18 @@ export const LeadsView: React.FC<LeadsViewProps> = ({ profile, onAddToEmailCampa
                                                             <span className="hidden sm:inline">{lead.size}</span>
                                                         </div>
                                                     </div>
-                                                    <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getPotentialColor(lead.outreachPotential)}`}>
-                                                        {lead.outreachPotential}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getPotentialColor(lead.outreachPotential)}`}>
+                                                            {lead.outreachPotential}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleDeleteLead(lead.id)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                            title="Delete lead"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <p className="text-xs sm:text-sm text-slate-600 mb-3 line-clamp-2">{lead.summary}</p>
                                                 <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm">
