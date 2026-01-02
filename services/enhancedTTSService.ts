@@ -1,7 +1,7 @@
 // Groq TTS Service - Desktop optimized, Mobile with special handling
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
-const GROQ_MAX_CHARS = 195; // Groq limit is 200, maximize to reduce API calls
+const GROQ_MAX_CHARS = 500; // Increased from 195 to reduce API calls and lag
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
@@ -226,7 +226,7 @@ const playAudioMobile = async (arrayBuffer: ArrayBuffer): Promise<void> => {
     });
 };
 
-// DESKTOP: Groq TTS (with small delay to avoid rate limits)
+// DESKTOP: Groq TTS with PRE-FETCHING for seamless playback
 const speakWithGroqDesktop = async (
     text: string,
     voice: string,
@@ -234,19 +234,29 @@ const speakWithGroqDesktop = async (
     onEnd?: () => void
 ): Promise<boolean> => {
     const chunks = chunkText(text);
-    console.log('[TTS] Desktop: Playing', chunks.length, 'chunks');
+    console.log('[TTS] Desktop: Playing', chunks.length, 'chunks with pre-fetching');
 
     let started = false;
+    let nextAudioPromise: Promise<ArrayBuffer | null> | null = null;
 
     for (let i = 0; i < chunks.length; i++) {
         if (isStopped) break;
 
-        // Small delay ONLY between chunks (not before first one)
-        if (i > 0) {
-            await new Promise(r => setTimeout(r, 100)); // Reduced from 200ms
+        // Get current audio (either from pre-fetch or new fetch)
+        let audioData: ArrayBuffer | null = null;
+
+        if (nextAudioPromise) {
+            audioData = await nextAudioPromise;
+            nextAudioPromise = null;
+        } else {
+            audioData = await fetchGroqAudio(chunks[i], voice);
         }
 
-        const audioData = await fetchGroqAudio(chunks[i], voice);
+        // Pre-fetch NEXT chunk while current one plays
+        if (i + 1 < chunks.length && !isStopped) {
+            nextAudioPromise = fetchGroqAudio(chunks[i + 1], voice);
+        }
+
         if (!audioData) continue;
 
         if (!started) { started = true; onStart?.(); }
@@ -257,7 +267,7 @@ const speakWithGroqDesktop = async (
     return started;
 };
 
-// MOBILE: Groq TTS with delays and retries
+// MOBILE: Groq TTS with PRE-FETCHING for seamless playback (no lag between sentences)
 const speakWithGroqMobile = async (
     text: string,
     voice: string,
@@ -265,32 +275,36 @@ const speakWithGroqMobile = async (
     onEnd?: () => void
 ): Promise<boolean> => {
     const chunks = chunkText(text);
-    console.log('[TTS] Mobile: Processing', chunks.length, 'chunks');
+    console.log('[TTS] Mobile: Processing', chunks.length, 'chunks with pre-fetching');
 
     let started = false;
+    let nextAudioPromise: Promise<ArrayBuffer | null> | null = null;
 
     for (let i = 0; i < chunks.length; i++) {
         if (isStopped) break;
 
-        // Reduced delay between chunks for mobile
-        if (i > 0) {
-            await new Promise(r => setTimeout(r, 200)); // Reduced from 500ms
+        // Get current audio (either from pre-fetch or new fetch)
+        let audioData: ArrayBuffer | null = null;
+
+        if (nextAudioPromise) {
+            // Use pre-fetched audio
+            audioData = await nextAudioPromise;
+            nextAudioPromise = null;
+        } else {
+            // First chunk - fetch directly
+            audioData = await fetchGroqAudio(chunks[i], voice);
         }
 
-        // Retry logic (faster)
-        let audioData: ArrayBuffer | null = null;
-        for (let attempt = 1; attempt <= 2; attempt++) {
-            if (isStopped) break;
-            audioData = await fetchGroqAudio(chunks[i], voice);
-            if (audioData) break;
-            if (attempt < 2 && !groqRateLimited) {
-                await new Promise(r => setTimeout(r, 500)); // Reduced from 1000ms
-            }
+        // Pre-fetch NEXT chunk while current one plays
+        if (i + 1 < chunks.length && !isStopped) {
+            nextAudioPromise = fetchGroqAudio(chunks[i + 1], voice);
         }
 
         if (!audioData) continue;
 
         if (!started) { started = true; onStart?.(); }
+
+        // Play current audio (next is already being fetched)
         await playAudioMobile(audioData);
     }
 

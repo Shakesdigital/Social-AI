@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Mic, MicOff, Square } from 'lucide-react';
+import { MessageSquare, Send, Bot, ChevronDown, Sparkles, Globe, TrendingUp, Users, Mail, FileText, Search, Zap, Lightbulb, Mic, MicOff, Square, Trash2 } from 'lucide-react';
 import { callLLM, hasFreeLLMConfigured, AllProvidersFailedError } from '../services/freeLLMService';
 import { searchWeb, searchWebValidated, searchForOutreach, getLatestNews, isWebResearchConfigured } from '../services/webResearchService';
 import { getBusinessContext, addToConversation, getRecentConversationContext, getStoredProfile } from '../services/contextMemoryService';
@@ -17,9 +17,24 @@ interface QuickAction {
   prompt: string;
 }
 
+const CHAT_STORAGE_KEY = 'marketmi_chat_history';
+
 export const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+
+  // Load chat history from localStorage
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.warn('[ChatBot] Failed to load chat history');
+    }
+    return [];
+  });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResearching, setIsResearching] = useState(false);
@@ -147,6 +162,25 @@ export const ChatBot: React.FC = () => {
   useEffect(() => {
     if (isOpen) scrollToBottom();
   }, [messages, isOpen]);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+      } catch (e) {
+        console.warn('[ChatBot] Failed to save chat history');
+      }
+    }
+  }, [messages]);
+
+  // Clear all chat history
+  const clearChatHistory = () => {
+    setMessages([]);
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+    ttsStopSpeaking();
+    setIsSpeaking(false);
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -383,13 +417,26 @@ Give specific, actionable advice. Be concise but comprehensive.`,
               </span>
             </div>
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
-            className="hover:bg-white/20 p-2 rounded-lg transition-colors"
-            aria-label="Minimize Chat"
-          >
-            <ChevronDown size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Clear Chat Button - only show when there are messages */}
+            {messages.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); clearChatHistory(); }}
+                className="hover:bg-white/20 p-2 rounded-lg transition-colors"
+                aria-label="Clear Chat"
+                title="Clear all chat history"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
+              className="hover:bg-white/20 p-2 rounded-lg transition-colors"
+              aria-label="Minimize Chat"
+            >
+              <ChevronDown size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
