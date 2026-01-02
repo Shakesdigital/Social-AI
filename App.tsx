@@ -708,29 +708,38 @@ export default function App() {
         // Check if this is the same user or a different user
         const storedUserId = localStorage.getItem('socialai_user_id');
         const isDifferentUser = storedUserId && storedUserId !== user.id;
+        const isFirstTimeUser = !storedUserId;
+
+        console.log('[Auth] User authenticated:', user.id);
+        console.log('[Auth] Stored user ID:', storedUserId);
+        console.log('[Auth] Is different user:', isDifferentUser);
+        console.log('[Auth] Is first time user:', isFirstTimeUser);
 
         if (isDifferentUser) {
           // Different user is logging in - clear all local data
           console.log('[Auth] Different user detected, clearing all local data');
           clearAllProfiles();
+          // Reset oauth handled so new user can use OAuth
+          setOauthHandled(false);
         }
 
         // Save current user ID
         localStorage.setItem('socialai_user_id', user.id);
 
-        // First check if we have local profiles for this user
-        const currentProfiles = isDifferentUser ? [] : allProfiles;
+        // For different user, we start fresh with no local profiles
+        // Use a fresh read from state after clear, or empty array
+        const currentLocalProfiles = isDifferentUser ? [] : allProfiles;
 
         // Try to fetch profile from Supabase (cross-device sync)
-        console.log('[Auth] Fetching profile from Supabase...');
+        console.log('[Auth] Fetching profile from Supabase for user:', user.id);
         const cloudProfile = await fetchProfile(user.id);
 
         if (cloudProfile) {
-          // Profile found in Supabase
+          // Profile found in Supabase - existing user on new device
           console.log('[Auth] Profile found in Supabase');
 
           // Check if this profile already exists locally
-          const existingLocalProfile = currentProfiles.find(
+          const existingLocalProfile = currentLocalProfiles.find(
             p => p.name === cloudProfile.name && p.industry === cloudProfile.industry
           );
 
@@ -745,16 +754,16 @@ export default function App() {
           }
 
           setView(AppView.DASHBOARD);
-        } else if (currentProfiles.length > 0) {
-          // No cloud profile but has local profiles - use the first one
-          console.log('[Auth] Using local profiles');
-          if (!activeProfileId || !currentProfiles.find(p => p.id === activeProfileId)) {
-            setActiveProfileId(currentProfiles[0].id);
+        } else if (currentLocalProfiles.length > 0 && !isDifferentUser) {
+          // No cloud profile but has local profiles AND same user - use the first one
+          console.log('[Auth] Using existing local profiles');
+          if (!activeProfileId || !currentLocalProfiles.find(p => p.id === activeProfileId)) {
+            setActiveProfileId(currentLocalProfiles[0].id);
           }
           setView(AppView.DASHBOARD);
         } else {
-          // No profile anywhere - new user, go to onboarding
-          console.log('[Auth] No profile found - new user, going to onboarding');
+          // No profile anywhere OR different user with no cloud profile - go to onboarding
+          console.log('[Auth] New user or different user with no profile - going to onboarding');
           setView(AppView.ONBOARDING);
         }
       }
