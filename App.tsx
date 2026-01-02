@@ -595,7 +595,7 @@ export default function App() {
   }, [allProfiles, activeProfileId, profile]);
 
   // Profile management functions
-  const setProfile = (updatedProfile: CompanyProfile) => {
+  const updateProfile = (updatedProfile: CompanyProfile) => {
     setAllProfiles(prev => prev.map(p =>
       p.id === updatedProfile.id ? updatedProfile : p
     ));
@@ -620,6 +620,7 @@ export default function App() {
     };
     setAllProfiles(prev => [...prev, profileWithId]);
     setActiveProfileId(profileWithId.id);
+    return profileWithId;
   };
 
   const deleteProfile = (profileId: string) => {
@@ -629,6 +630,27 @@ export default function App() {
       const remaining = allProfiles.filter(p => p.id !== profileId);
       setActiveProfileId(remaining.length > 0 ? remaining[0].id : null);
     }
+  };
+
+  // Clear all profiles and reset state (used on logout or user switch)
+  const clearAllProfiles = () => {
+    setAllProfiles([]);
+    setActiveProfileId(null);
+    setCalendarState(null);
+    setLeadsState(null);
+    setEmailState(null);
+    setBlogState(null);
+    setResearchState(null);
+    setStrategyState(null);
+    // Clear all localStorage items for this app
+    localStorage.removeItem('socialai_profiles');
+    localStorage.removeItem('socialai_profile');
+    localStorage.removeItem('socialai_calendar_state');
+    localStorage.removeItem('socialai_research_state');
+    localStorage.removeItem('socialai_strategy_state');
+    localStorage.removeItem('socialai_leads_state');
+    localStorage.removeItem('socialai_email_state');
+    localStorage.removeItem('socialai_blog_state');
   };
 
 
@@ -685,46 +707,55 @@ export default function App() {
 
         // Check if this is the same user or a different user
         const storedUserId = localStorage.getItem('socialai_user_id');
+        const isDifferentUser = storedUserId && storedUserId !== user.id;
 
-        if (storedUserId && storedUserId !== user.id) {
-          // Different user is logging in - clear local data
-          console.log('[Auth] Different user detected, clearing local data');
-          localStorage.removeItem('socialai_profile');
-          localStorage.removeItem('socialai_calendar_state');
-          localStorage.removeItem('socialai_research_state');
-          localStorage.removeItem('socialai_strategy_state');
-          localStorage.removeItem('socialai_leads_state');
-          localStorage.removeItem('socialai_email_state');
-          localStorage.removeItem('socialai_blog_state');
-          localStorage.removeItem('socialai_logged_out');
-          setProfile(null);
+        if (isDifferentUser) {
+          // Different user is logging in - clear all local data
+          console.log('[Auth] Different user detected, clearing all local data');
+          clearAllProfiles();
         }
 
         // Save current user ID
         localStorage.setItem('socialai_user_id', user.id);
+
+        // First check if we have local profiles for this user
+        const currentProfiles = isDifferentUser ? [] : allProfiles;
 
         // Try to fetch profile from Supabase (cross-device sync)
         console.log('[Auth] Fetching profile from Supabase...');
         const cloudProfile = await fetchProfile(user.id);
 
         if (cloudProfile) {
-          // Profile found in Supabase - use it
-          console.log('[Auth] Profile found in Supabase, loading...');
-          setProfile(cloudProfile);
-          localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
+          // Profile found in Supabase
+          console.log('[Auth] Profile found in Supabase');
+
+          // Check if this profile already exists locally
+          const existingLocalProfile = currentProfiles.find(
+            p => p.name === cloudProfile.name && p.industry === cloudProfile.industry
+          );
+
+          if (!existingLocalProfile) {
+            // Add cloud profile to local profiles
+            const newProfile = createNewProfile(cloudProfile);
+            console.log('[Auth] Added cloud profile to local storage:', newProfile.id);
+          } else {
+            // Profile already exists, just switch to it
+            setActiveProfileId(existingLocalProfile.id);
+            console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
+          }
+
+          setView(AppView.DASHBOARD);
+        } else if (currentProfiles.length > 0) {
+          // No cloud profile but has local profiles - use the first one
+          console.log('[Auth] Using local profiles');
+          if (!activeProfileId || !currentProfiles.find(p => p.id === activeProfileId)) {
+            setActiveProfileId(currentProfiles[0].id);
+          }
           setView(AppView.DASHBOARD);
         } else {
-          // No profile in Supabase - check localStorage
-          const localProfile = localStorage.getItem('socialai_profile');
-          if (localProfile && storedUserId === user.id) {
-            // Same user, has local profile - use it
-            setProfile(JSON.parse(localProfile));
-            setView(AppView.DASHBOARD);
-          } else {
-            // No profile anywhere, go to onboarding
-            console.log('[Auth] No profile found, going to onboarding');
-            setView(AppView.ONBOARDING);
-          }
+          // No profile anywhere - new user, go to onboarding
+          console.log('[Auth] No profile found - new user, going to onboarding');
+          setView(AppView.ONBOARDING);
         }
       }
     };
@@ -745,7 +776,7 @@ export default function App() {
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
-  }, [isAuthenticated, user, authLoading, view, oauthHandled]);
+  }, [isAuthenticated, user, authLoading, view, oauthHandled, allProfiles]);
 
   // Sync state: If profile is null and not authenticated, force view to Landing or Onboarding or Auth
   useEffect(() => {
@@ -756,17 +787,19 @@ export default function App() {
 
   const handleOnboardingComplete = async (p: CompanyProfile) => {
     // Add to multi-profile system
-    createNewProfile(p);
+    const newProfile = createNewProfile(p);
 
     // Save to legacy local storage for backward compatibility
-    localStorage.setItem('socialai_profile', JSON.stringify(p));
+    localStorage.setItem('socialai_profile', JSON.stringify(newProfile));
     localStorage.removeItem('socialai_logged_out'); // Clear logged out flag
 
-    // Save to Supabase for cross-device sync
+    // Mark this user as having completed onboarding
     if (user) {
+      localStorage.setItem('socialai_user_id', user.id);
+      localStorage.setItem(`socialai_onboarded_${user.id}`, 'true');
+
       console.log('[Onboarding] Saving profile to Supabase...');
-      // Note: Supabase saving might need update for multi-profile later
-      await saveProfile(user.id, p);
+      await saveProfile(user.id, newProfile);
     }
 
     setView(AppView.DASHBOARD);
@@ -775,9 +808,22 @@ export default function App() {
   const handleLogout = async () => {
     // Log out from Supabase
     await authLogout();
-    // Set a flag indicating the user is logged out (preserves profile for returning users)
+
+    // Set a flag indicating the user is logged out
+    // We preserve user ID so if same user comes back, we know it's them
     localStorage.setItem('socialai_logged_out', 'true');
-    setProfile(null);
+
+    // Clear active profile but preserve profiles for returning user
+    setActiveProfileId(null);
+
+    // Reset component states
+    setCalendarState(null);
+    setLeadsState(null);
+    setEmailState(null);
+    setBlogState(null);
+    setResearchState(null);
+    setStrategyState(null);
+
     setView(AppView.LANDING);
   };
 
@@ -874,10 +920,18 @@ export default function App() {
     if (view === AppView.LANDING) {
       return (
         <LandingPage
-          onGetStarted={() => setView(AppView.ONBOARDING)}
+          onGetStarted={() => setView(AppView.AUTH)}
           onLogin={() => setView(AppView.AUTH)}
           onContinueAsUser={(p) => {
-            setProfile(p);
+            // Find this profile in allProfiles or add it
+            const existingProfile = allProfiles.find(
+              prof => prof.name === p.name && prof.industry === p.industry
+            );
+            if (existingProfile) {
+              setActiveProfileId(existingProfile.id);
+            } else {
+              createNewProfile(p);
+            }
             localStorage.removeItem('socialai_logged_out');
             setView(AppView.DASHBOARD);
           }}
@@ -890,14 +944,10 @@ export default function App() {
         return (
           <AuthPage
             onSuccess={() => {
-              // After login, go to dashboard if profile exists, otherwise onboarding
-              const storedProfile = localStorage.getItem('socialai_profile');
-              if (storedProfile) {
-                setProfile(JSON.parse(storedProfile));
-                setView(AppView.DASHBOARD);
-              } else {
-                setView(AppView.ONBOARDING);
-              }
+              // After login, the useEffect will handle navigation based on profile existence
+              // This is called for email/password login (not OAuth)
+              // The auth state change will trigger handleAuthChange
+              console.log('[AuthPage] Login success, waiting for auth state to update...');
             }}
             onBack={() => setView(AppView.LANDING)}
           />
@@ -920,7 +970,7 @@ export default function App() {
       case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
       case AppView.BLOG: return <BlogView profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
       case AppView.ANALYTICS: return <AnalyticsView profile={profile!} />;
-      case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => setProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
+      case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
       default: return <div>Not Implemented</div>;
     }
   };
