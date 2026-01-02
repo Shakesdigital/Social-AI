@@ -1,7 +1,7 @@
 // Groq TTS Service - Desktop optimized, Mobile with special handling
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech';
-const GROQ_MAX_CHARS = 150; // Reduced from 500 to 150 to minimize first-chunk latency
+const GROQ_MAX_CHARS = 1000; // Increased to 1000 to drastically reduce API calls and prevent rate limiting
 
 export type VoiceGender = 'female' | 'male';
 export type TTSProvider = 'groq' | 'browser' | 'none';
@@ -121,6 +121,38 @@ const chunkText = (text: string, maxLength: number = GROQ_MAX_CHARS): string[] =
     return chunks.filter(c => c.length > 0);
 };
 
+// Smart chunking helper
+const getSmartChunks = (text: string): string[] => {
+    // 1. Isolate the first sentence (or first ~150 chars) for low-latency start
+    // Match first sentence ending with punctuation followed by space or end of string
+    const firstSentenceRegex = /^(.+?[.!?])(\s+|$)/s;
+    const match = text.match(firstSentenceRegex);
+
+    let firstChunk = '';
+    let remainingText = '';
+
+    if (match && match[1].length < 200) {
+        // If first sentence is reasonable length, use it as first chunk
+        firstChunk = match[1];
+        remainingText = text.substring(match[0].length);
+    } else {
+        // Fallback: just take first 150 chars roughly if no clear sentence or too long
+        if (text.length <= 200) return [text];
+        const splitPos = text.lastIndexOf(' ', 150);
+        const cutIndex = splitPos > 0 ? splitPos : 150;
+        firstChunk = text.substring(0, cutIndex);
+        remainingText = text.substring(cutIndex);
+    }
+
+    const chunks = [firstChunk];
+    if (remainingText.trim()) {
+        // Chunk the rest with LARGE chunks to avoid rate limits
+        chunks.push(...chunkText(remainingText, GROQ_MAX_CHARS));
+    }
+
+    return chunks;
+};
+
 // Fetch audio from Groq
 const fetchGroqAudio = async (text: string, voice: string): Promise<ArrayBuffer | null> => {
     try {
@@ -233,8 +265,8 @@ const speakWithGroqDesktop = async (
     onStart?: () => void,
     onEnd?: () => void
 ): Promise<boolean> => {
-    const chunks = chunkText(text);
-    console.log('[TTS] Desktop: Playing', chunks.length, 'chunks with pre-fetching');
+    const chunks = getSmartChunks(text);
+    console.log('[TTS] Desktop: Playing', chunks.length, 'chunks (Smart Split)');
 
     let started = false;
     let nextAudioPromise: Promise<ArrayBuffer | null> | null = null;
@@ -274,8 +306,8 @@ const speakWithGroqMobile = async (
     onStart?: () => void,
     onEnd?: () => void
 ): Promise<boolean> => {
-    const chunks = chunkText(text);
-    console.log('[TTS] Mobile: Processing', chunks.length, 'chunks with pre-fetching');
+    const chunks = getSmartChunks(text);
+    console.log('[TTS] Mobile: Processing', chunks.length, 'chunks (Smart Split)');
 
     let started = false;
     let nextAudioPromise: Promise<ArrayBuffer | null> | null = null;
