@@ -990,63 +990,63 @@ export default function App() {
               </button>
             </div>
           </div>
-        </div>
-          
-          {/* Profile Switcher */}
-      <div className="px-4 pt-4 pb-2">
-        <ProfileSwitcher
-          profiles={allProfiles}
-          activeProfile={profile}
-          onSwitchProfile={switchProfile}
-          onCreateNew={() => setView(AppView.ONBOARDING)}
-          onDeleteProfile={deleteProfile}
-        />
-      </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
-        <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
-        <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
-        <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
-        <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
-        <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
-        <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
-        <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
-        <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
-        <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
-        <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
-        <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
-      </nav>
-      <div className="p-4 border-t border-slate-100 space-y-3">
-        {/* Live Consultant button - DISABLED until better TTS solution */}
-        {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
+
+          {/* Profile Switcher */}
+          <div className="px-4 pt-4 pb-2">
+            <ProfileSwitcher
+              profiles={allProfiles}
+              activeProfile={profile}
+              onSwitchProfile={switchProfile}
+              onCreateNew={() => setView(AppView.ONBOARDING)}
+              onDeleteProfile={deleteProfile}
+            />
+          </div>
+
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
+            <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
+            <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
+            <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
+            <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
+            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
+            <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
+            <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
+            <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
+            <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
+            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
+            <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
+          </nav>
+          <div className="p-4 border-t border-slate-100 space-y-3">
+            {/* Live Consultant button - DISABLED until better TTS solution */}
+            {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
               <Mic size={18} className="animate-pulse" /> Live Consultant
             </button> */}
-        <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-          <Settings size={16} /> LLM Diagnostics
-        </button>
-        <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-          <LogOut size={16} /> Logout / Reset
-        </button>
-      </div>
-    </aside>
-  )
-}
+            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+              <Settings size={16} /> LLM Diagnostics
+            </button>
+            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+              <LogOut size={16} /> Logout / Reset
+            </button>
+          </div>
+        </aside>
+      )
+      }
 
-{/* Main Content Area */ }
-<main className={`
+      {/* Main Content Area */}
+      <main className={`
         flex-1 relative
         ${view === AppView.LANDING || view === AppView.ONBOARDING ? 'h-full overflow-y-auto' : 'overflow-hidden'} 
         ${!hasApiKey ? 'mt-6' : ''}
         ${showSidebar ? 'pt-14 lg:pt-0' : ''}
       `}>
-  {renderContent()}
-</main>
+        {renderContent()}
+      </main>
 
-{/* Modals and Overlays */ }
-<LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
-{ view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot /> }
-{ showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} /> }
+      {/* Modals and Overlays */}
+      <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
+      {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
+      {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
     </div >
   );
 }
