@@ -972,13 +972,17 @@ export default function App() {
   const [researchState, setResearchState] = useState<any>(null);
   const [strategyState, setStrategyState] = useState<any>(null);
 
+  // Profile loading state - prevents components from rendering before data is loaded
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+
   // Load per-profile data when activeProfileId changes
   useEffect(() => {
     if (!activeProfileId) return;
 
     console.log(`[State] Loading data for profile: ${activeProfileId}`);
+    setIsProfileLoading(true);
 
-    // Load from per-profile localStorage keys
+    // Load from per-profile localStorage keys SYNCHRONOUSLY
     try {
       const calendarData = localStorage.getItem(`socialai_calendar_${activeProfileId}`);
       const blogData = localStorage.getItem(`socialai_blog_${activeProfileId}`);
@@ -987,19 +991,23 @@ export default function App() {
       const researchData = localStorage.getItem(`socialai_research_${activeProfileId}`);
       const strategyData = localStorage.getItem(`socialai_strategy_${activeProfileId}`);
 
-      if (calendarData) setCalendarState(JSON.parse(calendarData));
-      if (blogData) setBlogState(JSON.parse(blogData));
-      if (leadsData) setLeadsState(JSON.parse(leadsData));
-      if (emailData) setEmailState(JSON.parse(emailData));
-      if (researchData) setResearchState(JSON.parse(researchData));
-      if (strategyData) setStrategyState(JSON.parse(strategyData));
+      // Set all states in one batch
+      setCalendarState(calendarData ? JSON.parse(calendarData) : null);
+      setBlogState(blogData ? JSON.parse(blogData) : null);
+      setLeadsState(leadsData ? JSON.parse(leadsData) : null);
+      setEmailState(emailData ? JSON.parse(emailData) : null);
+      setResearchState(researchData ? JSON.parse(researchData) : null);
+      setStrategyState(strategyData ? JSON.parse(strategyData) : null);
 
       console.log(`[State] Loaded local data for profile: ${activeProfileId}`);
     } catch (e) {
       console.error('[State] Error loading local data:', e);
     }
 
-    // Also try to load from cloud if authenticated
+    // Mark loading complete after a brief delay to ensure state updates have propagated
+    setTimeout(() => setIsProfileLoading(false), 100);
+
+    // Also try to load from cloud if authenticated (async, updates will merge)
     if (isAuthenticated && user) {
       fetchAllProfileData(user.id, activeProfileId).then(cloudData => {
         if (cloudData.calendar) setCalendarState(cloudData.calendar);
@@ -1156,141 +1164,163 @@ export default function App() {
             <AppFooter />
           </div>
         );
-      case AppView.DASHBOARD: return <Dashboard key={activeProfileId} profile={profile!} onNavigate={setView} />;
-      case AppView.RESEARCH: return <ResearchView key={activeProfileId} profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
-      case AppView.STRATEGY: return <div key={activeProfileId} className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
-      case AppView.CALENDAR: return <CalendarView key={activeProfileId} profile={profile!} savedState={calendarState} onStateChange={setCalendarState} />;
-      case AppView.LEADS: return <LeadsView key={activeProfileId} profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
-      case AppView.EMAIL: return <EmailView key={activeProfileId} profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
-      case AppView.BLOG: return <BlogView key={activeProfileId} profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
-      case AppView.ANALYTICS: return <AnalyticsView key={activeProfileId} profile={profile!} />;
-      case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
-      default: return <div>Not Implemented</div>;
-    }
-  };
+      // Show loading screen while profile data is being loaded
+      case AppView.DASHBOARD:
+      case AppView.RESEARCH:
+      case AppView.STRATEGY:
+      case AppView.CALENDAR:
+      case AppView.LEADS:
+      case AppView.EMAIL:
+      case AppView.BLOG:
+      case AppView.ANALYTICS:
+      case AppView.SETTINGS:
+        if (isProfileLoading) {
+          return (
+            <div className="h-full flex items-center justify-center bg-slate-50">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-600 font-medium">Loading profile data...</p>
+              </div>
+            </div>
+          );
+        }
+        // Render the actual component based on view
+        switch (view) {
+          case AppView.DASHBOARD: return <Dashboard key={activeProfileId} profile={profile!} onNavigate={setView} />;
+          case AppView.RESEARCH: return <ResearchView key={activeProfileId} profile={profile!} savedState={researchState} onStateChange={setResearchState} />;
+          case AppView.STRATEGY: return <div key={activeProfileId} className="p-8 h-full overflow-y-auto"><h1 className="text-2xl font-bold mb-4">Marketing Strategy</h1><StrategyWrapper profile={profile!} researchText={researchState?.report?.rawContent || ''} savedState={strategyState} onStateChange={setStrategyState} /></div>;
+          case AppView.CALENDAR: return <CalendarView key={activeProfileId} profile={profile!} savedState={calendarState} onStateChange={setCalendarState} />;
+          case AppView.LEADS: return <LeadsView key={activeProfileId} profile={profile!} savedState={leadsState} onStateChange={setLeadsState} onAddToEmailCampaign={(leads) => { setLeadsForEmail(leads); setView(AppView.EMAIL); }} />;
+          case AppView.EMAIL: return <EmailView key={activeProfileId} profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
+          case AppView.BLOG: return <BlogView key={activeProfileId} profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
+          case AppView.ANALYTICS: return <AnalyticsView key={activeProfileId} profile={profile!} />;
+          case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
+          default: return <div>Not Implemented</div>;
+        }
+    };
 
-  const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH;
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH;
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Close mobile menu when view changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [view]);
+    // Close mobile menu when view changes
+    useEffect(() => {
+      setMobileMenuOpen(false);
+    }, [view]);
 
-  return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      {/* API Key Warning Banner */}
-      {!hasApiKey && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
-          <AlertTriangle size={12} />
-          <span className="hidden sm:inline">WARNING: No LLM API Key configured. Please add VITE_GROQ_API_KEY to your Netlify Environment Variables.</span>
-          <span className="sm:hidden">No API Key configured</span>
-        </div>
-      )}
-
-      {/* Mobile Header - Only shown on mobile when sidebar should be visible */}
-      {showSidebar && (
-        <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-brand-600 font-bold text-lg">
-            <MarketMILogo className="w-7 h-7 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
+    return (
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
+        {/* API Key Warning Banner */}
+        {!hasApiKey && (
+          <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
+            <AlertTriangle size={12} />
+            <span className="hidden sm:inline">WARNING: No LLM API Key configured. Please add VITE_GROQ_API_KEY to your Netlify Environment Variables.</span>
+            <span className="sm:hidden">No API Key configured</span>
           </div>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Mobile Overlay */}
-      {showSidebar && mobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+        {/* Mobile Header - Only shown on mobile when sidebar should be visible */}
+        {showSidebar && (
+          <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-brand-600 font-bold text-lg">
+              <MarketMILogo className="w-7 h-7 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        )}
 
-      {/* Sidebar - Hidden on mobile, slide-out drawer when menu is open */}
-      {showSidebar && (
-        <aside className={`
+        {/* Mobile Overlay */}
+        {showSidebar && mobileMenuOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Sidebar - Hidden on mobile, slide-out drawer when menu is open */}
+        {showSidebar && (
+          <aside className={`
           fixed lg:relative inset-y-0 left-0 z-50
           w-72 lg:w-64 bg-white border-r border-slate-200 
           flex flex-col shrink-0
           transform transition-transform duration-300 ease-in-out
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
-          <div className="p-6 border-b border-slate-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-brand-600 font-bold text-xl cursor-pointer" onClick={() => setView(AppView.LANDING)}>
-                <MarketMILogo className="w-8 h-8 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-brand-600 font-bold text-xl cursor-pointer" onClick={() => setView(AppView.LANDING)}>
+                  <MarketMILogo className="w-8 h-8 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="lg:hidden p-1 rounded hover:bg-slate-100"
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="lg:hidden p-1 rounded hover:bg-slate-100"
-              >
-                <X size={20} />
-              </button>
             </div>
-          </div>
 
 
-          {/* Profile Switcher */}
-          <div className="px-4 pt-4 pb-2">
-            <ProfileSwitcher
-              profiles={allProfiles}
-              activeProfile={profile}
-              onSwitchProfile={switchProfile}
-              onCreateNew={() => setView(AppView.ONBOARDING)}
-              onDeleteProfile={deleteProfile}
-            />
-          </div>
+            {/* Profile Switcher */}
+            <div className="px-4 pt-4 pb-2">
+              <ProfileSwitcher
+                profiles={allProfiles}
+                activeProfile={profile}
+                onSwitchProfile={switchProfile}
+                onCreateNew={() => setView(AppView.ONBOARDING)}
+                onDeleteProfile={deleteProfile}
+              />
+            </div>
 
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
-            <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
-            <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
-            <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
-            <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
-            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
-            <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
-            <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
-            <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
-            <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
-            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
-            <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
-          </nav>
-          <div className="p-4 border-t border-slate-100 space-y-3">
-            {/* Live Consultant button - DISABLED until better TTS solution */}
-            {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
+            <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+              <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
+              <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
+              <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
+              <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
+              <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
+              <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
+              <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
+              <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
+              <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
+              <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
+              <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
+              <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
+            </nav>
+            <div className="p-4 border-t border-slate-100 space-y-3">
+              {/* Live Consultant button - DISABLED until better TTS solution */}
+              {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
               <Mic size={18} className="animate-pulse" /> Live Consultant
             </button> */}
-            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-              <Settings size={16} /> LLM Diagnostics
-            </button>
-            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-              <LogOut size={16} /> Logout / Reset
-            </button>
-          </div>
-        </aside>
-      )
-      }
+              <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+                <Settings size={16} /> LLM Diagnostics
+              </button>
+              <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+                <LogOut size={16} /> Logout / Reset
+              </button>
+            </div>
+          </aside>
+        )
+        }
 
-      {/* Main Content Area */}
-      <main className={`
+        {/* Main Content Area */}
+        <main className={`
         flex-1 relative
         ${view === AppView.LANDING || view === AppView.ONBOARDING ? 'h-full overflow-y-auto' : 'overflow-hidden'} 
         ${!hasApiKey ? 'mt-6' : ''}
         ${showSidebar ? 'pt-14 lg:pt-0' : ''}
       `}>
-        {renderContent()}
-      </main>
+          {renderContent()}
+        </main>
 
-      {/* Modals and Overlays */}
-      <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
-      {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
-      {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
-    </div >
-  );
-}
+        {/* Modals and Overlays */}
+        <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
+        {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
+        {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
+      </div >
+    );
+  }
