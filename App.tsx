@@ -40,7 +40,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
-import { fetchAllUserData, saveUserData, DataType } from './services/dataService';
+import { fetchAllProfileData, saveUserData, DataType } from './services/dataService';
 import ReactMarkdown from 'react-markdown';
 import { InlineChat } from './components/InlineChat';
 
@@ -602,15 +602,50 @@ export default function App() {
     ));
   };
 
-  const switchProfile = (profileId: string) => {
+  const switchProfile = async (profileId: string) => {
     setActiveProfileId(profileId);
-    // Clear component states when switching profiles
+
+    // Clear component states first
     setCalendarState(null);
     setLeadsState(null);
     setEmailState(null);
     setBlogState(null);
     setResearchState(null);
     setStrategyState(null);
+
+    // Load data for this profile from cloud if authenticated
+    if (isAuthenticated && user) {
+      console.log(`[Profile] Loading data for profile ${profileId} from cloud...`);
+      const profileData = await fetchAllProfileData(user.id, profileId);
+
+      if (profileData.calendar) setCalendarState(profileData.calendar);
+      if (profileData.leads) setLeadsState(profileData.leads);
+      if (profileData.email) setEmailState(profileData.email);
+      if (profileData.blog) setBlogState(profileData.blog);
+      if (profileData.research) setResearchState(profileData.research);
+      if (profileData.strategy) setStrategyState(profileData.strategy);
+
+      console.log(`[Profile] Data loaded for profile ${profileId}`);
+    } else {
+      // Try to load from localStorage as fallback (per-profile keys)
+      try {
+        const calendarData = localStorage.getItem(`socialai_calendar_${profileId}`);
+        const leadsData = localStorage.getItem(`socialai_leads_${profileId}`);
+        const emailData = localStorage.getItem(`socialai_email_${profileId}`);
+        const blogData = localStorage.getItem(`socialai_blog_${profileId}`);
+        const researchData = localStorage.getItem(`socialai_research_${profileId}`);
+        const strategyData = localStorage.getItem(`socialai_strategy_${profileId}`);
+
+        if (calendarData) setCalendarState(JSON.parse(calendarData));
+        if (leadsData) setLeadsState(JSON.parse(leadsData));
+        if (emailData) setEmailState(JSON.parse(emailData));
+        if (blogData) setBlogState(JSON.parse(blogData));
+        if (researchData) setResearchState(JSON.parse(researchData));
+        if (strategyData) setStrategyState(JSON.parse(strategyData));
+      } catch (e) {
+        console.error('[Profile] Error loading local data:', e);
+      }
+    }
   };
 
   const createNewProfile = (newProfile: CompanyProfile) => {
@@ -965,61 +1000,62 @@ export default function App() {
     } catch { return null; }
   });
 
-  // Save states to localStorage and cloud when they change
+  // Save states to localStorage and cloud when they change (per-profile)
   useEffect(() => {
-    if (calendarState) {
-      localStorage.setItem('socialai_calendar_state', JSON.stringify(calendarState));
+    if (calendarState && activeProfileId) {
+      // Save to per-profile localStorage key
+      localStorage.setItem(`socialai_calendar_${activeProfileId}`, JSON.stringify(calendarState));
       // Sync to cloud if authenticated
       if (isAuthenticated && user) {
-        saveUserData(user.id, 'calendar', calendarState);
+        saveUserData(user.id, activeProfileId, 'calendar', calendarState);
       }
     }
-  }, [calendarState, isAuthenticated, user]);
+  }, [calendarState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (blogState) {
-      localStorage.setItem('socialai_blog_state', JSON.stringify(blogState));
+    if (blogState && activeProfileId) {
+      localStorage.setItem(`socialai_blog_${activeProfileId}`, JSON.stringify(blogState));
       if (isAuthenticated && user) {
-        saveUserData(user.id, 'blog', blogState);
+        saveUserData(user.id, activeProfileId, 'blog', blogState);
       }
     }
-  }, [blogState, isAuthenticated, user]);
+  }, [blogState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (leadsState) {
-      localStorage.setItem('socialai_leads_state', JSON.stringify(leadsState));
+    if (leadsState && activeProfileId) {
+      localStorage.setItem(`socialai_leads_${activeProfileId}`, JSON.stringify(leadsState));
       if (isAuthenticated && user) {
-        saveUserData(user.id, 'leads', leadsState);
+        saveUserData(user.id, activeProfileId, 'leads', leadsState);
       }
     }
-  }, [leadsState, isAuthenticated, user]);
+  }, [leadsState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (emailState) {
-      localStorage.setItem('socialai_email_state', JSON.stringify(emailState));
+    if (emailState && activeProfileId) {
+      localStorage.setItem(`socialai_email_${activeProfileId}`, JSON.stringify(emailState));
       if (isAuthenticated && user) {
-        saveUserData(user.id, 'email', emailState);
+        saveUserData(user.id, activeProfileId, 'email', emailState);
       }
     }
-  }, [emailState, isAuthenticated, user]);
+  }, [emailState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (researchState) {
-      localStorage.setItem('socialai_research_state', JSON.stringify(researchState));
+    if (researchState && activeProfileId) {
+      localStorage.setItem(`socialai_research_${activeProfileId}`, JSON.stringify(researchState));
       if (isAuthenticated && user) {
-        saveUserData(user.id, 'research', researchState);
+        saveUserData(user.id, activeProfileId, 'research', researchState);
       }
     }
-  }, [researchState, isAuthenticated, user]);
+  }, [researchState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (strategyState) {
-      localStorage.setItem('socialai_strategy_state', JSON.stringify(strategyState));
+    if (strategyState && activeProfileId) {
+      localStorage.setItem(`socialai_strategy_${activeProfileId}`, JSON.stringify(strategyState));
       if (isAuthenticated && user) {
-        saveUserData(user.id, 'strategy', strategyState);
+        saveUserData(user.id, activeProfileId, 'strategy', strategyState);
       }
     }
-  }, [strategyState, isAuthenticated, user]);
+  }, [strategyState, isAuthenticated, user, activeProfileId]);
 
   const renderContent = () => {
     if (view === AppView.LANDING) {
