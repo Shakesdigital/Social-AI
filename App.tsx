@@ -656,6 +656,15 @@ export default function App() {
     };
     setAllProfiles(prev => [...prev, profileWithId]);
     setActiveProfileId(profileWithId.id);
+
+    // Clear component states so new profile starts with empty dashboard
+    setCalendarState(null);
+    setLeadsState(null);
+    setEmailState(null);
+    setBlogState(null);
+    setResearchState(null);
+    setStrategyState(null);
+
     return profileWithId;
   };
 
