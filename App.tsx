@@ -827,6 +827,9 @@ export default function App() {
     // We preserve user ID so if same user comes back, we know it's them
     localStorage.setItem('socialai_logged_out', 'true');
 
+    // Reset OAuth handled so next user can sign in with OAuth
+    setOauthHandled(false);
+
     // Clear active profile but preserve profiles for returning user
     setActiveProfileId(null);
 

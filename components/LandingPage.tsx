@@ -15,6 +15,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onContin
   // Check if there's an existing profile for returning users
   useEffect(() => {
     try {
+      // Check if user manually logged out - don't show "Welcome back" card
+      const isLoggedOut = localStorage.getItem('socialai_logged_out') === 'true';
+      if (isLoggedOut) {
+        setExistingProfile(null);
+        setShowLoginOption(false);
+        return;
+      }
+
       const savedProfile = localStorage.getItem('socialai_profile');
       if (savedProfile) {
         const profile = JSON.parse(savedProfile) as CompanyProfile;
