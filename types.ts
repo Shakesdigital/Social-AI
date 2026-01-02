@@ -1,11 +1,13 @@
 
 export interface CompanyProfile {
+  id: string; // Unique identifier for each profile
   name: string;
   industry: string;
   description: string;
   targetAudience: string;
   brandVoice: string;
   goals: string;
+  createdAt?: string; // ISO date string
   // Website & Social Media
   website?: string;
   socialMedia?: {
@@ -18,6 +20,12 @@ export interface CompanyProfile {
     pinterest?: string;
     threads?: string;
   };
+}
+
+// Multi-profile storage structure
+export interface ProfilesStore {
+  profiles: CompanyProfile[];
+  activeProfileId: string | null;
 }
 
 export interface ResearchReport {

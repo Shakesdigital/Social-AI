@@ -22,7 +22,7 @@ import {
   LogIn,
   BarChart3
 } from 'lucide-react';
-import { AppView, CompanyProfile, ResearchReport, SocialPost, AutoPilotConfig, Lead } from './types';
+import { AppView, CompanyProfile, ProfilesStore, ResearchReport, SocialPost, AutoPilotConfig, Lead } from './types';
 import { LiveAssistant } from './components/LiveAssistant';
 import { ChatBot } from './components/ChatBot';
 import { LandingPage } from './components/LandingPage';
@@ -32,6 +32,7 @@ import { BlogView } from './components/BlogView';
 import { CalendarView } from './components/CalendarView';
 import { ProfileSettings } from './components/ProfileSettings';
 import { AnalyticsView } from './components/AnalyticsView';
+import { ProfileSwitcher } from './components/ProfileSwitcher';
 import { LLMDiagnostics } from './components/LLMDiagnostics';
 import { AuthPage } from './components/AuthPage';
 import { UserMenu } from './components/UserMenu';
@@ -127,6 +128,7 @@ const AppFooter: React.FC = () => (
 
 const Onboarding: React.FC<{ onComplete: (profile: CompanyProfile) => void }> = ({ onComplete }) => {
   const [formData, setFormData] = useState<CompanyProfile>({
+    id: '', // Will be overwritten by createNewProfile
     name: '',
     industry: '',
     description: '',
@@ -529,15 +531,106 @@ export default function App() {
   // Auth state from Supabase
   const { user, isAuthenticated, logout: authLogout, isLoading: authLoading } = useAuth();
 
-  const [profile, setProfile] = useState<CompanyProfile | null>(() => {
+  // Multi-profile state management
+  const [allProfiles, setAllProfiles] = useState<CompanyProfile[]>(() => {
     try {
-      const saved = localStorage.getItem('socialai_profile');
-      return saved ? JSON.parse(saved) : null;
+      // Try to load profiles store first
+      const saved = localStorage.getItem('socialai_profiles');
+      if (saved) {
+        const store: ProfilesStore = JSON.parse(saved);
+        return store.profiles || [];
+      }
+      // Migrate from old single profile format
+      const oldProfile = localStorage.getItem('socialai_profile');
+      if (oldProfile) {
+        const parsed = JSON.parse(oldProfile);
+        // Add ID if missing (migration)
+        const migratedProfile = {
+          ...parsed,
+          id: parsed.id || 'profile_' + Date.now(),
+          createdAt: parsed.createdAt || new Date().toISOString()
+        };
+        return [migratedProfile];
+      }
+      return [];
     } catch (e) {
-      console.error("Failed to parse profile", e);
+      console.error("Failed to load profiles", e);
+      return [];
+    }
+  });
+
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('socialai_profiles');
+      if (saved) {
+        const store: ProfilesStore = JSON.parse(saved);
+        return store.activeProfileId;
+      }
+      // Check for old format
+      const oldProfile = localStorage.getItem('socialai_profile');
+      if (oldProfile) {
+        const parsed = JSON.parse(oldProfile);
+        return parsed.id || 'profile_' + Date.now();
+      }
+      return null;
+    } catch (e) {
       return null;
     }
   });
+
+  // Derived state: current active profile
+  const profile = allProfiles.find(p => p.id === activeProfileId) || null;
+
+  // Save profiles to localStorage whenever they change
+  useEffect(() => {
+    const store: ProfilesStore = {
+      profiles: allProfiles,
+      activeProfileId
+    };
+    localStorage.setItem('socialai_profiles', JSON.stringify(store));
+    // Keep old format updated for backward compatibility
+    if (profile) {
+      localStorage.setItem('socialai_profile', JSON.stringify(profile));
+    }
+  }, [allProfiles, activeProfileId, profile]);
+
+  // Profile management functions
+  const setProfile = (updatedProfile: CompanyProfile) => {
+    setAllProfiles(prev => prev.map(p =>
+      p.id === updatedProfile.id ? updatedProfile : p
+    ));
+  };
+
+  const switchProfile = (profileId: string) => {
+    setActiveProfileId(profileId);
+    // Clear component states when switching profiles
+    setCalendarState(null);
+    setLeadsState(null);
+    setEmailState(null);
+    setBlogState(null);
+    setResearchState(null);
+    setStrategyState(null);
+  };
+
+  const createNewProfile = (newProfile: CompanyProfile) => {
+    const profileWithId = {
+      ...newProfile,
+      id: 'profile_' + Date.now(),
+      createdAt: new Date().toISOString()
+    };
+    setAllProfiles(prev => [...prev, profileWithId]);
+    setActiveProfileId(profileWithId.id);
+  };
+
+  const deleteProfile = (profileId: string) => {
+    setAllProfiles(prev => prev.filter(p => p.id !== profileId));
+    // If deleting active profile, switch to first remaining one
+    if (profileId === activeProfileId) {
+      const remaining = allProfiles.filter(p => p.id !== profileId);
+      setActiveProfileId(remaining.length > 0 ? remaining[0].id : null);
+    }
+  };
+
 
   const [view, setView] = useState<AppView>(() => {
     try {
@@ -662,13 +755,17 @@ export default function App() {
   }, [profile, view]);
 
   const handleOnboardingComplete = async (p: CompanyProfile) => {
-    setProfile(p);
+    // Add to multi-profile system
+    createNewProfile(p);
+
+    // Save to legacy local storage for backward compatibility
     localStorage.setItem('socialai_profile', JSON.stringify(p));
     localStorage.removeItem('socialai_logged_out'); // Clear logged out flag
 
     // Save to Supabase for cross-device sync
     if (user) {
       console.log('[Onboarding] Saving profile to Supabase...');
+      // Note: Supabase saving might need update for multi-profile later
       await saveProfile(user.id, p);
     }
 
@@ -823,7 +920,7 @@ export default function App() {
       case AppView.EMAIL: return <EmailView profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
       case AppView.BLOG: return <BlogView profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
       case AppView.ANALYTICS: return <AnalyticsView profile={profile!} />;
-      case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => { setProfile(updatedProfile); localStorage.setItem('socialai_profile', JSON.stringify(updatedProfile)); }} onBack={() => setView(AppView.DASHBOARD)} />;
+      case AppView.SETTINGS: return <ProfileSettings profile={profile!} onSave={(updatedProfile) => setProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
       default: return <div>Not Implemented</div>;
     }
   };
@@ -893,49 +990,63 @@ export default function App() {
               </button>
             </div>
           </div>
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
-            <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
-            <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
-            <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
-            <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
-            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
-            <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
-            <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
-            <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
-            <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
-            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
-            <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
-          </nav>
-          <div className="p-4 border-t border-slate-100 space-y-3">
-            {/* Live Consultant button - DISABLED until better TTS solution */}
-            {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
+        </div>
+          
+          {/* Profile Switcher */}
+      <div className="px-4 pt-4 pb-2">
+        <ProfileSwitcher
+          profiles={allProfiles}
+          activeProfile={profile}
+          onSwitchProfile={switchProfile}
+          onCreateNew={() => setView(AppView.ONBOARDING)}
+          onDeleteProfile={deleteProfile}
+        />
+      </div>
+
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
+        <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
+        <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
+        <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
+        <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
+        <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
+        <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
+        <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
+        <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
+        <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
+        <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
+        <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
+      </nav>
+      <div className="p-4 border-t border-slate-100 space-y-3">
+        {/* Live Consultant button - DISABLED until better TTS solution */}
+        {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
               <Mic size={18} className="animate-pulse" /> Live Consultant
             </button> */}
-            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-              <Settings size={16} /> LLM Diagnostics
-            </button>
-            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-              <LogOut size={16} /> Logout / Reset
-            </button>
-          </div>
-        </aside>
-      )}
+        <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+          <Settings size={16} /> LLM Diagnostics
+        </button>
+        <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+          <LogOut size={16} /> Logout / Reset
+        </button>
+      </div>
+    </aside>
+  )
+}
 
-      {/* Main Content Area */}
-      <main className={`
+{/* Main Content Area */ }
+<main className={`
         flex-1 relative
         ${view === AppView.LANDING || view === AppView.ONBOARDING ? 'h-full overflow-y-auto' : 'overflow-hidden'} 
         ${!hasApiKey ? 'mt-6' : ''}
         ${showSidebar ? 'pt-14 lg:pt-0' : ''}
       `}>
-        {renderContent()}
-      </main>
+  {renderContent()}
+</main>
 
-      {/* Modals and Overlays */}
-      <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
-      {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
-      {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
-    </div>
+{/* Modals and Overlays */ }
+<LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
+{ view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot /> }
+{ showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} /> }
+    </div >
   );
 }
