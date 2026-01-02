@@ -384,11 +384,12 @@ Give specific, actionable advice. Be concise but comprehensive.`,
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 p-4 bg-gradient-to-r from-brand-600 to-brand-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 z-40 transform ${isOpen ? 'scale-0 opacity-0 rotate-90' : 'scale-100 opacity-100 rotate-0'
+        className={`fixed bottom-6 right-6 px-4 py-3 bg-gradient-to-r from-brand-600 to-brand-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 z-40 transform flex items-center gap-2 ${isOpen ? 'scale-0 opacity-0 rotate-90' : 'scale-100 opacity-100 rotate-0'
           }`}
         aria-label="Open Chat"
       >
-        <MessageSquare size={24} />
+        <MessageSquare size={22} />
+        <span className="font-semibold text-sm">Chat With Me</span>
       </button>
 
       {/* Chat Window */}
