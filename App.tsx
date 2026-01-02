@@ -964,53 +964,54 @@ export default function App() {
   // LIFTED STATE FOR COMPONENT PERSISTENCE
   // ========================================
 
-  // Calendar state
-  const [calendarState, setCalendarState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('socialai_calendar_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+  // Component states - these will be loaded per-profile
+  const [calendarState, setCalendarState] = useState<any>(null);
+  const [blogState, setBlogState] = useState<any>(null);
+  const [leadsState, setLeadsState] = useState<any>(null);
+  const [emailState, setEmailState] = useState<any>(null);
+  const [researchState, setResearchState] = useState<any>(null);
+  const [strategyState, setStrategyState] = useState<any>(null);
 
-  // Blog state
-  const [blogState, setBlogState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('socialai_blog_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+  // Load per-profile data when activeProfileId changes
+  useEffect(() => {
+    if (!activeProfileId) return;
 
-  // Leads state
-  const [leadsState, setLeadsState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('socialai_leads_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+    console.log(`[State] Loading data for profile: ${activeProfileId}`);
 
-  // Email state
-  const [emailState, setEmailState] = useState(() => {
+    // Load from per-profile localStorage keys
     try {
-      const saved = localStorage.getItem('socialai_email_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+      const calendarData = localStorage.getItem(`socialai_calendar_${activeProfileId}`);
+      const blogData = localStorage.getItem(`socialai_blog_${activeProfileId}`);
+      const leadsData = localStorage.getItem(`socialai_leads_${activeProfileId}`);
+      const emailData = localStorage.getItem(`socialai_email_${activeProfileId}`);
+      const researchData = localStorage.getItem(`socialai_research_${activeProfileId}`);
+      const strategyData = localStorage.getItem(`socialai_strategy_${activeProfileId}`);
 
-  // Research state
-  const [researchState, setResearchState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('socialai_research_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+      if (calendarData) setCalendarState(JSON.parse(calendarData));
+      if (blogData) setBlogState(JSON.parse(blogData));
+      if (leadsData) setLeadsState(JSON.parse(leadsData));
+      if (emailData) setEmailState(JSON.parse(emailData));
+      if (researchData) setResearchState(JSON.parse(researchData));
+      if (strategyData) setStrategyState(JSON.parse(strategyData));
 
-  // Strategy state
-  const [strategyState, setStrategyState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('socialai_strategy_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+      console.log(`[State] Loaded local data for profile: ${activeProfileId}`);
+    } catch (e) {
+      console.error('[State] Error loading local data:', e);
+    }
+
+    // Also try to load from cloud if authenticated
+    if (isAuthenticated && user) {
+      fetchAllProfileData(user.id, activeProfileId).then(cloudData => {
+        if (cloudData.calendar) setCalendarState(cloudData.calendar);
+        if (cloudData.blog) setBlogState(cloudData.blog);
+        if (cloudData.leads) setLeadsState(cloudData.leads);
+        if (cloudData.email) setEmailState(cloudData.email);
+        if (cloudData.research) setResearchState(cloudData.research);
+        if (cloudData.strategy) setStrategyState(cloudData.strategy);
+        console.log(`[State] Loaded cloud data for profile: ${activeProfileId}`);
+      });
+    }
+  }, [activeProfileId]); // Only run when profile changes
 
   // Save states to localStorage and cloud when they change (per-profile)
   useEffect(() => {
