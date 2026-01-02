@@ -778,12 +778,17 @@ export default function App() {
     }
   }, [isAuthenticated, user, authLoading, view, oauthHandled, allProfiles]);
 
-  // Sync state: If profile is null and not authenticated, force view to Landing or Onboarding or Auth
+  // Sync state: Only redirect to landing if user is NOT authenticated AND has no profile
+  // Authenticated users without profiles should stay on onboarding, not get redirected to landing
   useEffect(() => {
-    if (!profile && view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH) {
+    // Don't redirect if:
+    // 1. User has a profile (can access any view)
+    // 2. User is on landing, onboarding, or auth pages (allowed without profile)
+    // 3. User is authenticated (they may be going through onboarding flow)
+    if (!profile && !isAuthenticated && view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH) {
       setView(AppView.LANDING);
     }
-  }, [profile, view]);
+  }, [profile, view, isAuthenticated]);
 
   const handleOnboardingComplete = async (p: CompanyProfile) => {
     // Add to multi-profile system
