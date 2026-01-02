@@ -1197,130 +1197,132 @@ export default function App() {
           case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
           default: return <div>Not Implemented</div>;
         }
-    };
+      default: return <div>Not Implemented</div>;
+    }
+  };
 
-    const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH;
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    // Close mobile menu when view changes
-    useEffect(() => {
-      setMobileMenuOpen(false);
-    }, [view]);
+  // Close mobile menu when view changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [view]);
 
-    return (
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
-        {/* API Key Warning Banner */}
-        {!hasApiKey && (
-          <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
-            <AlertTriangle size={12} />
-            <span className="hidden sm:inline">WARNING: No LLM API Key configured. Please add VITE_GROQ_API_KEY to your Netlify Environment Variables.</span>
-            <span className="sm:hidden">No API Key configured</span>
+  return (
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* API Key Warning Banner */}
+      {!hasApiKey && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs font-bold text-center py-1 flex items-center justify-center gap-2">
+          <AlertTriangle size={12} />
+          <span className="hidden sm:inline">WARNING: No LLM API Key configured. Please add VITE_GROQ_API_KEY to your Netlify Environment Variables.</span>
+          <span className="sm:hidden">No API Key configured</span>
+        </div>
+      )}
+
+      {/* Mobile Header - Only shown on mobile when sidebar should be visible */}
+      {showSidebar && (
+        <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-brand-600 font-bold text-lg">
+            <MarketMILogo className="w-7 h-7 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
           </div>
-        )}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      )}
 
-        {/* Mobile Header - Only shown on mobile when sidebar should be visible */}
-        {showSidebar && (
-          <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-brand-600 font-bold text-lg">
-              <MarketMILogo className="w-7 h-7 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
-            </div>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        )}
+      {/* Mobile Overlay */}
+      {showSidebar && mobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
-        {/* Mobile Overlay */}
-        {showSidebar && mobileMenuOpen && (
-          <div
-            className="lg:hidden fixed inset-0 bg-black/50 z-40"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
-
-        {/* Sidebar - Hidden on mobile, slide-out drawer when menu is open */}
-        {showSidebar && (
-          <aside className={`
+      {/* Sidebar - Hidden on mobile, slide-out drawer when menu is open */}
+      {showSidebar && (
+        <aside className={`
           fixed lg:relative inset-y-0 left-0 z-50
           w-72 lg:w-64 bg-white border-r border-slate-200 
           flex flex-col shrink-0
           transform transition-transform duration-300 ease-in-out
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
-            <div className="p-6 border-b border-slate-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-brand-600 font-bold text-xl cursor-pointer" onClick={() => setView(AppView.LANDING)}>
-                  <MarketMILogo className="w-8 h-8 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
-                </div>
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="lg:hidden p-1 rounded hover:bg-slate-100"
-                >
-                  <X size={20} />
-                </button>
+          <div className="p-6 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-brand-600 font-bold text-xl cursor-pointer" onClick={() => setView(AppView.LANDING)}>
+                <MarketMILogo className="w-8 h-8 object-contain" onClick={() => setView(AppView.LANDING)} /> <span>Market MI</span>
               </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="lg:hidden p-1 rounded hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
             </div>
+          </div>
 
 
-            {/* Profile Switcher */}
-            <div className="px-4 pt-4 pb-2">
-              <ProfileSwitcher
-                profiles={allProfiles}
-                activeProfile={profile}
-                onSwitchProfile={switchProfile}
-                onCreateNew={() => setView(AppView.ONBOARDING)}
-                onDeleteProfile={deleteProfile}
-              />
-            </div>
+          {/* Profile Switcher */}
+          <div className="px-4 pt-4 pb-2">
+            <ProfileSwitcher
+              profiles={allProfiles}
+              activeProfile={profile}
+              onSwitchProfile={switchProfile}
+              onCreateNew={() => setView(AppView.ONBOARDING)}
+              onDeleteProfile={deleteProfile}
+            />
+          </div>
 
-            <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-              <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
-              <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
-              <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
-              <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
-              <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
-              <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
-              <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
-              <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
-              <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
-              <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
-              <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
-              <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
-            </nav>
-            <div className="p-4 border-t border-slate-100 space-y-3">
-              {/* Live Consultant button - DISABLED until better TTS solution */}
-              {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            <NavButton active={view === AppView.DASHBOARD} onClick={() => setView(AppView.DASHBOARD)} icon={<LayoutDashboard size={20} />} label="Dashboard" />
+            <div className="pt-2 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Social Media</span></div>
+            <NavButton active={view === AppView.RESEARCH} onClick={() => setView(AppView.RESEARCH)} icon={<Search size={20} />} label="Market Research" />
+            <NavButton active={view === AppView.STRATEGY} onClick={() => setView(AppView.STRATEGY)} icon={<Lightbulb size={20} />} label="Strategy" />
+            <NavButton active={view === AppView.CALENDAR} onClick={() => setView(AppView.CALENDAR)} icon={<CalendarIcon size={20} />} label="Content Calendar" />
+            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Marketing Suite</span></div>
+            <NavButton active={view === AppView.LEADS} onClick={() => setView(AppView.LEADS)} icon={<Users size={20} />} label="Lead Research" />
+            <NavButton active={view === AppView.EMAIL} onClick={() => setView(AppView.EMAIL)} icon={<Mail size={20} />} label="Email Marketing" />
+            <NavButton active={view === AppView.BLOG} onClick={() => setView(AppView.BLOG)} icon={<FileText size={20} />} label="Blog Content" />
+            <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
+            <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
+            <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
+          </nav>
+          <div className="p-4 border-t border-slate-100 space-y-3">
+            {/* Live Consultant button - DISABLED until better TTS solution */}
+            {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
               <Mic size={18} className="animate-pulse" /> Live Consultant
             </button> */}
-              <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-                <Settings size={16} /> LLM Diagnostics
-              </button>
-              <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-                <LogOut size={16} /> Logout / Reset
-              </button>
-            </div>
-          </aside>
-        )
-        }
+            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+              <Settings size={16} /> LLM Diagnostics
+            </button>
+            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
+              <LogOut size={16} /> Logout / Reset
+            </button>
+          </div>
+        </aside>
+      )
+      }
 
-        {/* Main Content Area */}
-        <main className={`
+      {/* Main Content Area */}
+      <main className={`
         flex-1 relative
         ${view === AppView.LANDING || view === AppView.ONBOARDING ? 'h-full overflow-y-auto' : 'overflow-hidden'} 
         ${!hasApiKey ? 'mt-6' : ''}
         ${showSidebar ? 'pt-14 lg:pt-0' : ''}
       `}>
-          {renderContent()}
-        </main>
+        {renderContent()}
+      </main>
 
-        {/* Modals and Overlays */}
-        <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
-        {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
-        {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
-      </div >
-    );
-  }
+      {/* Modals and Overlays */}
+      <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
+      {view !== AppView.LANDING && view !== AppView.ONBOARDING && <ChatBot />}
+      {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
+    </div >
+  );
+}
