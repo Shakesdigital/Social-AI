@@ -44,12 +44,18 @@ export const ChatBot: React.FC = () => {
 
   // Voice input state
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(() => {
+    return localStorage.getItem('marketmi_voice_mode') === 'true';
+  });
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Toggle voice mode - stops speaking when disabled
   const toggleVoiceMode = () => {
-    if (voiceModeEnabled) {
+    const newState = !voiceModeEnabled;
+    setVoiceModeEnabled(newState);
+    localStorage.setItem('marketmi_voice_mode', String(newState));
+
+    if (!newState) {
       // Turning OFF - stop any speaking
       ttsStopSpeaking();
       setIsSpeaking(false);
@@ -57,7 +63,6 @@ export const ChatBot: React.FC = () => {
       // Turning ON - unlock mobile audio
       unlockMobileAudio();
     }
-    setVoiceModeEnabled(!voiceModeEnabled);
   };
 
   // Start/stop voice recording
@@ -134,7 +139,10 @@ export const ChatBot: React.FC = () => {
 
   // Speak AI response when voice mode is on
   const speakResponse = async (text: string) => {
-    if (voiceModeEnabled) {
+    // Check both state and localStorage for consistency
+    const isVoiceOn = voiceModeEnabled || localStorage.getItem('marketmi_voice_mode') === 'true';
+
+    if (isVoiceOn) {
       setIsSpeaking(true);
       try {
         await ttsSpeak(text, 'female', {
@@ -346,6 +354,9 @@ ${profile ? `You are helping ${profile.name} in the ${profile.industry} industry
 Give specific, actionable advice. Be concise but comprehensive.`,
               temperature: 0.8
             });
+
+            // Add speech to retry success path too
+            speakResponse(retryResponse.text);
 
             addToConversation('assistant', retryResponse.text);
             // Remove the "breather" message and add the actual response
