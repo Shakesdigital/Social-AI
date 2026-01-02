@@ -40,6 +40,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
+import { fetchAllUserData, saveUserData, DataType } from './services/dataService';
 import ReactMarkdown from 'react-markdown';
 import { InlineChat } from './components/InlineChat';
 
@@ -785,6 +786,38 @@ export default function App() {
             setView(AppView.ONBOARDING);
           } else {
             console.log('[Auth] Log In mode - going to dashboard');
+
+            // Fetch all user data from cloud for cross-device sync
+            console.log('[Auth] Fetching all user data from cloud...');
+            const cloudData = await fetchAllUserData(user.id);
+
+            // Populate component states from cloud data
+            if (cloudData.calendar) {
+              setCalendarState(cloudData.calendar);
+              localStorage.setItem('socialai_calendar_state', JSON.stringify(cloudData.calendar));
+            }
+            if (cloudData.leads) {
+              setLeadsState(cloudData.leads);
+              localStorage.setItem('socialai_leads_state', JSON.stringify(cloudData.leads));
+            }
+            if (cloudData.email) {
+              setEmailState(cloudData.email);
+              localStorage.setItem('socialai_email_state', JSON.stringify(cloudData.email));
+            }
+            if (cloudData.blog) {
+              setBlogState(cloudData.blog);
+              localStorage.setItem('socialai_blog_state', JSON.stringify(cloudData.blog));
+            }
+            if (cloudData.research) {
+              setResearchState(cloudData.research);
+              localStorage.setItem('socialai_research_state', JSON.stringify(cloudData.research));
+            }
+            if (cloudData.strategy) {
+              setStrategyState(cloudData.strategy);
+              localStorage.setItem('socialai_strategy_state', JSON.stringify(cloudData.strategy));
+            }
+
+            console.log('[Auth] Cloud data loaded successfully');
             setView(AppView.DASHBOARD);
           }
         } else if (currentLocalProfiles.length > 0 && !isDifferentUser && authMode === 'login') {
@@ -932,42 +965,61 @@ export default function App() {
     } catch { return null; }
   });
 
-  // Save states to localStorage when they change
+  // Save states to localStorage and cloud when they change
   useEffect(() => {
     if (calendarState) {
       localStorage.setItem('socialai_calendar_state', JSON.stringify(calendarState));
+      // Sync to cloud if authenticated
+      if (isAuthenticated && user) {
+        saveUserData(user.id, 'calendar', calendarState);
+      }
     }
-  }, [calendarState]);
+  }, [calendarState, isAuthenticated, user]);
 
   useEffect(() => {
     if (blogState) {
       localStorage.setItem('socialai_blog_state', JSON.stringify(blogState));
+      if (isAuthenticated && user) {
+        saveUserData(user.id, 'blog', blogState);
+      }
     }
-  }, [blogState]);
+  }, [blogState, isAuthenticated, user]);
 
   useEffect(() => {
     if (leadsState) {
       localStorage.setItem('socialai_leads_state', JSON.stringify(leadsState));
+      if (isAuthenticated && user) {
+        saveUserData(user.id, 'leads', leadsState);
+      }
     }
-  }, [leadsState]);
+  }, [leadsState, isAuthenticated, user]);
 
   useEffect(() => {
     if (emailState) {
       localStorage.setItem('socialai_email_state', JSON.stringify(emailState));
+      if (isAuthenticated && user) {
+        saveUserData(user.id, 'email', emailState);
+      }
     }
-  }, [emailState]);
+  }, [emailState, isAuthenticated, user]);
 
   useEffect(() => {
     if (researchState) {
       localStorage.setItem('socialai_research_state', JSON.stringify(researchState));
+      if (isAuthenticated && user) {
+        saveUserData(user.id, 'research', researchState);
+      }
     }
-  }, [researchState]);
+  }, [researchState, isAuthenticated, user]);
 
   useEffect(() => {
     if (strategyState) {
       localStorage.setItem('socialai_strategy_state', JSON.stringify(strategyState));
+      if (isAuthenticated && user) {
+        saveUserData(user.id, 'strategy', strategyState);
+      }
     }
-  }, [strategyState]);
+  }, [strategyState, isAuthenticated, user]);
 
   const renderContent = () => {
     if (view === AppView.LANDING) {
