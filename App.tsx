@@ -1203,7 +1203,6 @@ export default function App() {
     if (view === AppView.LANDING) {
       return (
         <LandingPage
-          onPricing={() => setView(AppView.PRICING)}
           onSignIn={() => {
             // Both Sign In and Log In lead to auth page
             // After auth, the system will auto-detect:

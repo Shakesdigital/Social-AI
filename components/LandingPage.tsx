@@ -5,11 +5,10 @@ import { CompanyProfile } from '../types';
 interface LandingPageProps {
   onSignIn: () => void;  // For NEW users - goes to auth then onboarding
   onLogIn: () => void;   // For EXISTING users - goes to auth then dashboard
-  onPricing?: () => void; // Navigate to pricing page
   onContinueAsUser?: (profile: CompanyProfile) => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onPricing, onContinueAsUser }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onContinueAsUser }) => {
   const [existingProfile, setExistingProfile] = useState<CompanyProfile | null>(null);
   const [showLoginOption, setShowLoginOption] = useState(false);
 
@@ -59,13 +58,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onP
             <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-600">
               <a href="#features" className="hover:text-brand-600 transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-brand-600 transition-colors">How it Works</a>
-              <button
-                onClick={onPricing}
-                className="hover:text-brand-600 transition-colors flex items-center gap-1.5"
-              >
-                <Crown size={16} className="text-amber-500" />
-                Pricing
-              </button>
+              <a href="#pricing" className="hover:text-brand-600 transition-colors">Pricing</a>
             </div>
 
             {/* Action Buttons */}
@@ -317,6 +310,144 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onP
               <h3 className="font-bold text-lg mb-2">Auto-Pilot Execution</h3>
               <p className="text-slate-500 text-sm">Approve generated content batches and watch your accounts grow.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 sm:py-24 bg-gradient-to-b from-white to-slate-50 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Section Header */}
+          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-xs font-semibold uppercase tracking-wide mb-4">
+              <Crown size={14} className="fill-current" /> Simple Pricing
+            </div>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 text-slate-900">Choose Your Perfect Plan</h2>
+            <p className="text-base sm:text-lg md:text-xl text-slate-600 leading-relaxed">Start free and scale as you grow. All plans include our core AI-powered marketing tools.</p>
+          </div>
+
+          {/* Pricing Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-12">
+            {/* Free Tier */}
+            <div className="bg-white rounded-2xl border-2 border-slate-200 p-6 sm:p-8 hover:shadow-xl transition-all">
+              <div className="text-center mb-6">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Free</h3>
+                <p className="text-sm text-slate-500">Perfect to get started</p>
+              </div>
+              <div className="text-center mb-6">
+                <div className="flex items-baseline justify-center">
+                  <span className="text-4xl sm:text-5xl font-bold text-slate-900">$0</span>
+                  <span className="text-slate-500 ml-2">/month</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 mt-2">Free forever</p>
+              </div>
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>1 Business Profile</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>5 AI Content Generations/month</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>1 Market Research Report/month</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>10 Chat Messages/day</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Pro Tier - Highlighted */}
+            <div className="bg-white rounded-2xl border-2 border-brand-500 p-6 sm:p-8 shadow-2xl scale-[1.02] md:scale-105 relative">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-brand-600 to-brand-700 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
+                ⭐ Most Popular
+              </div>
+              <div className="text-center mb-6">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Pro</h3>
+                <p className="text-sm text-slate-500">For growing businesses</p>
+              </div>
+              <div className="text-center mb-6">
+                <div className="flex items-baseline justify-center">
+                  <span className="text-4xl sm:text-5xl font-bold text-slate-900">$12</span>
+                  <span className="text-slate-500 ml-2">/month</span>
+                </div>
+                <p className="text-xs sm:text-sm text-teal-600 font-medium mt-2">$120/year • Save $24</p>
+              </div>
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>3 Business Profiles</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>60 AI Content Generations/month</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>10 Market Research Reports/month</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>50 Chat Messages/day</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>Google Workspace Export</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Pro Plus Tier */}
+            <div className="bg-white rounded-2xl border-2 border-slate-200 p-6 sm:p-8 hover:shadow-xl transition-all">
+              <div className="text-center mb-6">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Pro Plus</h3>
+                <p className="text-sm text-slate-500">For power users</p>
+              </div>
+              <div className="text-center mb-6">
+                <div className="flex items-baseline justify-center">
+                  <span className="text-4xl sm:text-5xl font-bold text-slate-900">$19</span>
+                  <span className="text-slate-500 ml-2">/month</span>
+                </div>
+                <p className="text-xs sm:text-sm text-teal-600 font-medium mt-2">$190/year • Save $38</p>
+              </div>
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>5 Business Profiles</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>150 AI Content Generations/month</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>30 Market Research Reports/month</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>150 Chat Messages/day</span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-slate-600">
+                  <CheckCircle size={18} className="text-teal-500 shrink-0 mt-0.5" />
+                  <span>Auto-Pilot Mode</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* CTA Button */}
+          <div className="text-center">
+            <button
+              onClick={onSignIn}
+              className="px-8 py-4 bg-brand-600 text-white rounded-xl font-bold text-lg hover:bg-brand-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
+            >
+              <UserPlus size={20} /> Get Started Free
+            </button>
+            <p className="text-sm text-slate-500 mt-4">No credit card required • Upgrade anytime</p>
           </div>
         </div>
       </section>
