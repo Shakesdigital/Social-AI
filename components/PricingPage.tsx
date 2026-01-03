@@ -97,11 +97,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     ];
 
     return (
-        <div className="min-h-screen bg-white flex flex-col">
+        <div className="min-h-screen bg-white flex flex-col overflow-x-hidden overflow-y-auto">
             {/* Header */}
             <header className="fixed w-full z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16 sm:h-18 md:h-20">
+                    <div className="flex justify-between items-center h-14 sm:h-16 md:h-20">
                         {/* Logo */}
                         <div
                             className="flex items-center gap-2 cursor-pointer shrink-0"
@@ -144,36 +144,36 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </header>
 
             {/* Hero Section */}
-            <section className="pt-32 pb-16 px-4 bg-gradient-to-b from-brand-50 via-white to-white">
+            <section className="pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 px-4 sm:px-6 bg-gradient-to-b from-brand-50 via-white to-white">
                 <div className="max-w-4xl mx-auto text-center">
-                    <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
-                        <Crown size={16} />
+                    <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6">
+                        <Crown size={14} className="sm:w-4 sm:h-4" />
                         Simple, Transparent Pricing
                     </div>
-                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4 sm:mb-6 leading-tight px-2">
                         Power Your Marketing with
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-purple-600"> AI</span>
                     </h1>
-                    <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mb-10">
+                    <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-8 sm:mb-10 px-2">
                         From market research to content creation, get everything you need to grow your business. Start free, upgrade when you're ready.
                     </p>
 
                     {/* Billing Toggle */}
-                    <div className="flex items-center justify-center gap-4">
-                        <span className={`text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'}`}>
+                    <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+                        <span className={`text-xs sm:text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'}`}>
                             Monthly
                         </span>
                         <button
                             onClick={() => setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly')}
-                            className={`relative w-14 h-7 rounded-full transition-colors ${billingCycle === 'yearly' ? 'bg-brand-600' : 'bg-slate-200'}`}
+                            className={`relative w-12 sm:w-14 h-6 sm:h-7 rounded-full transition-colors ${billingCycle === 'yearly' ? 'bg-brand-600' : 'bg-slate-200'}`}
                         >
-                            <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${billingCycle === 'yearly' ? 'left-8' : 'left-1'}`} />
+                            <span className={`absolute top-0.5 sm:top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${billingCycle === 'yearly' ? 'left-6 sm:left-8' : 'left-0.5 sm:left-1'}`} />
                         </button>
-                        <span className={`text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'text-slate-900' : 'text-slate-400'}`}>
+                        <span className={`text-xs sm:text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'text-slate-900' : 'text-slate-400'}`}>
                             Yearly
                         </span>
                         {billingCycle === 'yearly' && (
-                            <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-1.5 rounded-full animate-pulse">
+                            <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full animate-pulse">
                                 Save 2 months! 🎉
                             </span>
                         )}
@@ -182,9 +182,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </section>
 
             {/* Pricing Cards */}
-            <section className="py-16 px-4">
+            <section className="py-12 sm:py-16 px-4 sm:px-6">
                 <div className="max-w-6xl mx-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-6 lg:gap-8">
                         {PRICING_PLANS.map((plan) => {
                             const isCurrentPlan = plan.tier === currentTier;
                             const price = billingCycle === 'yearly'
@@ -195,9 +195,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                             return (
                                 <div
                                     key={plan.tier}
-                                    className={`relative rounded-3xl border-2 p-8 transition-all duration-300 ${plan.highlighted
-                                            ? 'border-brand-500 bg-white shadow-2xl shadow-brand-200/50 scale-[1.02] lg:scale-105'
-                                            : 'border-slate-200 bg-white hover:shadow-xl hover:border-slate-300'
+                                    className={`relative rounded-2xl sm:rounded-3xl border-2 p-6 sm:p-8 transition-all duration-300 ${plan.highlighted
+                                        ? 'border-brand-500 bg-white shadow-xl sm:shadow-2xl shadow-brand-200/50 md:scale-[1.02] lg:scale-105'
+                                        : 'border-slate-200 bg-white hover:shadow-lg sm:hover:shadow-xl hover:border-slate-300'
                                         } ${isCurrentPlan ? 'ring-2 ring-teal-500 ring-offset-2' : ''}`}
                                 >
                                     {/* Popular Badge */}
@@ -242,10 +242,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                                         onClick={() => !isCurrentPlan && handleSelectPlan(plan.tier)}
                                         disabled={isCurrentPlan}
                                         className={`w-full py-4 rounded-xl font-bold transition-all mb-8 text-base ${isCurrentPlan
-                                                ? 'bg-slate-100 text-slate-500 cursor-default'
-                                                : plan.highlighted
-                                                    ? 'bg-gradient-to-r from-brand-600 to-purple-600 text-white hover:shadow-lg hover:shadow-brand-300/50 transform hover:-translate-y-0.5'
-                                                    : 'bg-slate-900 text-white hover:bg-slate-800'
+                                            ? 'bg-slate-100 text-slate-500 cursor-default'
+                                            : plan.highlighted
+                                                ? 'bg-gradient-to-r from-brand-600 to-purple-600 text-white hover:shadow-lg hover:shadow-brand-300/50 transform hover:-translate-y-0.5'
+                                                : 'bg-slate-900 text-white hover:bg-slate-800'
                                             }`}
                                     >
                                         {getButtonText(plan.tier)}
@@ -270,9 +270,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </section>
 
             {/* Trust Badges */}
-            <section className="py-12 bg-slate-50">
-                <div className="max-w-4xl mx-auto px-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <section className="py-10 sm:py-12 bg-slate-50">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
                         <div className="flex flex-col items-center">
                             <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center mb-3">
                                 <Shield size={24} className="text-brand-600" />
@@ -306,15 +306,16 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </section>
 
             {/* Feature Comparison Table */}
-            <section id="features" className="py-20 px-4">
+            <section id="features" className="py-14 sm:py-20 px-4 sm:px-6">
                 <div className="max-w-5xl mx-auto">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold text-slate-900 mb-4">Compare Features</h2>
-                        <p className="text-slate-600">See exactly what you get with each plan</p>
+                    <div className="text-center mb-8 sm:mb-12">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3 sm:mb-4">Compare Features</h2>
+                        <p className="text-sm sm:text-base text-slate-600">See exactly what you get with each plan</p>
+                        <p className="text-xs text-slate-400 mt-2 md:hidden">← Scroll to see all plans →</p>
                     </div>
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg">
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px]">
+                    <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-md sm:shadow-lg">
+                        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
+                            <table className="w-full min-w-[500px]">
                                 <thead>
                                     <tr className="border-b border-slate-200 bg-slate-50">
                                         <th className="text-left py-5 px-6 font-semibold text-slate-700">Feature</th>
@@ -380,21 +381,21 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </section>
 
             {/* FAQ Section */}
-            <section id="faq" className="py-20 px-4 bg-slate-50">
+            <section id="faq" className="py-14 sm:py-20 px-4 sm:px-6 bg-slate-50">
                 <div className="max-w-3xl mx-auto">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold text-slate-900 mb-4">Frequently Asked Questions</h2>
-                        <p className="text-slate-600">Everything you need to know about our pricing</p>
+                    <div className="text-center mb-8 sm:mb-12">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3 sm:mb-4">Frequently Asked Questions</h2>
+                        <p className="text-sm sm:text-base text-slate-600">Everything you need to know about our pricing</p>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                         {faqs.map((faq, index) => (
                             <div
                                 key={index}
-                                className="bg-white rounded-xl border border-slate-200 overflow-hidden transition-shadow hover:shadow-md"
+                                className="bg-white rounded-lg sm:rounded-xl border border-slate-200 overflow-hidden transition-shadow hover:shadow-md"
                             >
                                 <button
                                     onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                                    className="w-full flex items-center justify-between p-5 text-left"
+                                    className="w-full flex items-center justify-between p-4 sm:p-5 text-left gap-3"
                                 >
                                     <span className="font-semibold text-slate-800">{faq.question}</span>
                                     <ChevronDown
@@ -414,32 +415,32 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </section>
 
             {/* CTA Section */}
-            <section className="py-20 px-4 bg-gradient-to-r from-brand-600 to-purple-600">
+            <section className="py-14 sm:py-20 px-4 sm:px-6 bg-gradient-to-r from-brand-600 to-purple-600">
                 <div className="max-w-4xl mx-auto text-center text-white">
-                    <h2 className="text-3xl sm:text-4xl font-bold mb-6">Ready to Transform Your Marketing?</h2>
-                    <p className="text-lg text-white/80 mb-8 max-w-2xl mx-auto">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 px-2">Ready to Transform Your Marketing?</h2>
+                    <p className="text-base sm:text-lg text-white/80 mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
                         Join thousands of businesses using Market MI to create smarter, faster marketing content.
                     </p>
                     <button
                         onClick={onSignIn}
-                        className="bg-white text-brand-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1 inline-flex items-center gap-2"
+                        className="bg-white text-brand-600 px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-slate-50 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1 inline-flex items-center gap-2"
                     >
                         Get Started Free
-                        <ArrowRight size={20} />
+                        <ArrowRight size={18} className="sm:w-5 sm:h-5" />
                     </button>
-                    <p className="text-white/60 text-sm mt-4">No credit card required</p>
+                    <p className="text-white/60 text-xs sm:text-sm mt-3 sm:mt-4">No credit card required</p>
                 </div>
             </section>
 
             {/* Footer */}
-            <footer className="py-12 px-4 bg-slate-900 text-white">
+            <footer className="py-8 sm:py-12 px-4 sm:px-6 bg-slate-900 text-white">
                 <div className="max-w-6xl mx-auto">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6">
                         <div className="flex items-center gap-2">
-                            <img src="/market-mi-logo.png" alt="Market MI" className="w-8 h-8 object-contain brightness-0 invert" />
-                            <span className="font-bold text-lg">Market MI</span>
+                            <img src="/market-mi-logo.png" alt="Market MI" className="w-6 h-6 sm:w-8 sm:h-8 object-contain brightness-0 invert" />
+                            <span className="font-bold text-base sm:text-lg">Market MI</span>
                         </div>
-                        <div className="flex items-center gap-6 text-sm text-slate-400">
+                        <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 text-xs sm:text-sm text-slate-400">
                             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
                             <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
                             <a href="#" className="hover:text-white transition-colors">Contact</a>
