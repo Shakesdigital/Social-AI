@@ -1327,12 +1327,23 @@ export default function App() {
           default: return <div>Not Implemented</div>;
         }
       case AppView.PRICING:
-        return <PricingPage currentTier="free" onSelectPlan={(tier) => { console.log('Selected plan:', tier); setView(AppView.DASHBOARD); }} onBack={() => setView(AppView.DASHBOARD)} />;
+        return (
+          <PricingPage
+            currentTier="free"
+            onSelectPlan={(tier) => {
+              console.log('Selected plan:', tier);
+              setView(AppView.DASHBOARD);
+            }}
+            onBack={() => setView(AppView.LANDING)}
+            onSignIn={() => setView(AppView.AUTH)}
+            onLogIn={() => setView(AppView.AUTH)}
+          />
+        );
       default: return <div>Not Implemented</div>;
     }
   };
 
-  const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH;
+  const showSidebar = view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH && view !== AppView.PRICING;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Close mobile menu when view changes
@@ -1423,7 +1434,6 @@ export default function App() {
             <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
             <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
             <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
-            <NavButton active={view === AppView.PRICING} onClick={() => setView(AppView.PRICING)} icon={<Crown size={20} />} label="Pricing Plans" />
           </nav>
           <div className="p-4 border-t border-slate-100 space-y-3">
             {/* Live Consultant button - DISABLED until better TTS solution */}
