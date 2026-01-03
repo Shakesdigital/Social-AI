@@ -837,19 +837,7 @@ export default function App() {
       console.log('[Auth] Is first time user:', isFirstTimeUser);
       console.log('[Auth] Local profiles count:', allProfiles.length);
 
-      if (isDifferentUser) {
-        console.log('[Auth] Different user detected, clearing all local data');
-        clearAllProfiles();
-        setOauthHandled(false);
-      }
-
-      // Save current user ID
-      localStorage.setItem('socialai_user_id', user.id);
-
-      // For different user, we start fresh with no local profiles
-      const currentLocalProfiles = isDifferentUser ? [] : allProfiles;
-
-      // === STEP 1: Try to fetch profile from Supabase (with timeout for slow/blocked requests) ===
+      // === STEP 1: Fetch cloud profile FIRST (before clearing anything) ===
       console.log('[Auth] Fetching profile from Supabase for user:', user.id);
       let cloudProfile = null;
       let cloudFetchFailed = false;
@@ -862,13 +850,41 @@ export default function App() {
         );
 
         cloudProfile = await Promise.race([profilePromise, timeoutPromise]) as any;
+        console.log('[Auth] Cloud profile fetched:', cloudProfile ? 'Found' : 'Not found');
       } catch (e: any) {
         console.warn('[Auth] Error fetching profile (might be blocked by browser):', e.message);
         cloudFetchFailed = true;
       }
 
-      // === STEP 2: Determine if user is existing or new ===
-      // Check BOTH cloud profile AND local profiles
+      // === STEP 2: Handle user switching ===
+      // Only clear local profiles if switching to a different user AND we got their cloud data
+      let currentLocalProfiles = allProfiles;
+
+      if (isDifferentUser) {
+        console.log('[Auth] Different user detected');
+
+        if (cloudProfile) {
+          // We have the new user's cloud profile - safe to clear old data
+          console.log('[Auth] New user has cloud profile - clearing old local data');
+          clearAllProfiles();
+          currentLocalProfiles = [];
+        } else if (!cloudFetchFailed) {
+          // Cloud fetch succeeded but no profile = truly new user - clear old data
+          console.log('[Auth] New user has no cloud profile - clearing old local data');
+          clearAllProfiles();
+          currentLocalProfiles = [];
+        } else {
+          // Cloud fetch failed - keep local profiles as fallback but warn
+          console.warn('[Auth] Cloud fetch failed - keeping local profiles as fallback');
+        }
+
+        setOauthHandled(false);
+      }
+
+      // Save current user ID
+      localStorage.setItem('socialai_user_id', user.id);
+
+      // === STEP 3: Determine if user is existing or new ===
       const hasCloudProfile = !!cloudProfile;
       const hasLocalProfiles = currentLocalProfiles.length > 0;
       const isExistingUser = hasCloudProfile || hasLocalProfiles;
