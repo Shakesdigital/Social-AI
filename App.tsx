@@ -751,6 +751,9 @@ export default function App() {
   // Track if we've already handled an OAuth callback this session
   const [oauthHandled, setOauthHandled] = useState(false);
 
+  // Track which user we've already processed auth for (prevents duplicate handling)
+  const authHandledForUserRef = React.useRef<string | null>(null);
+
   // Track auth mode: 'signin' for NEW users (go to onboarding), 'login' for EXISTING users (go to dashboard)
   // Persist to localStorage so it survives OAuth redirect
   const [authMode, setAuthMode] = useState<'signin' | 'login' | null>(() => {
@@ -778,7 +781,7 @@ export default function App() {
       view,
       oauthHandled,
       authMode,
-      profilesCount: allProfiles.length
+      authHandledForUser: authHandledForUserRef.current
     });
 
     if (authLoading) {
@@ -807,10 +810,19 @@ export default function App() {
 
     if (!isAuthenticated || !user) {
       console.log('[Auth Effect] Not authenticated, skipping navigation');
+      // Reset the auth handled ref when user logs out
+      authHandledForUserRef.current = null;
       // Clean up URL if it has auth params but no user
       if (isOAuthCallback || hasAuthCode) {
         window.history.replaceState(null, '', window.location.pathname);
       }
+      return;
+    }
+
+    // CRITICAL: Check if we already processed auth for this exact user
+    // This prevents the effect from running multiple times and creating duplicates
+    if (authHandledForUserRef.current === user.id && !isOAuthCallback && !hasAuthCode) {
+      console.log('[Auth Effect] Already handled auth for this user, skipping');
       return;
     }
 
@@ -991,6 +1003,10 @@ export default function App() {
       console.log('[Auth] Clearing auth mode');
       setAuthMode(null);
 
+      // Mark this user as handled to prevent duplicate processing
+      authHandledForUserRef.current = user.id;
+      console.log('[Auth] Marked auth as handled for user:', user.id);
+
       // Clear the URL hash/params after OAuth callback
       if (isOAuthCallback || hasAuthCode) {
         setOauthHandled(true);
@@ -1001,7 +1017,8 @@ export default function App() {
 
     // Run the handler
     handleAuthChange();
-  }, [authLoading, isAuthenticated, user, view, oauthHandled, authMode, allProfiles.length]);
+    // NOTE: allProfiles.length is intentionally NOT in dependencies to prevent loops
+  }, [authLoading, isAuthenticated, user, view, oauthHandled, authMode]);
 
   // Sync state: Only redirect to landing if user is NOT authenticated AND has no profile
   // Authenticated users without profiles should stay on onboarding, not get redirected to landing
