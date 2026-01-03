@@ -866,67 +866,60 @@ export default function App() {
           };
           setAllProfiles(prev => [...prev, newProfile]);
           setActiveProfileId(cloudProfileId);
-          activeProfile = newProfile;
           console.log('[Auth] Added cloud profile with ID:', cloudProfileId);
         } else {
           // Profile already exists, just switch to it
           setActiveProfileId(existingLocalProfile.id);
-          activeProfile = existingLocalProfile;
           console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
         }
 
-        // If user clicked "Sign In" (new user flow), go to onboarding anyway
-        // If user clicked "Log In" (existing user flow), go to dashboard
-        if (authMode === 'signin') {
-          console.log('[Auth] Sign In mode - going to onboarding even with existing profile');
-          setView(AppView.ONBOARDING);
-        } else {
-          console.log('[Auth] Log In mode - going to dashboard');
+        // EXISTING USER: Has a profile in cloud → Always go to dashboard
+        // (Regardless of whether they clicked "Sign In" or "Log In")
+        console.log('[Auth] Existing user detected (has cloud profile) - going to dashboard');
 
-          // Fetch all user data from cloud for cross-device sync
-          // Use the CLOUD profile ID to fetch data saved under that ID
-          console.log('[Auth] Fetching all user data from cloud for profile:', cloudProfileId);
-          try {
-            const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
-            console.log('[Auth] Cloud data received:', Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null));
+        // Fetch all user data from cloud for cross-device sync
+        console.log('[Auth] Fetching all user data from cloud for profile:', cloudProfileId);
+        try {
+          const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
+          console.log('[Auth] Cloud data received:', Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null));
 
-            // Populate component states from cloud data
-            if (cloudData.calendar) {
-              setCalendarState(cloudData.calendar);
-              localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
-            }
-            if (cloudData.leads) {
-              setLeadsState(cloudData.leads);
-              localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
-            }
-            if (cloudData.email) {
-              setEmailState(cloudData.email);
-              localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
-            }
-            if (cloudData.blog) {
-              setBlogState(cloudData.blog);
-              localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
-            }
-            if (cloudData.research) {
-              setResearchState(cloudData.research);
-              localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
-            }
-            if (cloudData.strategy) {
-              setStrategyState(cloudData.strategy);
-              localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
-            }
-
-            console.log('[Auth] Cloud data loaded and applied successfully');
-          } catch (e) {
-            console.error('[Auth] Error fetching cloud data:', e);
+          // Populate component states from cloud data
+          if (cloudData.calendar) {
+            setCalendarState(cloudData.calendar);
+            localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
+          }
+          if (cloudData.leads) {
+            setLeadsState(cloudData.leads);
+            localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
+          }
+          if (cloudData.email) {
+            setEmailState(cloudData.email);
+            localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
+          }
+          if (cloudData.blog) {
+            setBlogState(cloudData.blog);
+            localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
+          }
+          if (cloudData.research) {
+            setResearchState(cloudData.research);
+            localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
+          }
+          if (cloudData.strategy) {
+            setStrategyState(cloudData.strategy);
+            localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
           }
 
-          console.log('[Auth] Navigating to DASHBOARD');
-          setView(AppView.DASHBOARD);
+          console.log('[Auth] Cloud data loaded and applied successfully');
+        } catch (e) {
+          console.error('[Auth] Error fetching cloud data:', e);
         }
-      } else if (currentLocalProfiles.length > 0 && !isDifferentUser && authMode === 'login') {
-        // No cloud profile but has local profiles AND same user AND logging in - use the first one
-        console.log('[Auth] Log In mode - using existing local profiles');
+
+        console.log('[Auth] Navigating to DASHBOARD');
+        setView(AppView.DASHBOARD);
+
+      } else if (currentLocalProfiles.length > 0 && !isDifferentUser) {
+        // No cloud profile but has local profiles AND same user - use the first one
+        console.log('[Auth] No cloud profile, but has local profiles - going to dashboard');
         const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
           ? activeProfileId
           : currentLocalProfiles[0].id;
@@ -951,8 +944,8 @@ export default function App() {
         console.log('[Auth] Navigating to DASHBOARD (local profile)');
         setView(AppView.DASHBOARD);
       } else {
-        // No profile anywhere OR user specifically clicked "Sign In" - go to onboarding
-        console.log('[Auth] Going to onboarding (new user or sign in mode)');
+        // NEW USER: No profile in cloud AND no local profiles → Go to onboarding
+        console.log('[Auth] New user detected (no profiles) - going to onboarding');
         setView(AppView.ONBOARDING);
       }
 
@@ -1152,40 +1145,47 @@ export default function App() {
       return (
         <LandingPage
           onSignIn={() => {
-            // NEW user flow - will go to onboarding after auth
-            setAuthMode('signin');
+            // Both Sign In and Log In lead to auth page
+            // After auth, the system will auto-detect:
+            // - Has profile → Dashboard
+            // - No profile → Onboarding
 
-            // If already authenticated, go directly to onboarding
             if (isAuthenticated && user) {
-              console.log('[Landing] Already authenticated, going to onboarding');
+              // Already authenticated - check if has profile
+              console.log('[Landing] Already authenticated, checking profile...');
               localStorage.removeItem('socialai_logged_out');
-              setView(AppView.ONBOARDING);
+
+              if (profile || allProfiles.length > 0) {
+                // Has profile → Dashboard
+                if (!activeProfileId && allProfiles.length > 0) {
+                  setActiveProfileId(allProfiles[0].id);
+                }
+                setView(AppView.DASHBOARD);
+              } else {
+                // No profile → Onboarding
+                setView(AppView.ONBOARDING);
+              }
             } else {
               // Need to authenticate first
               setView(AppView.AUTH);
             }
           }}
           onLogIn={() => {
-            // EXISTING user flow - will go to dashboard after auth
-            setAuthMode('login');
+            // Same logic as onSignIn - auto-detect user type
 
-            // If already authenticated, check for profile and route accordingly
             if (isAuthenticated && user) {
-              console.log('[Landing] Already authenticated, checking for profile');
+              console.log('[Landing] Already authenticated, checking profile...');
               localStorage.removeItem('socialai_logged_out');
 
-              // If has profile, go to dashboard; otherwise go to onboarding
               if (profile || allProfiles.length > 0) {
                 if (!activeProfileId && allProfiles.length > 0) {
                   setActiveProfileId(allProfiles[0].id);
                 }
                 setView(AppView.DASHBOARD);
               } else {
-                // No profile - need to complete onboarding first
                 setView(AppView.ONBOARDING);
               }
             } else {
-              // Need to authenticate first
               setView(AppView.AUTH);
             }
           }}
