@@ -771,71 +771,108 @@ export default function App() {
 
   // Handle auth state changes (including OAuth callback)
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to initialize
+    console.log('[Auth Effect] Running...', {
+      authLoading,
+      isAuthenticated,
+      hasUser: !!user,
+      view,
+      oauthHandled,
+      authMode
+    });
+
+    if (authLoading) {
+      console.log('[Auth Effect] Still loading, skipping...');
+      return;
+    }
+
+    // Check if this is an OAuth callback (URL contains access_token hash)
+    const isOAuthCallback = window.location.hash.includes('access_token');
+
+    // Determine if we should handle this auth state change
+    const shouldHandle = view === AppView.AUTH || (isOAuthCallback && !oauthHandled);
+
+    console.log('[Auth Effect] Should handle?', shouldHandle, { view, isOAuthCallback, oauthHandled });
+
+    if (!isAuthenticated || !user) {
+      console.log('[Auth Effect] Not authenticated, skipping navigation');
+      return;
+    }
+
+    if (!shouldHandle) {
+      console.log('[Auth Effect] shouldHandle is false, skipping navigation');
+      return;
+    }
 
     const handleAuthChange = async () => {
-      if (isAuthenticated && user) {
-        // User is authenticated
-        localStorage.removeItem('socialai_logged_out');
+      console.log('[Auth] Starting handleAuthChange...');
 
-        // Check if this is the same user or a different user
-        const storedUserId = localStorage.getItem('socialai_user_id');
-        const isDifferentUser = storedUserId && storedUserId !== user.id;
-        const isFirstTimeUser = !storedUserId;
+      // User is authenticated
+      localStorage.removeItem('socialai_logged_out');
 
-        console.log('[Auth] User authenticated:', user.id);
-        console.log('[Auth] Stored user ID:', storedUserId);
-        console.log('[Auth] Is different user:', isDifferentUser);
-        console.log('[Auth] Is first time user:', isFirstTimeUser);
+      // Check if this is the same user or a different user
+      const storedUserId = localStorage.getItem('socialai_user_id');
+      const isDifferentUser = storedUserId && storedUserId !== user.id;
+      const isFirstTimeUser = !storedUserId;
 
-        if (isDifferentUser) {
-          // Different user is logging in - clear all local data
-          console.log('[Auth] Different user detected, clearing all local data');
-          clearAllProfiles();
-          // Reset oauth handled so new user can use OAuth
-          setOauthHandled(false);
+      console.log('[Auth] User authenticated:', user.id);
+      console.log('[Auth] Stored user ID:', storedUserId);
+      console.log('[Auth] Is different user:', isDifferentUser);
+      console.log('[Auth] Is first time user:', isFirstTimeUser);
+      console.log('[Auth] Auth mode:', authMode);
+
+      if (isDifferentUser) {
+        // Different user is logging in - clear all local data
+        console.log('[Auth] Different user detected, clearing all local data');
+        clearAllProfiles();
+        // Reset oauth handled so new user can use OAuth
+        setOauthHandled(false);
+      }
+
+      // Save current user ID
+      localStorage.setItem('socialai_user_id', user.id);
+
+      // For different user, we start fresh with no local profiles
+      const currentLocalProfiles = isDifferentUser ? [] : allProfiles;
+
+      // Try to fetch profile from Supabase (cross-device sync)
+      console.log('[Auth] Fetching profile from Supabase for user:', user.id);
+      let cloudProfile = null;
+      try {
+        cloudProfile = await fetchProfile(user.id);
+      } catch (e) {
+        console.error('[Auth] Error fetching profile:', e);
+      }
+
+      if (cloudProfile) {
+        // Profile found in Supabase - existing user on new device
+        console.log('[Auth] Profile found in Supabase');
+
+        // Check if this profile already exists locally
+        const existingLocalProfile = currentLocalProfiles.find(
+          p => p.name === cloudProfile.name && p.industry === cloudProfile.industry
+        );
+
+        if (!existingLocalProfile) {
+          // Add cloud profile to local profiles
+          const newProfile = createNewProfile(cloudProfile);
+          console.log('[Auth] Added cloud profile to local storage:', newProfile.id);
+        } else {
+          // Profile already exists, just switch to it
+          setActiveProfileId(existingLocalProfile.id);
+          console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
         }
 
-        // Save current user ID
-        localStorage.setItem('socialai_user_id', user.id);
+        // If user clicked "Sign In" (new user flow), go to onboarding anyway
+        // If user clicked "Log In" (existing user flow), go to dashboard
+        if (authMode === 'signin') {
+          console.log('[Auth] Sign In mode - going to onboarding even with existing profile');
+          setView(AppView.ONBOARDING);
+        } else {
+          console.log('[Auth] Log In mode - going to dashboard');
 
-        // For different user, we start fresh with no local profiles
-        // Use a fresh read from state after clear, or empty array
-        const currentLocalProfiles = isDifferentUser ? [] : allProfiles;
-
-        // Try to fetch profile from Supabase (cross-device sync)
-        console.log('[Auth] Fetching profile from Supabase for user:', user.id);
-        const cloudProfile = await fetchProfile(user.id);
-
-        if (cloudProfile) {
-          // Profile found in Supabase - existing user on new device
-          console.log('[Auth] Profile found in Supabase');
-
-          // Check if this profile already exists locally
-          const existingLocalProfile = currentLocalProfiles.find(
-            p => p.name === cloudProfile.name && p.industry === cloudProfile.industry
-          );
-
-          if (!existingLocalProfile) {
-            // Add cloud profile to local profiles
-            const newProfile = createNewProfile(cloudProfile);
-            console.log('[Auth] Added cloud profile to local storage:', newProfile.id);
-          } else {
-            // Profile already exists, just switch to it
-            setActiveProfileId(existingLocalProfile.id);
-            console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
-          }
-
-          // If user clicked "Sign In" (new user flow), go to onboarding anyway
-          // If user clicked "Log In" (existing user flow), go to dashboard
-          if (authMode === 'signin') {
-            console.log('[Auth] Sign In mode - going to onboarding even with existing profile');
-            setView(AppView.ONBOARDING);
-          } else {
-            console.log('[Auth] Log In mode - going to dashboard');
-
-            // Fetch all user data from cloud for cross-device sync
-            console.log('[Auth] Fetching all user data from cloud...');
+          // Fetch all user data from cloud for cross-device sync
+          console.log('[Auth] Fetching all user data from cloud...');
+          try {
             const cloudData = await fetchAllUserData(user.id);
 
             // Populate component states from cloud data
@@ -865,43 +902,42 @@ export default function App() {
             }
 
             console.log('[Auth] Cloud data loaded successfully');
-            setView(AppView.DASHBOARD);
+          } catch (e) {
+            console.error('[Auth] Error fetching cloud data:', e);
           }
-        } else if (currentLocalProfiles.length > 0 && !isDifferentUser && authMode === 'login') {
-          // No cloud profile but has local profiles AND same user AND logging in - use the first one
-          console.log('[Auth] Log In mode - using existing local profiles');
-          if (!activeProfileId || !currentLocalProfiles.find(p => p.id === activeProfileId)) {
-            setActiveProfileId(currentLocalProfiles[0].id);
-          }
+
+          console.log('[Auth] Navigating to DASHBOARD');
           setView(AppView.DASHBOARD);
-        } else {
-          // No profile anywhere OR user specifically clicked "Sign In" - go to onboarding
-          console.log('[Auth] Going to onboarding (new user or sign in mode)');
-          setView(AppView.ONBOARDING);
         }
-
-        // Clear auth mode after handling
-        setAuthMode(null);
+      } else if (currentLocalProfiles.length > 0 && !isDifferentUser && authMode === 'login') {
+        // No cloud profile but has local profiles AND same user AND logging in - use the first one
+        console.log('[Auth] Log In mode - using existing local profiles');
+        if (!activeProfileId || !currentLocalProfiles.find(p => p.id === activeProfileId)) {
+          setActiveProfileId(currentLocalProfiles[0].id);
+        }
+        console.log('[Auth] Navigating to DASHBOARD (local profile)');
+        setView(AppView.DASHBOARD);
+      } else {
+        // No profile anywhere OR user specifically clicked "Sign In" - go to onboarding
+        console.log('[Auth] Going to onboarding (new user or sign in mode)');
+        setView(AppView.ONBOARDING);
       }
-    };
 
-    // Check if this is an OAuth callback (URL contains access_token hash)
-    const isOAuthCallback = window.location.hash.includes('access_token');
+      // Clear auth mode after handling
+      console.log('[Auth] Clearing auth mode');
+      setAuthMode(null);
 
-    // Only run when:
-    // 1. Coming from AUTH page (user explicitly clicked sign in)
-    // 2. OAuth callback (returned from Google/GitHub) - works on any page
-    // Do NOT run when just browsing landing page without OAuth callback
-    const shouldHandle = view === AppView.AUTH || (isOAuthCallback && !oauthHandled);
-    if (isAuthenticated && user && shouldHandle) {
-      handleAuthChange();
-      // Clear the hash and mark as handled after OAuth callback
+      // Clear the hash after OAuth callback
       if (isOAuthCallback) {
         setOauthHandled(true);
         window.history.replaceState(null, '', window.location.pathname);
       }
-    }
-  }, [isAuthenticated, user, authLoading, view, oauthHandled, allProfiles]);
+    };
+
+    // Run the handler
+    handleAuthChange();
+
+  }, [isAuthenticated, user, authLoading, view, oauthHandled, allProfiles, authMode]);
 
   // Sync state: Only redirect to landing if user is NOT authenticated AND has no profile
   // Authenticated users without profiles should stay on onboarding, not get redirected to landing
