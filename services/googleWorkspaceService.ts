@@ -105,7 +105,7 @@ export const connectGoogleWorkspace = (scopes: string = FULL_WORKSPACE_SCOPES): 
         }
 
         // Build OAuth URL
-        const redirectUri = `${window.location.origin}/google-callback`;
+        const redirectUri = `${window.location.origin}/google-callback.html`;
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
         authUrl.searchParams.set('redirect_uri', redirectUri);
