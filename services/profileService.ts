@@ -33,13 +33,16 @@ export const fetchProfile = async (userId: string): Promise<CompanyProfile | nul
         }
 
         // Convert database row to CompanyProfile
+        // IMPORTANT: Include the profile_id so we can use it for data fetching
         return {
+            id: data.profile_id || `profile_${Date.now()}`, // Use stored profile_id or generate one
             name: data.name || '',
             industry: data.industry || '',
             description: data.description || '',
             targetAudience: data.target_audience || '',
             brandVoice: data.brand_voice || '',
             goals: data.goals || '',
+            createdAt: data.created_at,
         };
     } catch (error) {
         console.error('[ProfileService] Error fetching profile:', error);
@@ -59,6 +62,7 @@ export const saveProfile = async (userId: string, profile: CompanyProfile): Prom
             .from('profiles')
             .upsert({
                 user_id: userId,
+                profile_id: profile.id, // IMPORTANT: Save the profile ID for cross-device sync
                 name: profile.name,
                 industry: profile.industry,
                 description: profile.description,
@@ -75,7 +79,7 @@ export const saveProfile = async (userId: string, profile: CompanyProfile): Prom
             return false;
         }
 
-        console.log('[ProfileService] Profile saved successfully');
+        console.log('[ProfileService] Profile saved successfully with ID:', profile.id);
         return true;
     } catch (error) {
         console.error('[ProfileService] Error saving profile:', error);

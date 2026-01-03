@@ -845,20 +845,33 @@ export default function App() {
 
       if (cloudProfile) {
         // Profile found in Supabase - existing user on new device
-        console.log('[Auth] Profile found in Supabase');
+        console.log('[Auth] Profile found in Supabase:', cloudProfile);
+
+        // IMPORTANT: Use the cloud profile's ID for data fetching
+        // This ensures we fetch data that was saved with this profile ID
+        const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
 
         // Check if this profile already exists locally
         const existingLocalProfile = currentLocalProfiles.find(
-          p => p.name === cloudProfile.name && p.industry === cloudProfile.industry
+          p => p.id === cloudProfileId || (p.name === cloudProfile.name && p.industry === cloudProfile.industry)
         );
 
+        let activeProfile;
         if (!existingLocalProfile) {
-          // Add cloud profile to local profiles
-          const newProfile = createNewProfile(cloudProfile);
-          console.log('[Auth] Added cloud profile to local storage:', newProfile.id);
+          // Add cloud profile to local profiles, preserving its original ID
+          const newProfile = {
+            ...cloudProfile,
+            id: cloudProfileId, // Keep the original cloud ID
+            createdAt: cloudProfile.createdAt || new Date().toISOString()
+          };
+          setAllProfiles(prev => [...prev, newProfile]);
+          setActiveProfileId(cloudProfileId);
+          activeProfile = newProfile;
+          console.log('[Auth] Added cloud profile with ID:', cloudProfileId);
         } else {
           // Profile already exists, just switch to it
           setActiveProfileId(existingLocalProfile.id);
+          activeProfile = existingLocalProfile;
           console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
         }
 
@@ -871,37 +884,39 @@ export default function App() {
           console.log('[Auth] Log In mode - going to dashboard');
 
           // Fetch all user data from cloud for cross-device sync
-          console.log('[Auth] Fetching all user data from cloud...');
+          // Use the CLOUD profile ID to fetch data saved under that ID
+          console.log('[Auth] Fetching all user data from cloud for profile:', cloudProfileId);
           try {
-            const cloudData = await fetchAllUserData(user.id);
+            const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
+            console.log('[Auth] Cloud data received:', Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null));
 
             // Populate component states from cloud data
             if (cloudData.calendar) {
               setCalendarState(cloudData.calendar);
-              localStorage.setItem('socialai_calendar_state', JSON.stringify(cloudData.calendar));
+              localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
             }
             if (cloudData.leads) {
               setLeadsState(cloudData.leads);
-              localStorage.setItem('socialai_leads_state', JSON.stringify(cloudData.leads));
+              localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
             }
             if (cloudData.email) {
               setEmailState(cloudData.email);
-              localStorage.setItem('socialai_email_state', JSON.stringify(cloudData.email));
+              localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
             }
             if (cloudData.blog) {
               setBlogState(cloudData.blog);
-              localStorage.setItem('socialai_blog_state', JSON.stringify(cloudData.blog));
+              localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
             }
             if (cloudData.research) {
               setResearchState(cloudData.research);
-              localStorage.setItem('socialai_research_state', JSON.stringify(cloudData.research));
+              localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
             }
             if (cloudData.strategy) {
               setStrategyState(cloudData.strategy);
-              localStorage.setItem('socialai_strategy_state', JSON.stringify(cloudData.strategy));
+              localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
             }
 
-            console.log('[Auth] Cloud data loaded successfully');
+            console.log('[Auth] Cloud data loaded and applied successfully');
           } catch (e) {
             console.error('[Auth] Error fetching cloud data:', e);
           }
@@ -912,9 +927,27 @@ export default function App() {
       } else if (currentLocalProfiles.length > 0 && !isDifferentUser && authMode === 'login') {
         // No cloud profile but has local profiles AND same user AND logging in - use the first one
         console.log('[Auth] Log In mode - using existing local profiles');
-        if (!activeProfileId || !currentLocalProfiles.find(p => p.id === activeProfileId)) {
-          setActiveProfileId(currentLocalProfiles[0].id);
+        const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
+          ? activeProfileId
+          : currentLocalProfiles[0].id;
+
+        setActiveProfileId(targetProfileId);
+
+        // Also try to fetch cloud data for this profile
+        console.log('[Auth] Fetching cloud data for local profile:', targetProfileId);
+        try {
+          const cloudData = await fetchAllProfileData(user.id, targetProfileId);
+          if (cloudData.calendar) setCalendarState(cloudData.calendar);
+          if (cloudData.leads) setLeadsState(cloudData.leads);
+          if (cloudData.email) setEmailState(cloudData.email);
+          if (cloudData.blog) setBlogState(cloudData.blog);
+          if (cloudData.research) setResearchState(cloudData.research);
+          if (cloudData.strategy) setStrategyState(cloudData.strategy);
+          console.log('[Auth] Cloud data loaded for local profile');
+        } catch (e) {
+          console.error('[Auth] Error fetching cloud data for local profile:', e);
         }
+
         console.log('[Auth] Navigating to DASHBOARD (local profile)');
         setView(AppView.DASHBOARD);
       } else {
