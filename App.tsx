@@ -20,7 +20,8 @@ import {
   Mail,
   FileText,
   LogIn,
-  BarChart3
+  BarChart3,
+  Crown
 } from 'lucide-react';
 import { AppView, CompanyProfile, ProfilesStore, ResearchReport, SocialPost, AutoPilotConfig, Lead } from './types';
 import { LiveAssistant } from './components/LiveAssistant';
@@ -36,7 +37,10 @@ import { ProfileSwitcher } from './components/ProfileSwitcher';
 import { LLMDiagnostics } from './components/LLMDiagnostics';
 import { AuthPage } from './components/AuthPage';
 import { UserMenu } from './components/UserMenu';
+import { PricingPage } from './components/PricingPage';
+import { UpgradeModal } from './components/UpgradeModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useSubscription } from './contexts/SubscriptionContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
@@ -1321,6 +1325,8 @@ export default function App() {
           case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
           default: return <div>Not Implemented</div>;
         }
+      case AppView.PRICING:
+        return <PricingPage currentTier="free" onSelectPlan={(tier) => { console.log('Selected plan:', tier); setView(AppView.DASHBOARD); }} onBack={() => setView(AppView.DASHBOARD)} />;
       default: return <div>Not Implemented</div>;
     }
   };
@@ -1416,6 +1422,7 @@ export default function App() {
             <NavButton active={view === AppView.ANALYTICS} onClick={() => setView(AppView.ANALYTICS)} icon={<BarChart3 size={20} />} label="Analytics" />
             <div className="pt-4 pb-1"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account</span></div>
             <NavButton active={view === AppView.SETTINGS} onClick={() => setView(AppView.SETTINGS)} icon={<Settings size={20} />} label="Profile Settings" />
+            <NavButton active={view === AppView.PRICING} onClick={() => setView(AppView.PRICING)} icon={<Crown size={20} />} label="Pricing Plans" />
           </nav>
           <div className="p-4 border-t border-slate-100 space-y-3">
             {/* Live Consultant button - DISABLED until better TTS solution */}

@@ -150,6 +150,7 @@ export enum AppView {
   BLOG = 'BLOG',
   ANALYTICS = 'ANALYTICS',
   SETTINGS = 'SETTINGS',
+  PRICING = 'PRICING',
 }
 
 export interface ImageGenerationConfig {
