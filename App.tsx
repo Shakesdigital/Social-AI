@@ -891,7 +891,7 @@ export default function App() {
 
       console.log('[Auth] Profile check:', { hasCloudProfile, hasLocalProfiles, isExistingUser, cloudFetchFailed });
 
-      // === STEP 3: Route based on user status ===
+      // === STEP 4: Route based on user status ===
       if (isExistingUser) {
         // EXISTING USER: Has profile somewhere -> Dashboard
         console.log('[Auth] Existing user detected - routing to dashboard');
@@ -899,20 +899,34 @@ export default function App() {
         let targetProfileId: string;
 
         if (cloudProfile) {
-          // Use cloud profile
+          // Use cloud profile - SET it as the only profile for this user
           const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
-          const existingLocalProfile = currentLocalProfiles.find(
+
+          // Check if we already have this profile (avoid duplicates)
+          const existingProfiles = allProfiles.filter(
             p => p.id === cloudProfileId || (p.name === cloudProfile.name && p.industry === cloudProfile.industry)
           );
 
-          if (!existingLocalProfile) {
+          if (existingProfiles.length === 0) {
+            // Profile doesn't exist locally - add it
             const newProfile = {
               ...cloudProfile,
               id: cloudProfileId,
               createdAt: cloudProfile.createdAt || new Date().toISOString()
             };
-            setAllProfiles(prev => [...prev, newProfile]);
+
+            // If we cleared profiles (different user), start fresh with just this profile
+            if (isDifferentUser) {
+              setAllProfiles([newProfile]);
+            } else {
+              // Same user, add to existing profiles
+              setAllProfiles(prev => [...prev, newProfile]);
+            }
             console.log('[Auth] Added cloud profile with ID:', cloudProfileId);
+          } else if (isDifferentUser) {
+            // Different user but profile exists - set ONLY this profile (clear others)
+            setAllProfiles([existingProfiles[0]]);
+            console.log('[Auth] Reset to single cloud profile for different user');
           }
 
           setActiveProfileId(cloudProfileId);
