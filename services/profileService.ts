@@ -33,9 +33,14 @@ export const fetchProfile = async (userId: string): Promise<CompanyProfile | nul
         }
 
         // Convert database row to CompanyProfile
-        // IMPORTANT: Include the profile_id so we can use it for data fetching
+        // IMPORTANT: Use stored profile_id, or derive a STABLE ID from user_id
+        // This prevents creating duplicate profiles on each fetch
+        const stableProfileId = data.profile_id || `profile_${userId.substring(0, 8)}`;
+
+        console.log('[ProfileService] Profile fetched with ID:', stableProfileId);
+
         return {
-            id: data.profile_id || `profile_${Date.now()}`, // Use stored profile_id or generate one
+            id: stableProfileId,
             name: data.name || '',
             industry: data.industry || '',
             description: data.description || '',
