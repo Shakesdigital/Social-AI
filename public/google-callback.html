@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Authorization - Market MI</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #666;
+        }
+
+        .success {
+            color: #22c55e;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="spinner" id="spinner"></div>
+        <h2 id="title">Connecting to Google...</h2>
+        <p id="message">Please wait while we complete the authorization.</p>
+    </div>
+
+    <script>
+        (function () {
+            const titleEl = document.getElementById('title');
+            const messageEl = document.getElementById('message');
+            const spinnerEl = document.getElementById('spinner');
+
+            // Parse the hash fragment
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+
+            const accessToken = params.get('access_token');
+            const expiresIn = params.get('expires_in');
+            const tokenType = params.get('token_type');
+            const scope = params.get('scope');
+            const error = params.get('error');
+            const errorDescription = params.get('error_description');
+
+            if (error) {
+                spinnerEl.style.display = 'none';
+                titleEl.textContent = 'Authorization Failed';
+                titleEl.className = 'error';
+                messageEl.textContent = errorDescription || error;
+
+                // Send error to parent
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'google-oauth-callback',
+                        error: errorDescription || error
+                    }, window.location.origin);
+                    setTimeout(() => window.close(), 2000);
+                }
+            } else if (accessToken) {
+                spinnerEl.style.display = 'none';
+                titleEl.textContent = 'Connected Successfully!';
+                titleEl.className = 'success';
+                messageEl.textContent = 'You can close this window now.';
+
+                // Send token to parent
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'google-oauth-callback',
+                        access_token: accessToken,
+                        expires_in: expiresIn,
+                        token_type: tokenType,
+                        scope: scope
+                    }, window.location.origin);
+                    setTimeout(() => window.close(), 1500);
+                }
+            } else {
+                spinnerEl.style.display = 'none';
+                titleEl.textContent = 'No Response';
+                messageEl.textContent = 'No authorization data received. Please try again.';
+            }
+        })();
+    </script>
+</body>
+
+</html>
