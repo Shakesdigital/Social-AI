@@ -312,8 +312,8 @@ async function callOpenRouter(prompt: string, opts: LLMOptions): Promise<Provide
             headers: {
                 'Authorization': `Bearer ${API_KEYS.openrouter}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://socialai.app',
-                'X-Title': 'SocialAI Marketing Assistant'
+                'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://marketmi.shakesdigital.com',
+                'X-Title': 'Market MI Marketing Assistant'
             },
             body: JSON.stringify({
                 model,
