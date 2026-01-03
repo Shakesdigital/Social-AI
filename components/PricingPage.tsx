@@ -63,7 +63,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     ];
 
     return (
-        <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900 overflow-x-hidden">
+        <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900 overflow-x-hidden overflow-y-auto">
             {/* Navigation - Matching home page */}
             <nav className="fixed w-full z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -75,9 +75,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                         <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-600">
                             <button onClick={onBack} className="hover:text-brand-600 transition-colors">Home</button>
                             <a href="#features" className="hover:text-brand-600 transition-colors">Features</a>
-                            <span className="text-brand-600 font-semibold flex items-center gap-1.5">
-                                <Crown size={16} className="text-amber-500" /> Pricing
-                            </span>
+                            <span className="text-brand-600 font-semibold">Pricing</span>
                             <a href="#faq" className="hover:text-brand-600 transition-colors">FAQ</a>
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3">
