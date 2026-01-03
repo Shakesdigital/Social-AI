@@ -1381,7 +1381,7 @@ export default function App() {
       {/* Main Content Area */}
       <main className={`
         flex-1 relative
-        ${view === AppView.LANDING || view === AppView.ONBOARDING ? 'h-full overflow-y-auto' : 'overflow-hidden'} 
+        ${view === AppView.LANDING || view === AppView.ONBOARDING || view === AppView.AUTH ? 'min-h-full overflow-y-auto' : 'overflow-y-auto lg:overflow-hidden'} 
         ${!hasApiKey ? 'mt-6' : ''}
         ${showSidebar ? 'pt-14 lg:pt-0' : ''}
       `}>
