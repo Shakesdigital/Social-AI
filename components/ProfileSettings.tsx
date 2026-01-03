@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw, Globe, Link, Instagram, Facebook, Twitter, Linkedin, Youtube, Unlink } from 'lucide-react';
 import { CompanyProfile, SocialPlatform } from '../types';
 import { getSocialConnections, isConnected, simulateConnect, disconnectPlatform } from '../services/socialPublishingService';
+import { GoogleWorkspaceIntegration } from './GoogleWorkspaceIntegration';
 
 interface ProfileSettingsProps {
     profile: CompanyProfile;
@@ -348,6 +349,9 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                             </p>
                         </div>
                     </div>
+
+                    {/* Google Workspace Integration */}
+                    <GoogleWorkspaceIntegration />
 
                     {/* Target Audience Section */}
                     <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
