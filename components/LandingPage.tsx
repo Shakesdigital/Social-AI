@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Zap, Globe, MessageSquare, BarChart3, Shield, Mic, Calendar, CheckCircle, Search, Lightbulb, LayoutDashboard, User, LogIn, UserPlus } from 'lucide-react';
+import { ArrowRight, Zap, Globe, MessageSquare, BarChart3, Shield, Mic, Calendar, CheckCircle, Search, Lightbulb, LayoutDashboard, User, LogIn, UserPlus, Crown } from 'lucide-react';
 import { CompanyProfile } from '../types';
 
 interface LandingPageProps {
   onSignIn: () => void;  // For NEW users - goes to auth then onboarding
   onLogIn: () => void;   // For EXISTING users - goes to auth then dashboard
+  onPricing?: () => void; // Navigate to pricing page
   onContinueAsUser?: (profile: CompanyProfile) => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onContinueAsUser }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onPricing, onContinueAsUser }) => {
   const [existingProfile, setExistingProfile] = useState<CompanyProfile | null>(null);
   const [showLoginOption, setShowLoginOption] = useState(false);
 
@@ -58,7 +59,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onC
             <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-600">
               <a href="#features" className="hover:text-brand-600 transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-brand-600 transition-colors">How it Works</a>
-              <a href="#pricing" className="hover:text-brand-600 transition-colors">Pricing</a>
+              <button
+                onClick={onPricing}
+                className="hover:text-brand-600 transition-colors flex items-center gap-1.5"
+              >
+                <Crown size={16} className="text-amber-500" />
+                Pricing
+              </button>
             </div>
 
             {/* Action Buttons */}
