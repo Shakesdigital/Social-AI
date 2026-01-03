@@ -11,7 +11,10 @@ import {
     Upload,
     ArrowLeft,
     Clock,
-    Timer
+    Timer,
+    Pencil,
+    Trash2,
+    Save
 } from 'lucide-react';
 import { CompanyProfile, SocialPost, AutoPilotConfig } from '../types';
 import {
@@ -143,6 +146,74 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
         loadingImage: false
     });
 
+    // Edit post state
+    const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
+    const [editFormData, setEditFormData] = useState<{
+        topic: string;
+        caption: string;
+        platform: string;
+        date: string;
+        time: string;
+        imageUrl: string;
+    }>({
+        topic: '',
+        caption: '',
+        platform: 'Instagram',
+        date: '',
+        time: '',
+        imageUrl: ''
+    });
+    const editImageInputRef = useRef<HTMLInputElement>(null);
+
+    // Open edit modal for a post
+    const handleEditPost = (post: SocialPost) => {
+        const postDate = post.date instanceof Date ? post.date : new Date(post.date);
+        setEditingPost(post);
+        setEditFormData({
+            topic: post.topic,
+            caption: post.caption,
+            platform: post.platform,
+            date: postDate.toISOString().split('T')[0],
+            time: postDate.toTimeString().slice(0, 5),
+            imageUrl: post.imageUrl || ''
+        });
+    };
+
+    // Save edited post
+    const handleSaveEditedPost = () => {
+        if (!editingPost) return;
+
+        const updatedDate = new Date(`${editFormData.date}T${editFormData.time}`);
+        const updatedPost: SocialPost = {
+            ...editingPost,
+            topic: editFormData.topic,
+            caption: editFormData.caption,
+            platform: editFormData.platform,
+            date: updatedDate,
+            imageUrl: editFormData.imageUrl
+        };
+
+        setPosts(prev => prev.map(p => p.id === editingPost.id ? updatedPost : p));
+        setEditingPost(null);
+    };
+
+    // Delete a post
+    const handleDeletePost = (postId: string) => {
+        setPosts(prev => prev.filter(p => p.id !== postId));
+    };
+
+    // Handle image upload for edit
+    const handleEditImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setEditFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+    };
+
     // Notify parent of state changes for persistence
     useEffect(() => {
         if (onStateChange) {
@@ -242,7 +313,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                 if (autoPilotConfig.autoApprove) {
                     setPosts(prev => [...prev, ...generatedPosts.map(p => ({ ...p, status: 'Scheduled' } as SocialPost))]);
                 } else {
-                    setPendingPosts(generatedPosts);
+                    setPendingPosts(prev => [...prev, ...generatedPosts]);
                     setShowReviewDashboard(true);
                 }
             } else if (!isRetry) {
@@ -448,7 +519,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                             </div>
                         )}
                         {posts.map(post => (
-                            <div key={post.id} className="flex gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all group">
+                            <div key={post.id} className="flex gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all group relative">
+                                {/* Action buttons - show on hover */}
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => handleEditPost(post)}
+                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-brand-600 hover:border-brand-300 transition-all shadow-sm"
+                                        title="Edit post"
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeletePost(post.id)}
+                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-red-600 hover:border-red-300 transition-all shadow-sm"
+                                        title="Delete post"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
                                 {/* Date column */}
                                 <div className="w-16 flex-shrink-0 text-center">
                                     <div className="bg-brand-50 rounded-xl p-2 border border-brand-100">
@@ -489,7 +577,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                     )}
                                 </div>
                                 {/* Content */}
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 pr-16">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
                                             post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
@@ -1054,6 +1142,157 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                         <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-4">
                             <button onClick={() => setIsCreatorOpen(false)} className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50">Cancel</button>
                             <button onClick={savePost} className="flex-[2] py-3 bg-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-100 hover:bg-brand-700 transition-all">Schedule Post</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Post Modal */}
+            {editingPost && (
+                <div className="fixed inset-0 bg-slate-900/40 z-[110] flex items-center justify-center backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-brand-100 text-brand-600 p-2 rounded-xl">
+                                    <Pencil size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">Edit Scheduled Post</h2>
+                                    <p className="text-xs text-slate-500">Make changes to your post</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setEditingPost(null)}
+                                className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                            {/* Platform */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Platform</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {['Instagram', 'LinkedIn', 'Twitter', 'Facebook', 'TikTok', 'YouTube', 'Pinterest', 'Threads'].map(p => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setEditFormData(prev => ({ ...prev, platform: p }))}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${editFormData.platform === p
+                                                ? 'bg-slate-900 text-white shadow-lg'
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Topic */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Topic / Title</label>
+                                <input
+                                    type="text"
+                                    value={editFormData.topic}
+                                    onChange={(e) => setEditFormData(prev => ({ ...prev, topic: e.target.value }))}
+                                    className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                    placeholder="Post topic or title..."
+                                />
+                            </div>
+
+                            {/* Caption */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Caption / Content</label>
+                                <textarea
+                                    value={editFormData.caption}
+                                    onChange={(e) => setEditFormData(prev => ({ ...prev, caption: e.target.value }))}
+                                    className="w-full h-32 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                                    placeholder="Write your post content..."
+                                />
+                            </div>
+
+                            {/* Date & Time */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Date</label>
+                                    <input
+                                        type="date"
+                                        value={editFormData.date}
+                                        onChange={(e) => setEditFormData(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Time</label>
+                                    <input
+                                        type="time"
+                                        value={editFormData.time}
+                                        onChange={(e) => setEditFormData(prev => ({ ...prev, time: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Image */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Image</label>
+                                <div className="flex gap-4">
+                                    {/* Image Preview */}
+                                    <div className="w-32 h-32 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center relative">
+                                        {editFormData.imageUrl ? (
+                                            <>
+                                                <img src={editFormData.imageUrl} alt="Post" className="w-full h-full object-cover" />
+                                                <button
+                                                    onClick={() => setEditFormData(prev => ({ ...prev, imageUrl: '' }))}
+                                                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <LucideImage size={32} className="text-slate-300" />
+                                        )}
+                                    </div>
+                                    {/* Upload Button */}
+                                    <div className="flex-1 flex flex-col justify-center">
+                                        <input
+                                            type="file"
+                                            ref={editImageInputRef}
+                                            accept="image/*"
+                                            onChange={handleEditImageUpload}
+                                            className="hidden"
+                                        />
+                                        <button
+                                            onClick={() => editImageInputRef.current?.click()}
+                                            className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Upload size={16} />
+                                            Upload Image
+                                        </button>
+                                        <p className="text-xs text-slate-400 mt-2 text-center">PNG, JPG up to 5MB</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
+                            <button
+                                onClick={() => setEditingPost(null)}
+                                className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveEditedPost}
+                                className="flex-[2] py-3 bg-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-100 hover:bg-brand-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Save size={18} />
+                                Save Changes
+                            </button>
                         </div>
                     </div>
                 </div>
