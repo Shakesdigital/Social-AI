@@ -1422,9 +1422,6 @@ export default function App() {
             {/* <button id="live-btn" onClick={() => setIsLiveOpen(true)} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm">
               <Mic size={18} className="animate-pulse" /> Live Consultant
             </button> */}
-            <button onClick={() => setShowDiagnostics(true)} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
-              <Settings size={16} /> LLM Diagnostics
-            </button>
             <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-800 px-2 py-2 text-sm rounded-lg hover:bg-slate-50">
               <LogOut size={16} /> Logout / Reset
             </button>
