@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Check, X, Zap, Crown, Sparkles, ArrowLeft } from 'lucide-react';
 import { PRICING_PLANS, SubscriptionTier, TIER_LIMITS } from '../types/subscription';
+import { PayPalCheckout, PaymentSuccess } from './PayPalCheckout';
+import { isPayPalConfigured } from '../services/paypalService';
 
 interface PricingPageProps {
     currentTier?: SubscriptionTier;
@@ -16,6 +18,45 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     onBack,
 }) => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
+    const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'checkout' | 'success' | 'error'>('idle');
+    const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+    const handleSelectPlan = (tier: SubscriptionTier) => {
+        if (tier === 'free') {
+            // Downgrade to free - just call onSelectPlan
+            onSelectPlan(tier);
+            return;
+        }
+        // For paid plans, show checkout
+        setSelectedTier(tier);
+        setShowCheckout(true);
+        setCheckoutStatus('checkout');
+    };
+
+    const handleCheckoutSuccess = () => {
+        setCheckoutStatus('success');
+    };
+
+    const handleCheckoutError = (error: string) => {
+        setCheckoutError(error);
+        setCheckoutStatus('error');
+    };
+
+    const handleCheckoutCancel = () => {
+        setShowCheckout(false);
+        setSelectedTier(null);
+        setCheckoutStatus('idle');
+    };
+
+    const handleContinueAfterSuccess = () => {
+        if (selectedTier) {
+            onSelectPlan(selectedTier);
+        }
+        setShowCheckout(false);
+        setCheckoutStatus('idle');
+    };
 
     const getButtonText = (planTier: SubscriptionTier) => {
         if (planTier === currentTier) return 'Current Plan';
@@ -98,8 +139,8 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                             <div
                                 key={plan.tier}
                                 className={`relative rounded-2xl border-2 p-8 transition-all ${plan.highlighted
-                                        ? 'border-brand-500 bg-white shadow-xl shadow-brand-100/50 scale-105'
-                                        : 'border-slate-200 bg-white hover:shadow-lg'
+                                    ? 'border-brand-500 bg-white shadow-xl shadow-brand-100/50 scale-105'
+                                    : 'border-slate-200 bg-white hover:shadow-lg'
                                     } ${isCurrentPlan ? 'ring-2 ring-teal-500 ring-offset-2' : ''}`}
                             >
                                 {/* Popular Badge */}
@@ -141,7 +182,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
 
                                 {/* CTA Button */}
                                 <button
-                                    onClick={() => !isCurrentPlan && onSelectPlan(plan.tier)}
+                                    onClick={() => !isCurrentPlan && handleSelectPlan(plan.tier)}
                                     disabled={isCurrentPlan}
                                     className={`w-full py-3.5 rounded-xl font-bold transition-all mb-6 ${getButtonStyle(plan.tier, plan.highlighted || false)
                                         }`}
@@ -247,6 +288,74 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Checkout Modal */}
+            {showCheckout && selectedTier && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={handleCheckoutCancel}
+                    />
+
+                    {/* Modal */}
+                    <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+                        <button
+                            onClick={handleCheckoutCancel}
+                            className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        {checkoutStatus === 'success' ? (
+                            <PaymentSuccess
+                                tier={selectedTier}
+                                onContinue={handleContinueAfterSuccess}
+                            />
+                        ) : checkoutStatus === 'error' ? (
+                            <div className="text-center py-6">
+                                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <X className="w-10 h-10 text-red-600" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900 mb-2">Payment Failed</h2>
+                                <p className="text-slate-600 mb-4">{checkoutError}</p>
+                                <button
+                                    onClick={() => setCheckoutStatus('checkout')}
+                                    className="px-6 py-2 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700"
+                                >
+                                    Try Again
+                                </button>
+                            </div>
+                        ) : (
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900 mb-4 text-center">
+                                    Complete Your Upgrade
+                                </h2>
+
+                                {isPayPalConfigured() ? (
+                                    <PayPalCheckout
+                                        tier={selectedTier}
+                                        billingCycle={billingCycle}
+                                        onSuccess={handleCheckoutSuccess}
+                                        onError={handleCheckoutError}
+                                        onCancel={handleCheckoutCancel}
+                                    />
+                                ) : (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                                        <p className="text-amber-700 text-sm font-medium mb-2">
+                                            PayPal Not Configured
+                                        </p>
+                                        <p className="text-amber-600 text-xs">
+                                            Please add PayPal credentials to enable payments.
+                                            See .env.example for setup instructions.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
