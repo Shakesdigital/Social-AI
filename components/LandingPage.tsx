@@ -225,9 +225,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onC
                   <div className="relative z-10">
                     <h2 className="text-2xl font-bold mb-2">Need real-time advice?</h2>
                     <p className="mb-6 opacity-90 max-w-lg">Talk directly to your marketing assistant powered by <a href="https://www.shakesdigital.com" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">Shakes Digital</a>.</p>
-                    <div className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold inline-flex items-center gap-2">
+                    <button
+                      onClick={onSignIn}
+                      className="bg-white text-brand-900 px-6 py-2 rounded-lg font-semibold inline-flex items-center gap-2 hover:bg-brand-50 transition-colors"
+                    >
                       <Mic size={18} /> Start Conversation
-                    </div>
+                    </button>
                   </div>
                   <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-brand-800 to-transparent"></div>
                 </div>
@@ -251,36 +254,42 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onC
               title="Market Research"
               description="Automatically analyze industry trends, competitor activities, and audience sentiment using real-time Google Search data."
               action="See Research"
+              onClick={onSignIn}
             />
             <FeatureCard
               icon={<Lightbulb className="w-6 h-6 text-brand-600" />}
               title="Strategic Planning"
               description="Our marketing assistant generates comprehensive strategies, content pillars, and KPIs tailored to your business goals."
               action="View Strategy"
+              onClick={onSignIn}
             />
             <FeatureCard
               icon={<Zap className="w-6 h-6 text-brand-600" />}
               title="Auto-Pilot Mode"
               description="Set your cadence and let Market MI automatically generate, caption, and schedule posts for all your platforms."
               action="Enable Auto-Pilot"
+              onClick={onSignIn}
             />
             <FeatureCard
               icon={<Calendar className="w-6 h-6 text-brand-600" />}
               title="Smart Scheduling"
               description="A visual content calendar that optimizes posting times for maximum engagement across Instagram, LinkedIn, and more."
               action="Open Calendar"
+              onClick={onSignIn}
             />
             <FeatureCard
               icon={<Mic className="w-6 h-6 text-brand-600" />}
               title="Live Consultant"
               description="Talk to your marketing assistant in real-time using voice to brainstorm ideas or get immediate advice."
               action="Talk Now"
+              onClick={onSignIn}
             />
             <FeatureCard
               icon={<BarChart3 className="w-6 h-6 text-brand-600" />}
               title="Performance Analytics"
               description="Track growth and engagement with automated reporting that helps you refine your strategy over time."
               action="View Report"
+              onClick={onSignIn}
             />
           </div>
         </div>
@@ -527,14 +536,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onC
   );
 };
 
-const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, description: string, action: string }> = ({ icon, title, description, action }) => (
+const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, description: string, action: string, onClick?: () => void }> = ({ icon, title, description, action, onClick }) => (
   <div className="bg-white rounded-lg p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 group flex flex-col items-center text-center">
     <div className="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
       {icon}
     </div>
     <h3 className="text-xl font-bold text-slate-900 mb-4">{title}</h3>
     <p className="text-slate-600 text-sm leading-relaxed mb-6">{description}</p>
-    <button className="mt-auto px-6 py-2 border border-brand-500 text-brand-600 font-medium rounded hover:bg-brand-50 transition-colors text-sm w-full">
+    <button
+      onClick={onClick}
+      className="mt-auto px-6 py-2 border border-brand-500 text-brand-600 font-medium rounded hover:bg-brand-50 transition-colors text-sm w-full"
+    >
       {action}
     </button>
   </div>
