@@ -777,7 +777,8 @@ export default function App() {
       hasUser: !!user,
       view,
       oauthHandled,
-      authMode
+      authMode,
+      profilesCount: allProfiles.length
     });
 
     if (authLoading) {
@@ -785,16 +786,31 @@ export default function App() {
       return;
     }
 
-    // Check if this is an OAuth callback (URL contains access_token hash)
-    const isOAuthCallback = window.location.hash.includes('access_token');
+    // Check if this is an OAuth callback (URL contains access_token or type=recovery hash)
+    const hash = window.location.hash;
+    const isOAuthCallback = hash.includes('access_token') || hash.includes('type=');
+
+    // Also detect OAuth from URL search params (some browsers handle it differently)
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasAuthCode = searchParams.has('code') || searchParams.has('access_token');
 
     // Determine if we should handle this auth state change
-    const shouldHandle = view === AppView.AUTH || (isOAuthCallback && !oauthHandled);
+    const shouldHandle = view === AppView.AUTH || ((isOAuthCallback || hasAuthCode) && !oauthHandled);
 
-    console.log('[Auth Effect] Should handle?', shouldHandle, { view, isOAuthCallback, oauthHandled });
+    console.log('[Auth Effect] Should handle?', shouldHandle, {
+      view,
+      isOAuthCallback,
+      hasAuthCode,
+      oauthHandled,
+      hash: hash.substring(0, 50)
+    });
 
     if (!isAuthenticated || !user) {
       console.log('[Auth Effect] Not authenticated, skipping navigation');
+      // Clean up URL if it has auth params but no user
+      if (isOAuthCallback || hasAuthCode) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       return;
     }
 
@@ -805,6 +821,7 @@ export default function App() {
 
     const handleAuthChange = async () => {
       console.log('[Auth] Starting handleAuthChange...');
+      console.log('[Auth] Browser:', navigator.userAgent);
 
       // User is authenticated
       localStorage.removeItem('socialai_logged_out');
@@ -818,13 +835,11 @@ export default function App() {
       console.log('[Auth] Stored user ID:', storedUserId);
       console.log('[Auth] Is different user:', isDifferentUser);
       console.log('[Auth] Is first time user:', isFirstTimeUser);
-      console.log('[Auth] Auth mode:', authMode);
+      console.log('[Auth] Local profiles count:', allProfiles.length);
 
       if (isDifferentUser) {
-        // Different user is logging in - clear all local data
         console.log('[Auth] Different user detected, clearing all local data');
         clearAllProfiles();
-        // Reset oauth handled so new user can use OAuth
         setOauthHandled(false);
       }
 
@@ -834,118 +849,111 @@ export default function App() {
       // For different user, we start fresh with no local profiles
       const currentLocalProfiles = isDifferentUser ? [] : allProfiles;
 
-      // Try to fetch profile from Supabase (cross-device sync)
+      // === STEP 1: Try to fetch profile from Supabase (with timeout for slow/blocked requests) ===
       console.log('[Auth] Fetching profile from Supabase for user:', user.id);
       let cloudProfile = null;
+      let cloudFetchFailed = false;
+
       try {
-        cloudProfile = await fetchProfile(user.id);
-      } catch (e) {
-        console.error('[Auth] Error fetching profile:', e);
-      }
-
-      if (cloudProfile) {
-        // Profile found in Supabase - existing user on new device
-        console.log('[Auth] Profile found in Supabase:', cloudProfile);
-
-        // IMPORTANT: Use the cloud profile's ID for data fetching
-        // This ensures we fetch data that was saved with this profile ID
-        const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
-
-        // Check if this profile already exists locally
-        const existingLocalProfile = currentLocalProfiles.find(
-          p => p.id === cloudProfileId || (p.name === cloudProfile.name && p.industry === cloudProfile.industry)
+        // Add timeout for privacy browsers that might block Supabase
+        const profilePromise = fetchProfile(user.id);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
         );
 
-        let activeProfile;
-        if (!existingLocalProfile) {
-          // Add cloud profile to local profiles, preserving its original ID
-          const newProfile = {
-            ...cloudProfile,
-            id: cloudProfileId, // Keep the original cloud ID
-            createdAt: cloudProfile.createdAt || new Date().toISOString()
-          };
-          setAllProfiles(prev => [...prev, newProfile]);
+        cloudProfile = await Promise.race([profilePromise, timeoutPromise]) as any;
+      } catch (e: any) {
+        console.warn('[Auth] Error fetching profile (might be blocked by browser):', e.message);
+        cloudFetchFailed = true;
+      }
+
+      // === STEP 2: Determine if user is existing or new ===
+      // Check BOTH cloud profile AND local profiles
+      const hasCloudProfile = !!cloudProfile;
+      const hasLocalProfiles = currentLocalProfiles.length > 0;
+      const isExistingUser = hasCloudProfile || hasLocalProfiles;
+
+      console.log('[Auth] Profile check:', { hasCloudProfile, hasLocalProfiles, isExistingUser, cloudFetchFailed });
+
+      // === STEP 3: Route based on user status ===
+      if (isExistingUser) {
+        // EXISTING USER: Has profile somewhere -> Dashboard
+        console.log('[Auth] Existing user detected - routing to dashboard');
+
+        let targetProfileId: string;
+
+        if (cloudProfile) {
+          // Use cloud profile
+          const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
+          const existingLocalProfile = currentLocalProfiles.find(
+            p => p.id === cloudProfileId || (p.name === cloudProfile.name && p.industry === cloudProfile.industry)
+          );
+
+          if (!existingLocalProfile) {
+            const newProfile = {
+              ...cloudProfile,
+              id: cloudProfileId,
+              createdAt: cloudProfile.createdAt || new Date().toISOString()
+            };
+            setAllProfiles(prev => [...prev, newProfile]);
+            console.log('[Auth] Added cloud profile with ID:', cloudProfileId);
+          }
+
           setActiveProfileId(cloudProfileId);
-          console.log('[Auth] Added cloud profile with ID:', cloudProfileId);
+          targetProfileId = cloudProfileId;
         } else {
-          // Profile already exists, just switch to it
-          setActiveProfileId(existingLocalProfile.id);
-          console.log('[Auth] Using existing local profile:', existingLocalProfile.id);
+          // Use first local profile (fallback for blocked Supabase)
+          targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
+            ? activeProfileId
+            : currentLocalProfiles[0].id;
+          setActiveProfileId(targetProfileId);
+          console.log('[Auth] Using local profile (cloud fetch failed/blocked):', targetProfileId);
         }
 
-        // EXISTING USER: Has a profile in cloud → Always go to dashboard
-        // (Regardless of whether they clicked "Sign In" or "Log In")
-        console.log('[Auth] Existing user detected (has cloud profile) - going to dashboard');
+        // Fetch data for this profile
+        if (!cloudFetchFailed) {
+          console.log('[Auth] Fetching cloud data for profile:', targetProfileId);
+          try {
+            const cloudData = await fetchAllProfileData(user.id, targetProfileId);
+            const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
+            console.log('[Auth] Cloud data loaded:', loadedTypes);
 
-        // Fetch all user data from cloud for cross-device sync
-        console.log('[Auth] Fetching all user data from cloud for profile:', cloudProfileId);
-        try {
-          const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
-          console.log('[Auth] Cloud data received:', Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null));
-
-          // Populate component states from cloud data
-          if (cloudData.calendar) {
-            setCalendarState(cloudData.calendar);
-            localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
+            if (cloudData.calendar) {
+              setCalendarState(cloudData.calendar);
+              localStorage.setItem(`socialai_calendar_${targetProfileId}`, JSON.stringify(cloudData.calendar));
+            }
+            if (cloudData.leads) {
+              setLeadsState(cloudData.leads);
+              localStorage.setItem(`socialai_leads_${targetProfileId}`, JSON.stringify(cloudData.leads));
+            }
+            if (cloudData.email) {
+              setEmailState(cloudData.email);
+              localStorage.setItem(`socialai_email_${targetProfileId}`, JSON.stringify(cloudData.email));
+            }
+            if (cloudData.blog) {
+              setBlogState(cloudData.blog);
+              localStorage.setItem(`socialai_blog_${targetProfileId}`, JSON.stringify(cloudData.blog));
+            }
+            if (cloudData.research) {
+              setResearchState(cloudData.research);
+              localStorage.setItem(`socialai_research_${targetProfileId}`, JSON.stringify(cloudData.research));
+            }
+            if (cloudData.strategy) {
+              setStrategyState(cloudData.strategy);
+              localStorage.setItem(`socialai_strategy_${targetProfileId}`, JSON.stringify(cloudData.strategy));
+            }
+          } catch (e) {
+            console.error('[Auth] Error fetching cloud data:', e);
           }
-          if (cloudData.leads) {
-            setLeadsState(cloudData.leads);
-            localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
-          }
-          if (cloudData.email) {
-            setEmailState(cloudData.email);
-            localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
-          }
-          if (cloudData.blog) {
-            setBlogState(cloudData.blog);
-            localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
-          }
-          if (cloudData.research) {
-            setResearchState(cloudData.research);
-            localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
-          }
-          if (cloudData.strategy) {
-            setStrategyState(cloudData.strategy);
-            localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
-          }
-
-          console.log('[Auth] Cloud data loaded and applied successfully');
-        } catch (e) {
-          console.error('[Auth] Error fetching cloud data:', e);
+        } else {
+          console.log('[Auth] Skipping cloud data fetch (Supabase blocked)');
         }
 
         console.log('[Auth] Navigating to DASHBOARD');
         setView(AppView.DASHBOARD);
-
-      } else if (currentLocalProfiles.length > 0 && !isDifferentUser) {
-        // No cloud profile but has local profiles AND same user - use the first one
-        console.log('[Auth] No cloud profile, but has local profiles - going to dashboard');
-        const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
-          ? activeProfileId
-          : currentLocalProfiles[0].id;
-
-        setActiveProfileId(targetProfileId);
-
-        // Also try to fetch cloud data for this profile
-        console.log('[Auth] Fetching cloud data for local profile:', targetProfileId);
-        try {
-          const cloudData = await fetchAllProfileData(user.id, targetProfileId);
-          if (cloudData.calendar) setCalendarState(cloudData.calendar);
-          if (cloudData.leads) setLeadsState(cloudData.leads);
-          if (cloudData.email) setEmailState(cloudData.email);
-          if (cloudData.blog) setBlogState(cloudData.blog);
-          if (cloudData.research) setResearchState(cloudData.research);
-          if (cloudData.strategy) setStrategyState(cloudData.strategy);
-          console.log('[Auth] Cloud data loaded for local profile');
-        } catch (e) {
-          console.error('[Auth] Error fetching cloud data for local profile:', e);
-        }
-
-        console.log('[Auth] Navigating to DASHBOARD (local profile)');
-        setView(AppView.DASHBOARD);
       } else {
-        // NEW USER: No profile in cloud AND no local profiles → Go to onboarding
-        console.log('[Auth] New user detected (no profiles) - going to onboarding');
+        // NEW USER: No profile anywhere -> Onboarding
+        console.log('[Auth] New user detected (no profiles) - routing to onboarding');
         setView(AppView.ONBOARDING);
       }
 
@@ -953,17 +961,17 @@ export default function App() {
       console.log('[Auth] Clearing auth mode');
       setAuthMode(null);
 
-      // Clear the hash after OAuth callback
-      if (isOAuthCallback) {
+      // Clear the URL hash/params after OAuth callback
+      if (isOAuthCallback || hasAuthCode) {
         setOauthHandled(true);
         window.history.replaceState(null, '', window.location.pathname);
+        console.log('[Auth] Cleared OAuth URL parameters');
       }
     };
 
     // Run the handler
     handleAuthChange();
-
-  }, [isAuthenticated, user, authLoading, view, oauthHandled, allProfiles, authMode]);
+  }, [authLoading, isAuthenticated, user, view, oauthHandled, authMode, allProfiles.length]);
 
   // Sync state: Only redirect to landing if user is NOT authenticated AND has no profile
   // Authenticated users without profiles should stay on onboarding, not get redirected to landing
