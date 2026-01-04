@@ -297,159 +297,124 @@ export async function generateBlogPost(
     const businessContext = getBusinessContext(profile);
     const currentYear = new Date().getFullYear();
 
-    // HUMAN-LIKE WRITING PROMPT - Sounds like a professional blogger, not AI
-    const prompt = `Write a professional blog post that sounds like it was written by an experienced human blogger.
+    // FOCUSED HUMAN-LIKE WRITING PROMPT - Professional, on-topic, proper length
+    const prompt = `Write a professional blog post about: "${topic.topic}"
 
-TOPIC: ${topic.topic}
-KEYWORDS: ${topic.relatedKeywords.join(', ')}
 BUSINESS: ${profile.name} - ${profile.industry}
 AUDIENCE: ${profile.targetAudience}
+KEYWORDS: ${topic.relatedKeywords.join(', ')}
 
 ═══════════════════════════════════════════════════════════
-WORD COUNT: 1,300-1,400 words (MANDATORY)
+CRITICAL: WORD COUNT MUST BE 1,300-1,400 WORDS
 ═══════════════════════════════════════════════════════════
 
-Each section should be 200-300 words. Include 5-6 main sections.
+Count your words carefully. Each ## section should be 200-250 words.
+Total: Introduction (100) + 5 sections (250 each = 1,250) + Conclusion (100) = ~1,450 words.
 
 ═══════════════════════════════════════════════════════════
-STRUCTURE:
+CRITICAL: STAY FOCUSED ON THE TOPIC
 ═══════════════════════════════════════════════════════════
 
-# [Engaging Title - 50-60 characters]
-
-[Hook paragraph - 80-100 words. Start with something unexpected: a surprising fact, a provocative question, or a relatable frustration. Make the reader think "Yes, that's exactly what I've been wondering!"]
-
-## [Section 1 - Problem or Context]
-[200-250 words. Set up why this matters. Use a real-world example or scenario.]
-
-## [Section 2 - Key Insight or Solution]
-[200-250 words. Share your main point with supporting evidence.]
-
-## [Section 3 - Practical Application]
-[200-250 words. Give actionable advice they can use today.]
-
-## [Section 4 - Common Mistakes or Misconceptions]
-[200-250 words. Address what people get wrong.]
-
-## [Section 5 - Expert Perspective]
-[200-250 words. Share insights that show deep knowledge.]
-
-## What This Means For You
-[Bullet list of 4-5 key takeaways]
-
-[Closing - 60-80 words. End with a question or forward-looking thought.]
+Every paragraph MUST directly relate to: "${topic.topic}"
+Do NOT go off on tangents. Do NOT discuss unrelated topics.
+The reader chose this article for THIS specific topic—deliver on that promise.
 
 ═══════════════════════════════════════════════════════════
-HUMAN WRITING STYLE (CRITICAL - READ CAREFULLY):
+STRUCTURE (Follow this exactly):
 ═══════════════════════════════════════════════════════════
 
-Write like a real person who:
-- Has actually worked in ${profile.industry} for years
-- Gets genuinely excited about sharing useful knowledge  
-- Occasionally goes on small tangents that add color
-- Admits when things are complicated or uncertain
-- Has personal opinions and isn't afraid to share them
+# [Title that matches the topic - 50-60 characters]
 
-VOICE CHARACTERISTICS:
-• Use contractions naturally (don't, you'll, it's, we've)
-• Include occasional parenthetical asides (like this one)
-• Start some sentences with "And" or "But" - real writers do this
-• Use em-dashes for emphasis—they add personality
-• Include the occasional one-word sentence. Really.
-• Ask questions mid-paragraph. Why? Because it creates rhythm.
+[Introduction - 100 words. Hook with a compelling question or fact ABOUT THIS TOPIC. Clearly state what the reader will learn.]
 
-AUTHENTIC ENGAGEMENT:
-• Share a brief personal anecdote or observation
-• Use phrases like "Here's the thing..." or "Look," to create intimacy
-• Acknowledge the reader's time: "I know you're busy, so let's cut to what matters"
-• Show genuine curiosity: "What fascinates me about this is..."
-• Express honest opinions: "Frankly, most advice about this is wrong"
+## [Section 1: What This Topic Means & Why It Matters]
+[250 words. Define/explain the topic. Why should readers care? Use specific examples related to ${profile.industry}.]
 
-VARIED RHYTHM:
-• Mix sentence lengths deliberately
-• Short sentences create punch.
-• Longer sentences allow you to develop an idea fully, giving readers the context they need to really understand your point.
-• Some paragraphs should be just 1-2 sentences.
-• Others can be longer, diving deep into a concept.
+## [Section 2: The Current State / Key Facts]
+[250 words. What's happening now? Include 2-3 specific data points or statistics about this topic.]
+
+## [Section 3: Practical Advice / How To Apply This]
+[250 words. Give actionable steps the reader can take. Be specific, not vague.]
+
+## [Section 4: Common Mistakes To Avoid]
+[250 words. What do people get wrong about this topic? How can they do better?]
+
+## [Section 5: Looking Ahead / Expert Insights]
+[250 words. What should readers keep in mind? Share professional perspective on this topic.]
+
+## Key Takeaways
+- [4-5 bullet points summarizing the main actionable points FROM THIS ARTICLE]
+
+[Conclusion - 100 words. Reinforce the main message. End with a forward-looking statement or call-to-action.]
 
 ═══════════════════════════════════════════════════════════
-AI DETECTION AVOIDANCE (CRITICAL):
+WRITING STYLE (Human, Professional, Focused):
 ═══════════════════════════════════════════════════════════
 
-NEVER use these AI-typical phrases:
+Write like a professional who:
+• Has deep expertise in ${profile.industry}
+• Respects the reader's time—every sentence adds value
+• Stays focused on the topic throughout
+• Uses a warm, conversational tone without rambling
+
+VOICE:
+• Use contractions naturally (don't, you'll, it's)
+• Mix short and long sentences for rhythm
+• Use "you" and "your" to connect with readers
+• Include specific examples and data
+• Ask occasional rhetorical questions
+
+AVOID THESE AI PHRASES:
 ❌ "In today's fast-paced world..."
-❌ "In this article, we will explore..."
-❌ "It's important to note that..."
-❌ "Let's dive in" or "Let's dive deep"
-❌ "In conclusion" or "To summarize"
-❌ "As we've discussed" or "As mentioned earlier"
-❌ "Game-changer" or "Take X to the next level"
-❌ "Unlock the potential" or "Leverage"
-❌ "Navigate the landscape" or "Embark on a journey"
-❌ "Delve into" or "Delve deeper"
-❌ "Revolutionize" or "Transform" (overused)
-❌ "Crucial" or "Essential" at the start of sentences
-❌ "Moreover" or "Furthermore" as transitions
-❌ "It goes without saying"
-❌ Generic superlatives without specifics
+❌ "Let's dive in..."
+❌ "In conclusion..."
+❌ "Game-changer" / "Leverage" / "Navigate"
+❌ "Delve into" / "Embark on a journey"
+❌ Starting sentences with "Crucial" or "Essential"
 
-INSTEAD, use natural transitions like:
-✅ "Here's where it gets interesting..."
-✅ "But wait—there's a catch"
-✅ "The real question is..."
+USE NATURAL TRANSITIONS:
+✅ "Here's the thing..."
 ✅ "What most people miss is..."
-✅ "I've seen this pattern over and over"
-✅ "So what does this actually mean for you?"
-✅ "Let me break this down"
+✅ "The key insight here is..."
+✅ "So what does this mean for you?"
 
 ═══════════════════════════════════════════════════════════
-SPECIFIC CONTENT REQUIREMENTS:
+CONTENT QUALITY:
 ═══════════════════════════════════════════════════════════
 
 Include:
-• 2-3 specific statistics (can say "research suggests" or give approximate numbers)
-• 1-2 brief real-world examples or mini case studies
-• At least one slightly controversial or surprising opinion
-• One moment of humor or wit (subtle, professional)
-• Specific, actionable advice (not vague generalities)
+• 2-3 specific statistics or data points
+• 1-2 concrete examples or scenarios
+• Specific, actionable advice (not generic)
+• Expert insights relevant to ${profile.industry}
 
-═══════════════════════════════════════════════════════════
+MOST IMPORTANT: 
+1. Hit 1,300-1,400 words (count carefully!)
+2. Every paragraph must relate to "${topic.topic}"
+3. Sound human but stay professional and focused
 
-Now write the complete blog post (1,300-1,400 words):`;
+Now write the complete 1,300-1,400 word blog post about "${topic.topic}":`;
 
-    console.log('[Blog] Calling LLM with human-writing prompt...');
+    console.log('[Blog] Calling LLM with focused human-writing prompt...');
 
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are Sarah Chen, a professional content strategist and blogger with 12 years of experience. You've written for major publications and built a loyal following because your writing is refreshingly honest and actually useful.
+        systemPrompt: `You are a professional ${profile.industry} blogger with 10+ years of experience. You write focused, valuable content that delivers exactly what the title promises.
 
-YOUR WRITING PERSONALITY:
-- You're knowledgeable but never condescending
-- You share real opinions, not just safe platitudes
-- You write like you talk—naturally, with personality
-- You care more about being helpful than sounding impressive
-- You occasionally admit what you don't know
+YOUR APPROACH:
+• Stay strictly on topic—every paragraph relates to the main subject
+• Use a natural, human voice without rambling
+• Be specific and helpful, not vague
+• Respect the reader's time
 
-YOUR PET PEEVES (things you NEVER do):
-- You hate buzzwords and corporate jargon
-- You never start with "In today's world" or similar clichés
-- You avoid words like "leverage," "synergy," "game-changer"
-- You don't use passive voice unless absolutely necessary
-- You never pad content with filler
+STRICT REQUIREMENTS:
+1. Word count: EXACTLY 1,300-1,400 words (count each section: ~250 words each)
+2. Topic focus: Every section must directly address "${topic.topic}"
+3. No tangents or off-topic content
+4. Sound human but stay professional
 
-YOUR SECRET SAUCE:
-- You make complex topics feel simple without dumbing them down
-- You include specific examples, not vague generalities
-- You write short paragraphs that are easy to scan
-- You use humor sparingly but effectively
-- You end articles with something memorable, not just a summary
-
-CRITICAL REQUIREMENTS:
-1. Write EXACTLY 1,300-1,400 words
-2. Sound unmistakably human—like a real person wrote this
-3. Every sentence should earn its place
-4. Output directly in Markdown format, starting with # for title`,
-        temperature: 0.9,  // Higher for more creative, human-like output
+OUTPUT: Write directly in Markdown format. Start with # for the title.`,
+        temperature: 0.8,  // Balanced for creativity AND focus
         maxTokens: 10000
     });
 
