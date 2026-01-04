@@ -280,171 +280,215 @@ function extractTopicsFromText(text: string, count: number): string[] {
 }
 
 /**
- * Generate a comprehensive, SEO-optimized blog post
- * Professional-level quality with 10+ years of blogging expertise
- * Target: 1,500-2,500 words for optimal SEO performance
+ * Generate a research-backed, factually accurate blog post
+ * RESEARCH-FIRST APPROACH: Deep research before writing
+ * Target: 1,200-1,500 words - focused, accurate, and valuable
  */
 export async function generateBlogPost(
     topic: TrendingTopic,
     profile: CompanyProfile,
-    wordCount: number = 2000  // Updated default to professional standard
+    wordCount: number = 1350  // Sweet spot for 1200-1500 range
 ): Promise<BlogPost> {
-    // Ensure minimum professional word count
-    const targetWordCount = Math.max(wordCount, 1500);
+    // Target word count: 1200-1500 words (highly accurate, focused content)
+    const targetWordCount = Math.min(Math.max(wordCount, 1200), 1500);
 
-    // Get supporting research
-    let researchContext = '';
-    let competitorInsights = '';
+    console.log('[Blog] PHASE 1: Conducting deep research for factual accuracy...');
+
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 1: DEEP RESEARCH (Gather facts from credible sources)
+    // ═══════════════════════════════════════════════════════════
+
+    let researchFindings = '';
+    let credibleSources: { title: string; url: string; keyFact: string }[] = [];
+    let factualData = '';
+    let expertInsights = '';
 
     if (isWebResearchConfigured()) {
-        // Research existing content on this topic
-        const searchResults = await searchWeb(`${topic.topic} ${topic.relatedKeywords.join(' ')}`, 8);
-        if (searchResults.length > 0) {
-            researchContext = `
-SUPPORTING RESEARCH & SOURCES TO REFERENCE:
-${searchResults.map((r, i) => `${i + 1}. ${r.title} (${r.url})
-   Key insight: ${r.snippet}`).join('\n')}
-`;
-            // Analyze competitor content length and structure
-            competitorInsights = `
-COMPETITOR CONTENT ANALYSIS (Top 5-10 Results):
-• Average estimated word count: ~2,200 words
-• Common structures: Problem → Solution, Step-by-step guides, Comprehensive overviews
-• Your goal: Match or exceed this depth while being MORE helpful and valuable
-• Differentiation opportunity: Add unique insights, better examples, clearer explanations
+        // Search 1: Primary topic research - get facts and data
+        const primaryResearch = await searchWeb(`${topic.topic} facts statistics data ${new Date().getFullYear()}`, 10);
+
+        // Search 2: Expert opinions and industry insights  
+        const expertResearch = await searchWeb(`${topic.topic} expert opinion research study`, 8);
+
+        // Search 3: Related keywords for comprehensive coverage
+        const keywordResearch = await searchWeb(`${topic.relatedKeywords.slice(0, 3).join(' ')} guide`, 5);
+
+        // Compile research findings
+        if (primaryResearch.length > 0) {
+            credibleSources = primaryResearch.slice(0, 8).map(r => ({
+                title: r.title,
+                url: r.url,
+                keyFact: r.snippet
+            }));
+
+            researchFindings = `
+═══════════════════════════════════════════════════════════
+VERIFIED RESEARCH FINDINGS (Use these facts in the blog):
+═══════════════════════════════════════════════════════════
+
+PRIMARY SOURCES (${primaryResearch.length} credible sources found):
+${primaryResearch.slice(0, 8).map((r, i) => `
+📚 Source ${i + 1}: ${r.title}
+   URL: ${r.url}
+   Key Fact: ${r.snippet}
+`).join('')}
 `;
         }
+
+        if (expertResearch.length > 0) {
+            expertInsights = `
+EXPERT INSIGHTS & RESEARCH STUDIES:
+${expertResearch.slice(0, 5).map((r, i) => `
+🎓 Expert Source ${i + 1}: ${r.title}
+   Insight: ${r.snippet}
+`).join('')}
+`;
+        }
+
+        if (keywordResearch.length > 0) {
+            factualData = `
+ADDITIONAL CONTEXT FOR COMPREHENSIVE COVERAGE:
+${keywordResearch.slice(0, 3).map((r, i) => `
+- ${r.title}: ${r.snippet.slice(0, 150)}...
+`).join('')}
+`;
+        }
+
+        console.log(`[Blog] Research complete: ${credibleSources.length} credible sources found`);
+    } else {
+        console.log('[Blog] Web research not configured - using LLM knowledge only');
+        researchFindings = `
+NOTE: Web research is not configured. Generate accurate content based on your training knowledge.
+Always cite general sources when making claims (e.g., "According to industry reports...", "Research shows that...")
+`;
     }
 
     // Get business context
     const businessContext = getBusinessContext(profile);
 
-    // Get current date for timely content
+    // Get current date
     const today = new Date();
     const currentYear = today.getFullYear();
 
-    const prompt = `
-You are a SENIOR PROFESSIONAL BLOG WRITER with 10+ years of experience creating high-ranking, engaging content for Fortune 500 companies and industry-leading publications.
+    console.log('[Blog] PHASE 2: Generating factually accurate blog content...');
 
-Your writing is known for:
-• Naturally human tone - professional yet warm and approachable
-• Deep expertise that establishes thought leadership
-• Comprehensive coverage that answers all reader questions
-• SEO optimization that ranks without feeling keyword-stuffed
-• Engaging storytelling that keeps readers to the end
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 2: GENERATE RESEARCH-BACKED BLOG POST
+    // ═══════════════════════════════════════════════════════════
+
+    const prompt = `
+You are a SENIOR JOURNALIST AND CONTENT EXPERT with 10+ years of experience writing research-backed, factually accurate articles for credible publications.
+
+YOUR MISSION: Write a blog post that is DEEPLY RESEARCHED, FACTUALLY ACCURATE, and based on CREDIBLE SOURCES.
 
 ${businessContext}
 
 ═══════════════════════════════════════════════════════════
-CONTENT BRIEF - PROFESSIONAL BLOG POST
+CONTENT ASSIGNMENT
 ═══════════════════════════════════════════════════════════
 
 Topic: ${topic.topic}
 Category: ${topic.category}
-Primary Keywords: ${topic.relatedKeywords.join(', ')}
-Target Word Count: ${targetWordCount}+ words (MINIMUM 1,500 words)
-Publication Date Context: ${today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+Target Keywords: ${topic.relatedKeywords.join(', ')}
+Target Length: ${targetWordCount} words (1,200-1,500 range)
+Date: ${today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 
-${researchContext}
-${competitorInsights}
-
-═══════════════════════════════════════════════════════════
-PROFESSIONAL BLOG POST STRUCTURE (REQUIRED):
-═══════════════════════════════════════════════════════════
-
-📌 INTRODUCTION (150-250 words)
-   • Compelling hook: story, surprising stat, or relatable problem
-   • Clearly state what the reader will learn
-   • Establish credibility and relevance
-   • Include primary keyword naturally in first paragraph
-
-📌 BODY SECTIONS (1,200-2,000 words across 4-7 sections)
-   • Each section answers a key question or covers a major subtopic
-   • Use ## for main sections (H2) and ### for subsections (H3)
-   • Include practical examples, data, or case studies
-   • Add bullet points and numbered lists for scannability
-   • Use blockquotes for expert insights or key takeaways
-   • Include transition sentences between sections
-   • Address objections and common questions proactively
-
-📌 CONCLUSION (150-250 words)
-   • Summarize key takeaways (3-5 bullet points)
-   • Reinforce the main message
-   • Strong call-to-action relevant to the business
-   • End with forward-looking statement or question for engagement
+${researchFindings}
+${expertInsights}
+${factualData}
 
 ═══════════════════════════════════════════════════════════
-PROFESSIONAL WRITING STANDARDS:
+RESEARCH-FIRST WRITING REQUIREMENTS:
 ═══════════════════════════════════════════════════════════
 
-✓ TONE: Professional yet friendly - like a knowledgeable colleague explaining something
-✓ VOICE: Authoritative but approachable - NOT robotic, NOT generic, NOT salesy
-✓ READABILITY: Flesch-Kincaid grade level 8-10 (clear for broad audience)
-✓ SENTENCES: Varied length, mix of short punchy and longer explanatory
-✓ PARAGRAPHS: 2-4 sentences max, generous white space
-✓ PERSONALITY: Include occasional first-person perspective, rhetorical questions
+✅ FACTUAL ACCURACY (CRITICAL):
+• Base every major claim on the research provided above
+• Reference specific statistics, studies, or expert opinions
+• When citing data, mention the source (e.g., "According to [Source]...")
+• Do NOT make up statistics or facts
+• If uncertain, use hedging language ("Research suggests...", "Many experts believe...")
 
-AVOID:
-✗ Robotic, AI-sounding phrases ("In conclusion", "As we've discussed")
-✗ Excessive jargon without explanation
-✗ Vague, generic advice anyone could write
-✗ Salesy language or excessive self-promotion
-✗ Padding with fluff - every sentence should add value
+✅ CREDIBLE CONTENT:
+• Draw from the research sources provided
+• Include 2-3 specific citations or references in the content
+• Demonstrate expertise through accurate, well-researched information
+• Provide actionable advice backed by evidence
+
+✅ STRUCTURE (1,200-1,500 words total):
+
+📌 INTRODUCTION (100-150 words)
+   • Hook with a relevant fact, statistic, or question
+   • State the problem/topic clearly
+   • Preview what the reader will learn
+
+📌 BODY (900-1,100 words across 3-5 sections)
+   • Each section makes a key point backed by research
+   • Include specific data, examples, or case studies
+   • Use ## for main headings (H2) and ### for sub-points (H3)
+   • Add bullet points for readability
+   • Include at least 2-3 references to the research/sources
+
+📌 CONCLUSION (100-150 words)
+   • Summarize 3-4 key actionable takeaways
+   • End with a thought-provoking statement or question
+   • Soft call-to-action
 
 ═══════════════════════════════════════════════════════════
-SEO OPTIMIZATION (${currentYear} Best Practices):
+WRITING STYLE:
 ═══════════════════════════════════════════════════════════
 
-• Primary keyword in: title, H1, first paragraph, 1-2 H2s, conclusion
-• Keyword density: 1-2% (natural, not forced)
-• Semantic keywords: Use variations and related terms throughout
-• Internal linking: Mark opportunities as [INTERNAL LINK: topic]
-• External links: Reference 1-2 authoritative sources
-• Featured snippet optimization: Include a clear definition or list that could be featured
-• E-E-A-T signals: Demonstrate Experience, Expertise, Authoritativeness, Trustworthiness
+TONE: Professional yet conversational - like a knowledgeable friend explaining something
+VOICE: Confident but not arrogant, helpful but not preachy
+FEEL: Human-written, thoughtful, genuinely helpful
+
+DO:
+✓ Use "you" and "your" to connect with readers
+✓ Vary sentence length (mix short punchy with longer explanatory)
+✓ Include personal observations or industry experience
+✓ Ask rhetorical questions to engage readers
+✓ Use transition words between sections
+
+DON'T:
+✗ Start with "In today's..." or "In this article..."
+✗ Use "In conclusion" or "As we've discussed"
+✗ Sound robotic or AI-generated
+✗ Make claims without backing them up
+✗ Pad content with fluff - every sentence should add value
 
 ═══════════════════════════════════════════════════════════
 
-Return JSON (ensure content is COMPLETE and ${targetWordCount}+ words):
+Return JSON:
 {
-  "title": "SEO-optimized, compelling headline under 60 characters",
-  "excerpt": "Meta description under 160 characters with value proposition and soft CTA",
-  "content": "Full Markdown blog post with proper ## and ### heading hierarchy. MUST be ${targetWordCount}+ words with complete introduction, body sections, and conclusion.",
-  "seoKeywords": ["primary", "secondary", "long-tail keywords"],
-  "seoScore": 85-95,
+  "title": "Compelling, accurate headline (50-60 characters)",
+  "excerpt": "Research-backed meta description (under 155 characters)",
+  "content": "Full Markdown blog post, ${targetWordCount} words, with research citations and factual accuracy",
+  "seoKeywords": ["primary keyword", "secondary 1", "secondary 2", "long-tail"],
+  "seoScore": 85,
   "readingTime": "${Math.ceil(targetWordCount / 200)} min read",
-  "suggestedImages": ["Hero image description", "Supporting infographic/image 1", "Supporting image 2"]
+  "sources": ${JSON.stringify(credibleSources.slice(0, 3).map(s => s.title))}
 }`;
 
-    console.log('[Blog] Calling LLM for professional blog post generation...');
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are a world-class professional blog writer with 10+ years of experience at top-tier publications like HubSpot, Forbes, and industry-leading company blogs.
+        systemPrompt: `You are a senior journalist and content expert with 10+ years of experience at publications like Harvard Business Review, Forbes, and industry-leading trade publications.
 
-YOUR WRITING CREDENTIALS:
-• 500+ published articles with millions of total views
-• Content that consistently ranks on Google's first page
-• Expertise in making complex topics accessible and engaging
-• Master of SEO without sacrificing readability
-• Known for a distinctive, human voice that builds trust
+YOUR EXPERTISE:
+• Research-driven writing that builds credibility
+• Translating complex data into accessible insights
+• Fact-checking and source verification
+• Creating content that educates and informs
 
-YOUR WRITING PHILOSOPHY:
-• Every article should be the best resource on the internet for its topic
-• Write as if you're explaining to a smart friend over coffee
-• Back up claims with data, examples, and real-world applications
-• Make readers feel informed, confident, and ready to take action
-• Quality over quantity - but comprehensive coverage is essential for SEO
+YOUR WRITING PRINCIPLES:
+1. ACCURACY FIRST: Never make up facts. Use research provided or clearly indicate when drawing on general knowledge.
+2. CITE SOURCES: Reference the research sources naturally within the content.
+3. ADD VALUE: Every paragraph should teach something useful.
+4. BE HUMAN: Write like an expert explaining to a colleague, not a robot generating text.
+5. STAY FOCUSED: ${targetWordCount} words is the target. No padding, no fluff.
 
-CRITICAL REQUIREMENTS:
-1. Generate COMPLETE, FULL blog posts - NEVER cut content short
-2. Target word count is ${targetWordCount}+ words - this is a MINIMUM
-3. Include proper Introduction → Body → Conclusion structure
-4. Sound like a human expert, NOT a robot or AI
-5. Every paragraph should provide genuine value
-
-You are being paid $500 for this article. Make it worth every penny.`,
-        temperature: 0.75,
-        maxTokens: 12000  // Increased significantly for longer professional posts
+QUALITY STANDARD:
+This blog post should read like it was written by a subject matter expert after hours of research. It should be the kind of article readers bookmark and share because of its accuracy and usefulness.`,
+        temperature: 0.7,  // Lower for more accuracy
+        maxTokens: 8000
     });
 
     console.log('[Blog] LLM response received, length:', response.text?.length || 0);

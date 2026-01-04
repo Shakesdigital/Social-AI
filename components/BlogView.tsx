@@ -100,8 +100,8 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
         setError(null);
         try {
             console.log('[BlogView] Starting blog generation for:', topic.topic);
-            // Generate a full comprehensive blog post (1500+ words)
-            const post = await generateBlogPost(topic, profile, 1500);
+            // Generate a research-backed, factually accurate blog post (1200-1500 words)
+            const post = await generateBlogPost(topic, profile, 1350);
 
             // Validate the content was actually generated
             if (!post.content || post.content === 'Failed to generate content.' || post.wordCount < 100) {
@@ -121,7 +121,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                 // Auto-retry after 3 seconds
                 setTimeout(async () => {
                     try {
-                        const retryPost = await generateBlogPost(topic, profile, 1500);
+                        const retryPost = await generateBlogPost(topic, profile, 1350);
                         if (retryPost.content && retryPost.wordCount > 100) {
                             setPosts(prev => [retryPost, ...prev]);
                             setSelectedPost(retryPost);
