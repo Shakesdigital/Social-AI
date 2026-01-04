@@ -281,6 +281,7 @@ function extractTopicsFromText(text: string, count: number): string[] {
 
 /**
  * Generate a professional blog post with human-like writing
+ * RESEARCH-FIRST: Gather knowledge before writing
  * Target: 1,200-1,500 words - focused, accurate, and valuable
  */
 export async function generateBlogPost(
@@ -293,17 +294,104 @@ export async function generateBlogPost(
     console.log('[Blog] Starting blog generation for:', topic.topic);
     console.log('[Blog] Target word count:', targetWordCount);
 
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 1: DEEP RESEARCH - Gather knowledge before writing
+    // ═══════════════════════════════════════════════════════════
+
+    console.log('[Blog] PHASE 1: Conducting research...');
+
+    let researchContext = '';
+    let researchSources: string[] = [];
+    let hasResearch = false;
+
+    if (isWebResearchConfigured()) {
+        try {
+            // Search 1: Topic-specific research
+            console.log('[Blog] Research query 1: Topic facts...');
+            const topicSearch = await searchWeb(`${topic.topic} facts guide ${new Date().getFullYear()}`, 5);
+
+            // Search 2: Industry context
+            console.log('[Blog] Research query 2: Industry context...');
+            const industrySearch = await searchWeb(`${profile.industry} ${topic.relatedKeywords[0]} best practices`, 3);
+
+            // Search 3: Expert insights (if topic is specific enough)
+            console.log('[Blog] Research query 3: Expert insights...');
+            const expertSearch = await searchWeb(`${topic.relatedKeywords.slice(0, 2).join(' ')} expert tips`, 3);
+
+            // Compile research - only if we got actual results
+            const allResults = [...topicSearch, ...industrySearch, ...expertSearch];
+            const validResults = allResults.filter(r => r?.snippet && r.snippet.length > 30);
+
+            if (validResults.length >= 3) {
+                hasResearch = true;
+                researchSources = validResults.slice(0, 8).map(r => r.title);
+
+                researchContext = `
+═══════════════════════════════════════════════════════════
+📚 RESEARCH FINDINGS (Use this knowledge in your writing)
+═══════════════════════════════════════════════════════════
+
+The following information was gathered from credible sources. Use these facts and insights to write an informed, accurate article:
+
+${validResults.slice(0, 8).map((r, i) => `
+SOURCE ${i + 1}: ${r.title}
+Key Information: ${r.snippet}
+`).join('')}
+
+INSTRUCTIONS:
+• Incorporate relevant facts from this research naturally
+• When citing, use phrases like "According to industry sources..." or "Research indicates..."
+• Cross-reference claims—don't include conflicting information
+• If research conflicts with your knowledge, prioritize accuracy
+
+═══════════════════════════════════════════════════════════
+`;
+                console.log(`[Blog] Research successful: ${validResults.length} sources compiled`);
+            } else {
+                console.log('[Blog] Research returned insufficient results');
+            }
+        } catch (e) {
+            console.log('[Blog] Research phase encountered an error:', e);
+        }
+    }
+
+    // If no research available, provide guidance for LLM to use training knowledge
+    if (!hasResearch) {
+        console.log('[Blog] Using LLM training knowledge (no web research available)');
+        researchContext = `
+═══════════════════════════════════════════════════════════
+📚 RESEARCH GUIDANCE (Web research unavailable)
+═══════════════════════════════════════════════════════════
+
+Live research is not available. Use your training knowledge to write this article, but:
+
+• Only state facts you're confident are accurate
+• Use hedging language for uncertain claims: "typically", "often", "many experts suggest"
+• Focus on evergreen information that doesn't require real-time data
+• If writing about a specific location (e.g., Uganda), only mention places you're certain exist there
+• Avoid specific statistics unless you're confident they're accurate—use general statements instead
+
+REMEMBER: It's better to be generally accurate than specifically wrong.
+
+═══════════════════════════════════════════════════════════
+`;
+    }
+
+    console.log('[Blog] PHASE 2: Writing with research context...');
+
     // Get business context
     const businessContext = getBusinessContext(profile);
     const currentYear = new Date().getFullYear();
 
-    // PROFESSIONAL BLOGGER VOICE - Human touch + Focus + Word count + FACT-CHECKING
+    // PROFESSIONAL BLOGGER VOICE - Human touch + Focus + Word count + FACT-CHECKING + RESEARCH
     const prompt = `Write a blog post like an experienced professional blogger would write it.
 
 TOPIC: "${topic.topic}"
 BUSINESS: ${profile.name} (${profile.industry})
 AUDIENCE: ${profile.targetAudience}
 KEYWORDS: ${topic.relatedKeywords.join(', ')}
+
+${researchContext}
 
 ═══════════════════════════════════════════════════════════
 ⚠️ CRITICAL: FACT-CHECK EVERYTHING YOU WRITE ⚠️
@@ -409,11 +497,13 @@ CONTENT REQUIREMENTS:
 
 Write the complete blog post now (1,300-1,400 words, focused on "${topic.topic}"):`;
 
-    console.log('[Blog] Calling LLM with fact-checked professional blogger voice...');
+    console.log('[Blog] Calling LLM with researched professional blogger voice...');
 
     const response = await callLLM(prompt, {
         type: 'reasoning',
         systemPrompt: `You are an experienced professional blogger who has been writing about ${profile.industry} for over a decade. You've built a reputation for ACCURATE, well-researched content.
+
+${hasResearch ? '📚 RESEARCH PROVIDED: You have been given research findings above. Use this information to write a well-informed article. Incorporate the facts naturally.' : '📚 NO LIVE RESEARCH: Use your training knowledge carefully. Hedge uncertain claims.'}
 
 ⚠️ FACT-CHECKING IS YOUR TOP PRIORITY ⚠️
 
@@ -436,19 +526,20 @@ YOUR WRITING IDENTITY:
 
 HOW YOU WRITE:
 • Every article delivers what the title promises
+• ${hasResearch ? 'Use the research provided to support your points' : 'Rely on evergreen knowledge you are confident about'}
 • You triple-check any specific claims
-• You use data only when you're confident it's accurate
 • You write tight paragraphs—no fluff or padding
 
 CRITICAL RULES:
-1. FACT-CHECK everything before writing it
-2. Hit EXACTLY 1,300-1,400 words
-3. Stay 100% focused on: "${topic.topic}"
-4. Sound like a human professional, not AI
-5. Geographic accuracy is essential—verify all place names
+1. ${hasResearch ? 'USE the research provided in your writing' : 'Be cautious with specific claims'}
+2. FACT-CHECK everything before writing it
+3. Hit EXACTLY 1,300-1,400 words
+4. Stay 100% focused on: "${topic.topic}"
+5. Sound like a human professional, not AI
+6. Geographic accuracy is essential—verify all place names
 
 Output in Markdown format. Start with # for the title.`,
-        temperature: 0.75,  // Lower for more accuracy
+        temperature: hasResearch ? 0.8 : 0.7,  // Higher if we have research to be creative with, lower if relying on training
         maxTokens: 10000
     });
 
