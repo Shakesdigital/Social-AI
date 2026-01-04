@@ -407,6 +407,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
         } catch (e) { alert("Failed to generate image"); }
     };
 
+    // State to track which posts are regenerating captions
+    const [regeneratingCaptions, setRegeneratingCaptions] = useState<Set<string>>(new Set());
+
+    // Regenerate caption for a specific pending post
+    const handleRegenerateCaption = async (id: string) => {
+        const post = pendingPosts.find(p => p.id === id);
+        if (!post) return;
+
+        setRegeneratingCaptions(prev => new Set(prev).add(id));
+        try {
+            const newCaption = await generatePostCaption(profile, post.topic, post.platform);
+            setPendingPosts(prev => prev.map(p => p.id === id ? { ...p, caption: newCaption } : p));
+        } catch (e) {
+            console.error("Failed to regenerate caption:", e);
+            alert("Failed to regenerate caption. Please try again.");
+        } finally {
+            setRegeneratingCaptions(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 md:p-8 h-full flex flex-col relative">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
@@ -997,10 +1021,32 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Topic</p>
                                             <p className="text-sm font-semibold text-slate-800 -mt-1">{post.topic}</p>
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Caption</label>
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Caption</label>
+                                                    <button
+                                                        onClick={() => handleRegenerateCaption(post.id)}
+                                                        disabled={regeneratingCaptions.has(post.id)}
+                                                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title="Regenerate caption with AI"
+                                                    >
+                                                        {regeneratingCaptions.has(post.id) ? (
+                                                            <>
+                                                                <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                                                <span>Regenerating...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <RefreshCw size={12} />
+                                                                <span>Regenerate</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
                                                 <textarea
-                                                    defaultValue={post.caption}
-                                                    className="w-full p-3 text-sm text-slate-600 border border-slate-100 rounded-xl h-24 bg-slate-50/50 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none scrollbar-hide"
+                                                    value={post.caption}
+                                                    onChange={(e) => setPendingPosts(prev => prev.map(p => p.id === post.id ? { ...p, caption: e.target.value } : p))}
+                                                    className="w-full p-3 text-sm text-slate-600 border border-slate-100 rounded-xl h-32 bg-slate-50/50 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none scrollbar-hide resize-none"
+                                                    placeholder="Caption will appear here..."
                                                 />
                                             </div>
                                         </div>

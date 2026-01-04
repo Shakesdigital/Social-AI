@@ -371,43 +371,166 @@ YOUR STANDARDS:
 };
 
 /**
- * Post Caption Generation with Platform Optimization and Memory
+ * Post Caption Generation with Platform Optimization, Memory, and Holiday Awareness
+ * Crafted with 10+ years of social media expertise
  */
 export const generatePostCaption = async (profile: CompanyProfile, topic: string, platform: string) => {
   // Get business context from memory
   const businessContext = getBusinessContext(profile);
 
+  // Get current date context for holidays and observances
+  const today = new Date();
+  const currentMonth = today.toLocaleString('en-US', { month: 'long' });
+  const currentYear = today.getFullYear();
+
+  // Major global observances and awareness months/days
+  const holidayContext = `
+CURRENT DATE CONTEXT:
+• Today: ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+• Month: ${currentMonth} ${currentYear}
+
+CONSIDER RELEVANT OBSERVANCES (if applicable to the topic/business):
+• January: New Year, MLK Day, Financial Wellness Month
+• February: Valentine's Day, Black History Month, Heart Health Month
+• March: International Women's Day, St. Patrick's Day, Women's History Month
+• April: Earth Day, Easter, Autism Awareness Month
+• May: Mental Health Awareness, Mother's Day, Memorial Day, Asian Heritage Month
+• June: Pride Month, Father's Day, Juneteenth
+• July: Independence Day (US), World Emoji Day
+• August: Back to School, National Wellness Month
+• September: Labor Day, Hispanic Heritage Month, World Suicide Prevention Day
+• October: Breast Cancer Awareness, Halloween, Small Business Month
+• November: Veterans Day, Thanksgiving, Native American Heritage Month
+• December: Hanukkah, Christmas, Kwanzaa, New Year's Eve
+
+Only incorporate observances if they naturally align with the business niche and post topic. Don't force it.
+`;
+
   const platformGuidelines: Record<string, string> = {
-    Instagram: "Use emojis strategically, include 5-10 relevant hashtags at the end, write in a visual/aesthetic tone, max 2200 chars but hook in first line",
-    LinkedIn: "Professional but personable, use line breaks for readability, storytelling format, no hashtags in the middle of text, call-to-action at end",
-    Twitter: "Punchy and concise (under 280 chars), controversial or thought-provoking angles work well, 1-2 hashtags max",
-    Facebook: "Conversational, encourage discussion, questions work well, can be longer form, minimal hashtags"
+    Instagram: `INSTAGRAM MASTERY (Algorithm-optimized):
+    • HOOK: First line MUST stop the scroll - use pattern interrupts, bold statements, or relatable hooks
+    • LENGTH: Optimal is 150-2000 characters. Longer = more engagement when valuable
+    • FORMATTING: Use line breaks for readability. One idea per line.
+    • EMOJIS: Use strategically (3-8 max). Place at line starts or as visual breaks
+    • HASHTAGS: 8-15 relevant hashtags. Mix of sizes (1M+, 100K-1M, under 100K)
+    • CTA: End with a question or clear call-to-action (save, share, comment, tag)
+    • TRENDS: Reference trending audio, formats, or cultural moments when relevant
+    • SAVE-WORTHY: Include tips, frameworks, or insights worth bookmarking`,
+
+    LinkedIn: `LINKEDIN EXPERTISE (Professional engagement):
+    • HOOK: First 2 lines appear before "see more" - make them COUNT
+    • TONE: Professional but human. Vulnerability and authenticity perform well
+    • FORMAT: Short paragraphs. ↳ or → for visual hierarchy. One sentence per line.
+    • STRUCTURE: Hook → Story/Context → Value/Insight → CTA
+    • LENGTH: 1200-1900 characters is the sweet spot for engagement
+    • HASHTAGS: 3-5 max, placed naturally or at the end
+    • NO EMOJIS OVERLOAD: 1-3 strategically placed only
+    • CTA: Ask a genuine question that invites discussion, or "Agree? 👇"
+    • STORYTELLING: Personal anecdotes + lessons massively outperform generic posts`,
+
+    Twitter: `TWITTER/X MASTERY (Viral potential):
+    • CONSTRAINTS: Max 280 characters. Every word matters.
+    • HOOKS: Hot takes, contrarian views, surprising stats, relatable scenarios
+    • ENGAGEMENT: Questions, polls, controversial opinions drive replies
+    • THREADS: For longer content, tease the thread in first tweet
+    • HASHTAGS: 0-2 max. Often perform better without them
+    • FORMATTING: Use line breaks. Single tweet > wall of text
+    • TIMING: Real-time relevance with news, trends, and cultural moments
+    • PERSONALITY: Be punchy, opinionated, witty. Personality wins.`,
+
+    Facebook: `FACEBOOK OPTIMIZATION (Community building):
+    • LENGTH: 40-80 characters OR 400+ for storytelling (avoid middle ground)
+    • TONE: Conversational, like talking to a friend
+    • QUESTIONS: Open-ended questions drive comments
+    • STORIES: Personal narratives, behind-the-scenes, relatable moments
+    • VISUALS: Reference the image/video in your caption
+    • HASHTAGS: 0-3 max, or none. Not as important here
+    • CTA: Encourage shares, tag-a-friend, or save for later
+    • GROUPS: Consider cross-posting relevant content to niche groups`,
+
+    TikTok: `TIKTOK CAPTION EXPERTISE:
+    • LENGTH: Short and punchy (50-150 characters ideal)
+    • HOOKS: First few words matter for auto-captions
+    • HASHTAGS: 3-5 relevant ones. Mix trending + niche
+    • TRENDS: Reference sounds, challenges, or formats
+    • PERSONALITY: Casual, authentic, slightly chaotic energy welcome
+    • CTA: "Follow for more", "Part 2?", "Tag someone who needs this"`,
+
+    YouTube: `YOUTUBE DESCRIPTION OPTIMIZATION:
+    • FIRST 150 CHARS: Most important - shows in search
+    • KEYWORDS: Front-load with SEO terms
+    • TIMESTAMPS: Include chapter markers if applicable
+    • LINKS: CTA to subscribe, related videos, website
+    • HASHTAGS: 3-5 max in description
+    • VALUE PROP: What will viewers learn/gain?`
   };
 
   const prompt = `
-Write a scroll-stopping ${platform} caption for this topic: "${topic}"
+You are a world-class social media copywriter with 10+ years of experience growing brands to millions of followers and driving real business results. Your captions have generated millions in engagement and conversions.
+
+CRAFT A PREMIUM ${platform.toUpperCase()} CAPTION FOR:
+"${topic}"
 
 ${businessContext}
 
-PLATFORM RULES: ${platformGuidelines[platform] || platformGuidelines.Instagram}
+${holidayContext}
 
-CAPTION FORMULA:
-1. HOOK: First line must stop the scroll
-2. VALUE: Deliver on the hook's promise
-3. CTA: Tell them what to do (like, comment, share, save)
+${platformGuidelines[platform] || platformGuidelines.Instagram}
 
-Write only the caption, ready to copy-paste. No explanations.
+EXPERT CAPTION FRAMEWORK:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 🎯 HOOK (First Line)
+   - Pattern interrupt or curiosity gap
+   - Relatable scenario or bold statement
+   - Stop the scroll in under 3 seconds
+
+2. 💎 VALUE BODY
+   - Deliver on the hook's promise
+   - Actionable insight, story, or framework
+   - Emotional connection or transformation
+
+3. 🔥 CALL-TO-ACTION
+   - Clear next step (save, share, comment, follow)
+   - Engagement driver (question, opinion request)
+   - Community building element
+
+QUALITY STANDARDS:
+• Write like you're talking to ONE person, not an audience
+• Be specific and concrete, never vague or generic
+• Create FOMO or urgency when appropriate
+• Make it save-worthy and share-worthy
+• Match the brand voice and speak to the target audience
+• If a relevant holiday/observance fits naturally, weave it in subtly
+
+Write ONLY the caption, ready to copy-paste. No explanations or meta-commentary.
 `;
 
   try {
     const response = await callLLM(prompt, {
       type: 'reasoning',
-      systemPrompt: `You are an expert ${platform} content creator. Your captions consistently get high engagement because you understand the platform's algorithm and audience psychology. Always stay true to the brand voice and speak directly to the target audience.`,
-      temperature: 0.85
+      systemPrompt: `You are an elite ${platform} content creator and social media strategist with over 10 years of experience. You've grown personal brands to 1M+ followers and managed content for Fortune 500 companies.
+
+YOUR EXPERTISE:
+• Algorithm mastery - You understand what makes content go viral on ${platform}
+• Psychology of engagement - You know exactly what makes people stop, read, and act
+• Brand voice chameleon - You adapt perfectly to any brand personality
+• Conversion copywriting - Your captions drive real business results
+• Trend awareness - You know what's culturally relevant right now
+
+YOUR SIGNATURE STYLE:
+• Hooks that are impossible to scroll past
+• Value that makes people screenshot and save
+• Authentic voice that builds genuine connection
+• Strategic use of formatting, emojis, and hashtags
+• CTAs that feel natural, not salesy
+
+Every caption you write is worthy of a premium content agency.`,
+      temperature: 0.85,
+      maxTokens: 1500
     });
 
     // Track the caption generation
-    trackAction(`Generated ${platform} caption for: ${topic.slice(0, 50)}`);
+    trackAction(`Generated expert ${platform} caption for: ${topic.slice(0, 50)}`);
 
     return response.text;
   } catch (error) {
@@ -497,7 +620,8 @@ You're like having a CMO on speed dial. Be helpful, specific, and actionable.`
 };
 
 /**
- * Auto-Pilot Batch Generation with Trend Integration and Memory
+ * Auto-Pilot Batch Generation with Trend Integration, Memory, and Holiday Awareness
+ * Expert-level content crafted with 10+ years of social media expertise
  */
 export const generateBatchContent = async (profile: CompanyProfile, config: AutoPilotConfig) => {
   const platforms = Object.entries(config.postingFrequency)
@@ -511,6 +635,33 @@ export const generateBatchContent = async (profile: CompanyProfile, config: Auto
   // Get business context and topics to avoid
   const businessContext = getBusinessContext(profile);
   const topicsToAvoid = getTopicsToAvoid();
+
+  // Get current date context for holidays and observances
+  const today = new Date();
+  const currentMonth = today.toLocaleString('en-US', { month: 'long' });
+  const currentYear = today.getFullYear();
+
+  const holidayContext = `
+CURRENT DATE & SEASONAL CONTEXT:
+• Today: ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+• Month: ${currentMonth} ${currentYear}
+
+UPCOMING OBSERVANCES & HOLIDAYS TO CONSIDER (incorporate if relevant to the business niche):
+• January: New Year, MLK Day, Financial Wellness Month
+• February: Valentine's Day, Black History Month, Heart Health Month  
+• March: International Women's Day, St. Patrick's Day, Women's History Month
+• April: Earth Day, Easter, Autism Awareness Month
+• May: Mental Health Awareness, Mother's Day, Memorial Day
+• June: Pride Month, Father's Day, Juneteenth
+• July: Independence Day (US), World Emoji Day
+• August: Back to School, National Wellness Month
+• September: Labor Day, Hispanic Heritage Month
+• October: Breast Cancer Awareness, Halloween, Small Business Month
+• November: Veterans Day, Thanksgiving, Black Friday
+• December: Hanukkah, Christmas, Kwanzaa, New Year's Eve
+
+Only weave in observances that naturally align with the business and add value. Never force it.
+`;
 
   // Get real-time trends for content inspiration
   let trendContext = '';
@@ -529,9 +680,11 @@ TRENDING CONTENT TO LEVERAGE:
   const planPrompt = `
 CRITICAL: You MUST respond with ONLY a valid JSON object. No text before or after the JSON. No markdown, no explanations.
 
-Create a viral content calendar.
+You are a Senior Social Media Strategist with 10+ years of experience growing brands to millions of followers. Create an EXCEPTIONAL content calendar.
 
 ${businessContext}
+
+${holidayContext}
 
 REQUIREMENTS:
 • Cadence: ${config.cadence}
@@ -542,28 +695,69 @@ ${trendContext}
 
 ${topicsToAvoid}
 
-For each post, provide:
-1. Platform (optimized for that platform's algorithm)
-2. Topic (specific, compelling idea - FRESH, not repeated)
-3. Caption (ready to post, with hashtags/emojis as appropriate)
-4. Image Prompt (detailed description for AI image generation)
-5. Best Time (suggested posting time)
+═══════════════════════════════════════════════════════════
+EXPERT CAPTION STANDARDS FOR EACH POST:
+═══════════════════════════════════════════════════════════
+
+For each post, the CAPTION must follow this expert framework:
+
+1. 🎯 HOOK (First Line) - Stop the scroll immediately
+   • Pattern interrupt, curiosity gap, or bold statement
+   • Relatable scenario that makes them say "that's me"
+   • Surprising stat or contrarian take
+
+2. 💎 VALUE BODY - Deliver transformation
+   • Actionable tips, frameworks, or insights
+   • Story that creates emotional connection
+   • Specific and concrete, never generic
+
+3. 🔥 CTA - Drive engagement
+   • Natural call-to-action (save, share, comment, tag)
+   • Question that prompts discussion
+   • Community-building element
+
+PLATFORM-SPECIFIC EXCELLENCE:
+• Instagram: Strong hook, strategic emojis (3-8), 8-15 hashtags at end, save-worthy content
+• LinkedIn: Professional hook, short paragraphs, storytelling, vulnerability wins, 3-5 hashtags
+• Twitter/X: Punchy (<280 chars), hot takes, no hashtags or 1-2 max
+• Facebook: Conversational, question-driven, community focus
+• TikTok: Short, punchy, trend-aware, 3-5 hashtags
 
 CONTENT MIX GUIDELINES:
-• 40% Educational/Value
-• 30% Engaging/Interactive
-• 20% Behind-the-scenes/Personal
-• 10% Promotional
+• 40% Educational/Value (tips, how-tos, frameworks)
+• 30% Engaging/Interactive (questions, polls, relatable content)
+• 20% Behind-the-scenes/Personal (process, struggles, wins)
+• 10% Promotional (offers, announcements, case studies)
+
+Each caption should be DETAILED and OPTIMIZED - not short placeholder text.
+Write captions as if they're worth $500 each from a premium agency.
 
 IMPORTANT: Respond with ONLY this exact JSON structure, nothing else:
-{"posts": [{"platform": "Instagram", "topic": "Your topic here", "caption": "Full caption with hashtags", "imagePrompt": "Detailed image description", "bestTime": "9:00 AM"}]}
+{"posts": [{"platform": "Instagram", "topic": "Your topic here", "caption": "Full detailed caption with proper formatting, emojis, and hashtags - multiple paragraphs if needed", "imagePrompt": "Detailed image description", "bestTime": "9:00 AM"}]}
 `;
 
   try {
     const response = await callLLM(planPrompt, {
       type: 'reasoning',
-      systemPrompt: "You are a JSON-only content calendar generator. You MUST respond with ONLY valid JSON. No explanations, no markdown, no text outside the JSON object. Generate fresh, engaging content for each platform.",
-      maxTokens: 3000
+      systemPrompt: `You are an elite Social Media Content Director with 10+ years of experience. You've managed content for Fortune 500 brands and grown personal brands to millions of followers.
+
+YOUR EXPERTISE:
+• Algorithm mastery across all platforms
+• Psychology of viral content and engagement
+• Brand voice development and consistency
+• Conversion-focused copywriting
+• Trend-jacking and cultural relevance
+
+YOUR STANDARDS:
+• Every caption is scroll-stopping quality
+• Hooks that are impossible to skip
+• Value that makes people screenshot and save
+• CTAs that feel natural, not salesy
+• Platform-specific optimization
+
+You generate content calendars that brands would pay $5,000+ for.
+Respond with ONLY valid JSON. No explanations, no markdown.`,
+      maxTokens: 4000
     });
 
     const parsed = parseJSONFromLLM<any>(response.text);
