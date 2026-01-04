@@ -280,8 +280,7 @@ function extractTopicsFromText(text: string, count: number): string[] {
 }
 
 /**
- * Generate a research-backed, factually accurate blog post
- * Professional-level quality with human-like writing
+ * Generate a professional blog post with human-like writing
  * Target: 1,200-1,500 words - focused, accurate, and valuable
  */
 export async function generateBlogPost(
@@ -289,195 +288,133 @@ export async function generateBlogPost(
     profile: CompanyProfile,
     wordCount: number = 1350
 ): Promise<BlogPost> {
-    // Target word count: 1200-1500 words
-    const targetWordCount = Math.min(Math.max(wordCount, 1200), 1500);
+    const targetWordCount = 1350; // Fixed for consistency
 
     console.log('[Blog] Starting blog generation for:', topic.topic);
     console.log('[Blog] Target word count:', targetWordCount);
-
-    // Try to gather research (may fail due to CORS in production)
-    let researchContext = '';
-    let hasRealResearch = false;
-
-    if (isWebResearchConfigured()) {
-        try {
-            console.log('[Blog] Attempting web research...');
-            const searchResults = await searchWeb(`${topic.topic} ${topic.relatedKeywords.slice(0, 2).join(' ')}`, 5);
-
-            // Only use research if we got actual results with content
-            if (searchResults.length > 0 && searchResults[0]?.snippet?.length > 20) {
-                hasRealResearch = true;
-                researchContext = `
-USE THESE VERIFIED SOURCES IN YOUR ARTICLE:
-${searchResults.slice(0, 5).map((r, i) => `
-Source ${i + 1}: "${r.title}"
-- Key point: ${r.snippet}
-- Reference as: "According to ${r.title}..." or cite naturally
-`).join('')}
-
-IMPORTANT: Incorporate at least 2-3 of these sources naturally in your content.
-`;
-                console.log('[Blog] Research successful:', searchResults.length, 'sources');
-            } else {
-                console.log('[Blog] Research returned no usable results, using LLM knowledge');
-            }
-        } catch (e) {
-            console.log('[Blog] Research failed, using LLM knowledge');
-        }
-    }
 
     // Get business context
     const businessContext = getBusinessContext(profile);
     const currentYear = new Date().getFullYear();
 
-    // Build the prompt - SIMPLIFIED for better output
-    const prompt = `Write a ${targetWordCount}-word professional blog post about: "${topic.topic}"
+    // SIMPLIFIED PROMPT - Direct instruction for better compliance
+    const prompt = `Write a professional blog post.
 
-${businessContext}
+TOPIC: ${topic.topic}
+KEYWORDS: ${topic.relatedKeywords.join(', ')}
+BUSINESS: ${profile.name} - ${profile.industry}
+AUDIENCE: ${profile.targetAudience}
 
-TARGET KEYWORDS: ${topic.relatedKeywords.join(', ')}
+CRITICAL REQUIREMENTS:
 
-${hasRealResearch ? researchContext : `
-IMPORTANT: Since live research is unavailable, draw on your extensive training knowledge. 
-When making claims, use phrases like:
-- "Industry research shows that..."
-- "According to recent studies..."  
-- "Experts in the field suggest..."
-- "Data indicates that..."
-`}
+1. WORD COUNT: Write EXACTLY 1,300-1,400 words. This is mandatory.
+   - Count your words as you write
+   - Each section should be 200-300 words
+   - Include 5-6 main sections
 
-═══════════════════════════════════════════════════════════
-WORD COUNT REQUIREMENT: EXACTLY ${targetWordCount} WORDS
-═══════════════════════════════════════════════════════════
+2. FORMAT: Use this exact structure:
+   
+   # [Blog Title - 50-60 characters]
+   
+   [Opening paragraph: 80-100 words. Hook the reader with a question, statistic, or bold statement. NO "In today's world..." phrases.]
+   
+   ## [First Main Section Title]
+   [2-3 detailed paragraphs, 200-250 words total. Include specific examples.]
+   
+   ## [Second Main Section Title]  
+   [2-3 paragraphs, 200-250 words. Add data points or statistics.]
+   
+   ## [Third Main Section Title]
+   [2-3 paragraphs, 200-250 words. Include actionable advice.]
+   
+   ## [Fourth Main Section Title]
+   [2-3 paragraphs, 200-250 words. Address common questions or concerns.]
+   
+   ## [Fifth Main Section Title]
+   [2-3 paragraphs, 200-250 words. Provide expert tips or insights.]
+   
+   ## Key Takeaways
+   - [Actionable point 1]
+   - [Actionable point 2]
+   - [Actionable point 3]
+   - [Actionable point 4]
+   
+   [Closing paragraph: 60-80 words. End with a thought-provoking question or call-to-action.]
 
-This is CRITICAL. Count your words. The blog MUST be between 1,200-1,500 words.
-If too short, add more detail, examples, and explanations.
-If too long, trim unnecessary content.
+3. WRITING STYLE:
+   - Write like a knowledgeable friend explaining something over coffee
+   - Use "you" and "your" frequently
+   - Mix short sentences with longer ones
+   - Include specific numbers, examples, and details
+   - Add phrases like "What many people miss is..." or "The key insight here is..."
+   - Ask rhetorical questions to engage readers
+   
+4. AVOID:
+   - "In today's digital age" or "In this article"
+   - "In conclusion" or "As we've discussed"
+   - Generic advice that could apply to anything
+   - Vague statements without specifics
+   - Robotic or AI-sounding language
 
-═══════════════════════════════════════════════════════════
-STRUCTURE (Follow this exactly):
-═══════════════════════════════════════════════════════════
+5. INCLUDE:
+   - At least 3 specific statistics or data points (can reference "research shows" or "studies indicate")
+   - 2-3 practical examples or scenarios
+   - Expert-sounding insights relevant to ${profile.industry}
 
-## [Compelling H2 Section Title]
-[2-3 paragraphs with specific, actionable content]
+Now write the complete blog post (1,300-1,400 words):`;
 
-## [Another H2 Section]  
-[2-3 paragraphs with examples, data points, or case studies]
-
-### [Optional H3 Subsection]
-[Supporting details]
-
-[Continue with 4-6 main sections total]
-
-## Key Takeaways
-[Bullet list of 3-5 actionable points]
-
-═══════════════════════════════════════════════════════════
-WRITING STYLE REQUIREMENTS (CRITICAL):
-═══════════════════════════════════════════════════════════
-
-✅ DO:
-- Write like a human expert having a conversation, not a textbook
-- Use "you" and "your" to connect with readers  
-- Include specific examples, numbers, and details
-- Vary sentence length - mix short punchy sentences with longer explanatory ones
-- Add personal insights like "In my experience..." or "What many people miss is..."
-- Use rhetorical questions to engage readers
-- Include transition phrases between sections
-
-❌ DO NOT:
-- Start with "In today's digital age..." or "In this article..."
-- Use "In conclusion" or "As we've discussed"
-- Write generic advice that could apply to any topic
-- Use excessive buzzwords or jargon
-- Sound robotic or AI-generated
-- Pad with filler content
-
-TONE: Professional but warm, like a knowledgeable colleague explaining something interesting over coffee.
-
-═══════════════════════════════════════════════════════════
-
-Respond with ONLY valid JSON (no markdown code blocks):
-{"title": "Compelling Title Under 60 Characters", "excerpt": "Meta description under 155 chars", "content": "Full markdown blog post with ## headings, ${targetWordCount} words minimum", "seoKeywords": ["keyword1", "keyword2", "keyword3"], "seoScore": 85}`;
-
-    console.log('[Blog] Calling LLM...');
+    console.log('[Blog] Calling LLM with simplified prompt...');
 
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are a senior content writer with 10+ years of experience writing for publications like Forbes, HubSpot, and industry-leading blogs.
+        systemPrompt: `You are an expert blog writer. Your task is to write a complete, detailed blog post of EXACTLY 1,300-1,400 words.
 
-YOUR WRITING STYLE:
-- Naturally human and engaging
-- Specific and detailed, never vague or generic
-- Professional but conversational
-- Every paragraph adds real value
+CRITICAL: Count your words carefully. The post MUST be at least 1,300 words.
 
-CRITICAL RULES:
-1. The blog MUST be ${targetWordCount} words. Count carefully.
-2. Write complete, detailed sections - not brief summaries
-3. Include specific examples, data points, or scenarios
-4. Sound like a human expert, not an AI
-5. NO "In today's...", NO "In conclusion", NO generic phrases
-6. Respond with valid JSON only, no markdown code blocks`,
-        temperature: 0.8,
-        maxTokens: 8000
+Write in a natural, human voice. Be specific and detailed. Every paragraph should add real value.
+
+Output the blog post directly in Markdown format. Start with # for the title.`,
+        temperature: 0.85,
+        maxTokens: 10000
     });
 
     console.log('[Blog] LLM response received, length:', response.text?.length || 0);
 
-    // Parse the response
-    let parsed: any = null;
-    let content = '';
+    // Extract content directly - response should be markdown
+    let content = response.text.trim();
     let blogTitle = topic.topic;
 
-    // Try to parse JSON
-    try {
-        // Remove markdown code blocks if present
-        let cleanText = response.text.trim();
-        if (cleanText.startsWith('```json')) {
-            cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (cleanText.startsWith('```')) {
-            cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
+    // Extract title from markdown if present
+    const titleMatch = content.match(/^#\s+(.+?)[\n\r]/);
+    if (titleMatch) {
+        blogTitle = titleMatch[1].trim();
+    }
 
-        parsed = JSON.parse(cleanText);
-        content = parsed.content || '';
-        blogTitle = parsed.title || topic.topic;
-    } catch (e) {
-        console.log('[Blog] JSON parse failed, extracting content...');
-
-        // Extract content from raw text
-        const contentMatch = response.text.match(/"content"\s*:\s*"([\s\S]*?)"\s*,\s*"seo/i);
-        if (contentMatch) {
-            content = contentMatch[1]
-                .replace(/\\n/g, '\n')
-                .replace(/\\"/g, '"')
-                .replace(/\\\\/g, '\\');
+    // Remove any JSON wrapper if accidentally included
+    if (content.startsWith('{')) {
+        try {
+            const parsed = JSON.parse(content);
+            content = parsed.content || content;
+            blogTitle = parsed.title || blogTitle;
+        } catch (e) {
+            // Not JSON, use as-is
         }
+    }
 
-        // Extract title
-        const titleMatch = response.text.match(/"title"\s*:\s*"([^"]+)"/i);
-        if (titleMatch) {
-            blogTitle = titleMatch[1];
-        }
-
-        // If still no content, try to find any markdown content
-        if (!content || content.length < 500) {
-            const markdownMatch = response.text.match(/##\s+[\s\S]+/);
-            if (markdownMatch) {
-                content = markdownMatch[0];
-            }
-        }
+    // Clean up markdown code blocks if wrapped
+    if (content.startsWith('```')) {
+        content = content.replace(/^```(?:markdown)?\s*/, '').replace(/\s*```$/, '');
     }
 
     // Calculate word count
     const actualWordCount = content.split(/\s+/).filter(w => w.length > 0).length;
     console.log('[Blog] Generated content word count:', actualWordCount);
 
-    // If content is too short, log a warning
-    if (actualWordCount < 1000) {
-        console.warn('[Blog] WARNING: Content is shorter than expected:', actualWordCount, 'words');
-    }
+    // Generate excerpt from first paragraph
+    const firstParagraph = content.match(/^#[^\n]+\n+([^\n#]+)/);
+    const excerpt = firstParagraph
+        ? firstParagraph[1].slice(0, 150).trim() + '...'
+        : `Discover insights about ${topic.topic} in this comprehensive guide.`;
 
     // Track in memory
     addGeneratedBlogTitle(blogTitle);
@@ -490,9 +427,9 @@ CRITICAL RULES:
         id: `post-${Date.now()}`,
         title: blogTitle,
         content: content || `# ${topic.topic}\n\nContent generation encountered an issue. Please try again.`,
-        excerpt: parsed?.excerpt || `Explore ${topic.topic} with this comprehensive guide.`,
-        seoKeywords: parsed?.seoKeywords || topic.relatedKeywords,
-        seoScore: parsed?.seoScore || 75,
+        excerpt,
+        seoKeywords: topic.relatedKeywords,
+        seoScore: actualWordCount >= 1200 ? 85 : 70,
         trendingTopic: topic.topic,
         status: 'Draft',
         wordCount: actualWordCount
