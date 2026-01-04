@@ -1225,7 +1225,8 @@ export default function App() {
                 setView(AppView.ONBOARDING);
               }
             } else {
-              // Need to authenticate first
+              // Need to authenticate first - set mode to signup for new users
+              setAuthMode('signin');
               setView(AppView.AUTH);
             }
           }}
@@ -1245,6 +1246,8 @@ export default function App() {
                 setView(AppView.ONBOARDING);
               }
             } else {
+              // Set mode to login for existing users
+              setAuthMode('login');
               setView(AppView.AUTH);
             }
           }}
