@@ -297,84 +297,159 @@ export async function generateBlogPost(
     const businessContext = getBusinessContext(profile);
     const currentYear = new Date().getFullYear();
 
-    // SIMPLIFIED PROMPT - Direct instruction for better compliance
-    const prompt = `Write a professional blog post.
+    // HUMAN-LIKE WRITING PROMPT - Sounds like a professional blogger, not AI
+    const prompt = `Write a professional blog post that sounds like it was written by an experienced human blogger.
 
 TOPIC: ${topic.topic}
 KEYWORDS: ${topic.relatedKeywords.join(', ')}
 BUSINESS: ${profile.name} - ${profile.industry}
 AUDIENCE: ${profile.targetAudience}
 
-CRITICAL REQUIREMENTS:
+═══════════════════════════════════════════════════════════
+WORD COUNT: 1,300-1,400 words (MANDATORY)
+═══════════════════════════════════════════════════════════
 
-1. WORD COUNT: Write EXACTLY 1,300-1,400 words. This is mandatory.
-   - Count your words as you write
-   - Each section should be 200-300 words
-   - Include 5-6 main sections
+Each section should be 200-300 words. Include 5-6 main sections.
 
-2. FORMAT: Use this exact structure:
-   
-   # [Blog Title - 50-60 characters]
-   
-   [Opening paragraph: 80-100 words. Hook the reader with a question, statistic, or bold statement. NO "In today's world..." phrases.]
-   
-   ## [First Main Section Title]
-   [2-3 detailed paragraphs, 200-250 words total. Include specific examples.]
-   
-   ## [Second Main Section Title]  
-   [2-3 paragraphs, 200-250 words. Add data points or statistics.]
-   
-   ## [Third Main Section Title]
-   [2-3 paragraphs, 200-250 words. Include actionable advice.]
-   
-   ## [Fourth Main Section Title]
-   [2-3 paragraphs, 200-250 words. Address common questions or concerns.]
-   
-   ## [Fifth Main Section Title]
-   [2-3 paragraphs, 200-250 words. Provide expert tips or insights.]
-   
-   ## Key Takeaways
-   - [Actionable point 1]
-   - [Actionable point 2]
-   - [Actionable point 3]
-   - [Actionable point 4]
-   
-   [Closing paragraph: 60-80 words. End with a thought-provoking question or call-to-action.]
+═══════════════════════════════════════════════════════════
+STRUCTURE:
+═══════════════════════════════════════════════════════════
 
-3. WRITING STYLE:
-   - Write like a knowledgeable friend explaining something over coffee
-   - Use "you" and "your" frequently
-   - Mix short sentences with longer ones
-   - Include specific numbers, examples, and details
-   - Add phrases like "What many people miss is..." or "The key insight here is..."
-   - Ask rhetorical questions to engage readers
-   
-4. AVOID:
-   - "In today's digital age" or "In this article"
-   - "In conclusion" or "As we've discussed"
-   - Generic advice that could apply to anything
-   - Vague statements without specifics
-   - Robotic or AI-sounding language
+# [Engaging Title - 50-60 characters]
 
-5. INCLUDE:
-   - At least 3 specific statistics or data points (can reference "research shows" or "studies indicate")
-   - 2-3 practical examples or scenarios
-   - Expert-sounding insights relevant to ${profile.industry}
+[Hook paragraph - 80-100 words. Start with something unexpected: a surprising fact, a provocative question, or a relatable frustration. Make the reader think "Yes, that's exactly what I've been wondering!"]
+
+## [Section 1 - Problem or Context]
+[200-250 words. Set up why this matters. Use a real-world example or scenario.]
+
+## [Section 2 - Key Insight or Solution]
+[200-250 words. Share your main point with supporting evidence.]
+
+## [Section 3 - Practical Application]
+[200-250 words. Give actionable advice they can use today.]
+
+## [Section 4 - Common Mistakes or Misconceptions]
+[200-250 words. Address what people get wrong.]
+
+## [Section 5 - Expert Perspective]
+[200-250 words. Share insights that show deep knowledge.]
+
+## What This Means For You
+[Bullet list of 4-5 key takeaways]
+
+[Closing - 60-80 words. End with a question or forward-looking thought.]
+
+═══════════════════════════════════════════════════════════
+HUMAN WRITING STYLE (CRITICAL - READ CAREFULLY):
+═══════════════════════════════════════════════════════════
+
+Write like a real person who:
+- Has actually worked in ${profile.industry} for years
+- Gets genuinely excited about sharing useful knowledge  
+- Occasionally goes on small tangents that add color
+- Admits when things are complicated or uncertain
+- Has personal opinions and isn't afraid to share them
+
+VOICE CHARACTERISTICS:
+• Use contractions naturally (don't, you'll, it's, we've)
+• Include occasional parenthetical asides (like this one)
+• Start some sentences with "And" or "But" - real writers do this
+• Use em-dashes for emphasis—they add personality
+• Include the occasional one-word sentence. Really.
+• Ask questions mid-paragraph. Why? Because it creates rhythm.
+
+AUTHENTIC ENGAGEMENT:
+• Share a brief personal anecdote or observation
+• Use phrases like "Here's the thing..." or "Look," to create intimacy
+• Acknowledge the reader's time: "I know you're busy, so let's cut to what matters"
+• Show genuine curiosity: "What fascinates me about this is..."
+• Express honest opinions: "Frankly, most advice about this is wrong"
+
+VARIED RHYTHM:
+• Mix sentence lengths deliberately
+• Short sentences create punch.
+• Longer sentences allow you to develop an idea fully, giving readers the context they need to really understand your point.
+• Some paragraphs should be just 1-2 sentences.
+• Others can be longer, diving deep into a concept.
+
+═══════════════════════════════════════════════════════════
+AI DETECTION AVOIDANCE (CRITICAL):
+═══════════════════════════════════════════════════════════
+
+NEVER use these AI-typical phrases:
+❌ "In today's fast-paced world..."
+❌ "In this article, we will explore..."
+❌ "It's important to note that..."
+❌ "Let's dive in" or "Let's dive deep"
+❌ "In conclusion" or "To summarize"
+❌ "As we've discussed" or "As mentioned earlier"
+❌ "Game-changer" or "Take X to the next level"
+❌ "Unlock the potential" or "Leverage"
+❌ "Navigate the landscape" or "Embark on a journey"
+❌ "Delve into" or "Delve deeper"
+❌ "Revolutionize" or "Transform" (overused)
+❌ "Crucial" or "Essential" at the start of sentences
+❌ "Moreover" or "Furthermore" as transitions
+❌ "It goes without saying"
+❌ Generic superlatives without specifics
+
+INSTEAD, use natural transitions like:
+✅ "Here's where it gets interesting..."
+✅ "But wait—there's a catch"
+✅ "The real question is..."
+✅ "What most people miss is..."
+✅ "I've seen this pattern over and over"
+✅ "So what does this actually mean for you?"
+✅ "Let me break this down"
+
+═══════════════════════════════════════════════════════════
+SPECIFIC CONTENT REQUIREMENTS:
+═══════════════════════════════════════════════════════════
+
+Include:
+• 2-3 specific statistics (can say "research suggests" or give approximate numbers)
+• 1-2 brief real-world examples or mini case studies
+• At least one slightly controversial or surprising opinion
+• One moment of humor or wit (subtle, professional)
+• Specific, actionable advice (not vague generalities)
+
+═══════════════════════════════════════════════════════════
 
 Now write the complete blog post (1,300-1,400 words):`;
 
-    console.log('[Blog] Calling LLM with simplified prompt...');
+    console.log('[Blog] Calling LLM with human-writing prompt...');
 
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are an expert blog writer. Your task is to write a complete, detailed blog post of EXACTLY 1,300-1,400 words.
+        systemPrompt: `You are Sarah Chen, a professional content strategist and blogger with 12 years of experience. You've written for major publications and built a loyal following because your writing is refreshingly honest and actually useful.
 
-CRITICAL: Count your words carefully. The post MUST be at least 1,300 words.
+YOUR WRITING PERSONALITY:
+- You're knowledgeable but never condescending
+- You share real opinions, not just safe platitudes
+- You write like you talk—naturally, with personality
+- You care more about being helpful than sounding impressive
+- You occasionally admit what you don't know
 
-Write in a natural, human voice. Be specific and detailed. Every paragraph should add real value.
+YOUR PET PEEVES (things you NEVER do):
+- You hate buzzwords and corporate jargon
+- You never start with "In today's world" or similar clichés
+- You avoid words like "leverage," "synergy," "game-changer"
+- You don't use passive voice unless absolutely necessary
+- You never pad content with filler
 
-Output the blog post directly in Markdown format. Start with # for the title.`,
-        temperature: 0.85,
+YOUR SECRET SAUCE:
+- You make complex topics feel simple without dumbing them down
+- You include specific examples, not vague generalities
+- You write short paragraphs that are easy to scan
+- You use humor sparingly but effectively
+- You end articles with something memorable, not just a summary
+
+CRITICAL REQUIREMENTS:
+1. Write EXACTLY 1,300-1,400 words
+2. Sound unmistakably human—like a real person wrote this
+3. Every sentence should earn its place
+4. Output directly in Markdown format, starting with # for title`,
+        temperature: 0.9,  // Higher for more creative, human-like output
         maxTokens: 10000
     });
 
