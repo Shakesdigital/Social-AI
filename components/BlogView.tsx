@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, TrendingUp, Loader, Plus, Calendar, ExternalLink, Copy, BarChart3, Sparkles } from 'lucide-react';
+import { FileText, TrendingUp, Loader, Plus, Calendar, ExternalLink, Copy, BarChart3, Sparkles, Edit3, Trash2, Check, X } from 'lucide-react';
 import { CompanyProfile, BlogPost, TrendingTopic } from '../types';
 import { researchTrendingTopics, generateBlogPost, publishToWordPress } from '../services/blogService';
 import { useFreeLLM } from '../hooks/useFreeLLM';
@@ -23,6 +23,9 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
     const [isLoadingTopics, setIsLoadingTopics] = useState(false);
     const [isLoadingPost, setIsLoadingPost] = useState(false);
     const [nicheInput, setNicheInput] = useState(savedState?.nicheInput || profile.industry);
+    const [targetWordCount, setTargetWordCount] = useState<number>(savedState?.targetWordCount || 1350);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedContent, setEditedContent] = useState('');
     const [error, setError] = useState<string | null>(null);
 
     // Notify parent of state changes for persistence
@@ -32,10 +35,11 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                 topics,
                 posts,
                 selectedPost,
-                nicheInput
+                nicheInput,
+                targetWordCount
             });
         }
-    }, [topics, posts, selectedPost, nicheInput]);
+    }, [topics, posts, selectedPost, nicheInput, targetWordCount]);
 
     const handleResearchTopics = async () => {
         setIsLoadingTopics(true);
@@ -99,9 +103,9 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
         setIsLoadingPost(true);
         setError(null);
         try {
-            console.log('[BlogView] Starting blog generation for:', topic.topic);
-            // Generate a research-backed, factually accurate blog post (1200-1500 words)
-            const post = await generateBlogPost(topic, profile, 1350);
+            console.log('[BlogView] Starting blog generation for:', topic.topic, 'Target words:', targetWordCount);
+            // Generate a research-backed, factually accurate blog post
+            const post = await generateBlogPost(topic, profile, targetWordCount);
 
             // Validate the content was actually generated
             if (!post.content || post.content === 'Failed to generate content.' || post.wordCount < 100) {
@@ -121,7 +125,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                 // Auto-retry after 3 seconds
                 setTimeout(async () => {
                     try {
-                        const retryPost = await generateBlogPost(topic, profile, 1350);
+                        const retryPost = await generateBlogPost(topic, profile, targetWordCount);
                         if (retryPost.content && retryPost.wordCount > 100) {
                             setPosts(prev => [retryPost, ...prev]);
                             setSelectedPost(retryPost);
@@ -167,6 +171,44 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
         const scheduled = { ...post, status: 'Scheduled' as const, scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) };
         setPosts(prev => prev.map(p => p.id === post.id ? scheduled : p));
         if (onAddToCalendar) onAddToCalendar(scheduled);
+    };
+
+    // Edit handlers
+    const handleStartEdit = () => {
+        if (selectedPost) {
+            setEditedContent(selectedPost.content);
+            setIsEditing(true);
+        }
+    };
+
+    const handleSaveEdit = () => {
+        if (selectedPost && editedContent) {
+            const wordCount = editedContent.split(/\s+/).filter(w => w.length > 0).length;
+            const updatedPost = {
+                ...selectedPost,
+                content: editedContent,
+                wordCount,
+                status: 'Draft' as const
+            };
+            setPosts(prev => prev.map(p => p.id === selectedPost.id ? updatedPost : p));
+            setSelectedPost(updatedPost);
+            setIsEditing(false);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setEditedContent('');
+    };
+
+    // Delete handler
+    const handleDeletePost = (postId: string) => {
+        if (window.confirm('Are you sure you want to delete this blog post?')) {
+            setPosts(prev => prev.filter(p => p.id !== postId));
+            if (selectedPost?.id === postId) {
+                setSelectedPost(null);
+            }
+        }
     };
 
     const getScoreColor = (score: number) => {
@@ -215,6 +257,24 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                                 className="w-full border border-slate-300 rounded-lg p-2.5 sm:p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                                 placeholder="Enter your niche (e.g., Digital Marketing, AI, Fitness)..."
                             />
+
+                            {/* Word Count Selector */}
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm text-slate-600 whitespace-nowrap">Word Count:</label>
+                                <select
+                                    value={targetWordCount}
+                                    onChange={e => setTargetWordCount(Number(e.target.value))}
+                                    className="flex-1 border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white"
+                                >
+                                    <option value={800}>800 words (Short)</option>
+                                    <option value={1000}>1,000 words (Medium)</option>
+                                    <option value={1350}>1,350 words (Standard)</option>
+                                    <option value={1500}>1,500 words (Long)</option>
+                                    <option value={2000}>2,000 words (In-depth)</option>
+                                    <option value={2500}>2,500 words (Comprehensive)</option>
+                                </select>
+                            </div>
+
                             <button
                                 onClick={handleResearchTopics}
                                 disabled={isLoadingTopics || !isConfigured || !nicheInput.trim()}
@@ -383,6 +443,21 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                                         <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
                                             {Math.ceil((selectedPost.wordCount || selectedPost.content.split(/\s+/).length) / 200)} min read
                                         </span>
+                                        {/* Edit and Delete buttons */}
+                                        <button
+                                            onClick={handleStartEdit}
+                                            className="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded transition-colors"
+                                            title="Edit post"
+                                        >
+                                            <Edit3 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeletePost(selectedPost.id)}
+                                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                            title="Delete post"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1">
@@ -394,21 +469,54 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                                 </div>
                             </div>
 
-                            {/* Post Content - Full Height */}
+                            {/* Post Content - Full Height with Edit Mode */}
                             <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 350px)' }}>
-                                <div className="prose prose-lg max-w-none prose-headings:text-slate-900 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-p:text-slate-700 prose-p:leading-relaxed prose-li:text-slate-700 prose-strong:text-slate-800 prose-blockquote:border-brand-500 prose-blockquote:bg-brand-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-lg">
-                                    <ReactMarkdown>{selectedPost.content}</ReactMarkdown>
-                                </div>
+                                {isEditing ? (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-slate-600">Editing Mode</span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={handleSaveEdit}
+                                                    className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1"
+                                                >
+                                                    <Check size={14} /> Save
+                                                </button>
+                                                <button
+                                                    onClick={handleCancelEdit}
+                                                    className="px-3 py-1.5 bg-slate-200 text-slate-700 text-sm rounded-lg hover:bg-slate-300 flex items-center gap-1"
+                                                >
+                                                    <X size={14} /> Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <textarea
+                                            value={editedContent}
+                                            onChange={e => setEditedContent(e.target.value)}
+                                            className="w-full h-96 p-4 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 outline-none resize-y"
+                                            placeholder="Edit your blog content (Markdown supported)..."
+                                        />
+                                        <p className="text-xs text-slate-500">
+                                            Word count: {editedContent.split(/\s+/).filter(w => w.length > 0).length} words
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="prose prose-lg max-w-none prose-headings:text-slate-900 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-p:text-slate-700 prose-p:leading-relaxed prose-li:text-slate-700 prose-strong:text-slate-800 prose-blockquote:border-brand-500 prose-blockquote:bg-brand-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-lg">
+                                        <ReactMarkdown>{selectedPost.content}</ReactMarkdown>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Inline Chat for follow-up questions about the blog */}
-                            <div className="p-4 border-t border-slate-100">
-                                <InlineChat
-                                    context={`Title: ${selectedPost.title}\n\nContent: ${selectedPost.content}\n\nKeywords: ${selectedPost.seoKeywords.join(', ')}`}
-                                    contextType="blog"
-                                    placeholder="Ask about this blog post..."
-                                />
-                            </div>
+                            {!isEditing && (
+                                <div className="p-4 border-t border-slate-100">
+                                    <InlineChat
+                                        context={`Title: ${selectedPost.title}\n\nContent: ${selectedPost.content}\n\nKeywords: ${selectedPost.seoKeywords.join(', ')}`}
+                                        contextType="blog"
+                                        placeholder="Ask about this blog post..."
+                                    />
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2">

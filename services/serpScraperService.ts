@@ -18,9 +18,9 @@
 // ============================================
 
 const SERP_CONFIG = {
-    // Vercel Serverless Function (when deployed on Vercel)
-    // This is auto-detected and routes through /api/serp
-    vercelProxy: typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+    // Vercel Serverless Function (when deployed)
+    // Auto-detect: if we're in production (not localhost), use /api/serp
+    vercelProxy: typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
         ? '/api/serp'
         : (import.meta.env.VITE_VERCEL_SERP_URL || ''),
 
