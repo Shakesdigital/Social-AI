@@ -1,0 +1,51 @@
+# Netlify Configuration
+
+[build]
+  # Build command
+  command = "npm run build"
+  # Output directory
+  publish = "dist"
+  # Functions directory
+  functions = "netlify/functions"
+
+# Environment variables for build
+[build.environment]
+  NODE_VERSION = "18"
+
+# Redirects - Route /api/* to Netlify Functions
+[[redirects]]
+  from = "/api/serp"
+  to = "/.netlify/functions/serp"
+  status = 200
+
+[[redirects]]
+  from = "/api/serp/*"
+  to = "/.netlify/functions/serp"
+  status = 200
+
+# SPA fallback - all routes go to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for CORS and caching
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
+
+# Cache static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

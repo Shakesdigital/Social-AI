@@ -17,14 +17,18 @@
 // CONFIGURATION - Set via Environment Variables
 // ============================================
 
-const SERP_CONFIG = {
-    // Vercel Serverless Function (when deployed)
-    // Auto-detect: if we're in production (not localhost), use /api/serp
-    vercelProxy: typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
-        ? '/api/serp'
-        : (import.meta.env.VITE_VERCEL_SERP_URL || ''),
+// Check if we're in a production environment (not localhost)
+const isProduction = typeof window !== 'undefined' &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1');
 
-    // Primary: Self-hosted Novexity instance
+const SERP_CONFIG = {
+    // Serverless Function Proxy (Netlify or Vercel)
+    // In production, route through /api/serp (redirected to /.netlify/functions/serp)
+    // This avoids CORS issues by making requests server-side
+    serverlessProxy: isProduction ? '/api/serp' : '',
+
+    // Primary: Self-hosted Novexity instance (only used in dev or as fallback)
     novexityUrl: import.meta.env.VITE_NOVEXITY_URL || '',
     novexityApiKey: import.meta.env.VITE_NOVEXITY_API_KEY || '',
 
@@ -33,6 +37,7 @@ const SERP_CONFIG = {
 
     // FREE PUBLIC SearXNG instances (no setup required!)
     // These are community-run instances that anyone can use
+    // Note: May be blocked by CORS in browsers - use serverless proxy in production
     publicSearxngInstances: [
         'https://search.bus-hit.me',
         'https://searx.be',
@@ -445,15 +450,15 @@ function generateMockResults(options: SerpOptions): SerpResponse {
 }
 
 // ============================================
-// VERCEL PROXY (when deployed on Vercel)
+// SERVERLESS PROXY (Netlify/Vercel function)
 // ============================================
 
-async function searchVercelProxy(options: SerpOptions): Promise<SerpResponse | null> {
-    if (!SERP_CONFIG.vercelProxy) {
+async function searchServerlessProxy(options: SerpOptions): Promise<SerpResponse | null> {
+    if (!SERP_CONFIG.serverlessProxy) {
         return null;
     }
 
-    console.log('[SERP] Using Vercel serverless proxy');
+    console.log('[SERP] Using serverless function proxy (avoids CORS)');
 
     try {
         const params = new URLSearchParams({
@@ -464,10 +469,10 @@ async function searchVercelProxy(options: SerpOptions): Promise<SerpResponse | n
             type: options.type || 'web',
         });
 
-        const response = await fetch(`${SERP_CONFIG.vercelProxy}?${params}`);
+        const response = await fetch(`${SERP_CONFIG.serverlessProxy}?${params}`);
 
         if (!response.ok) {
-            throw new Error(`Vercel proxy error: ${response.status}`);
+            throw new Error(`Serverless proxy error: ${response.status}`);
         }
 
         const data = await response.json();
@@ -482,10 +487,10 @@ async function searchVercelProxy(options: SerpOptions): Promise<SerpResponse | n
                 domain: item.domain,
             })),
             relatedSearches: data.relatedSearches || [],
-            provider: data.provider || 'vercel-proxy',
+            provider: data.provider || 'serverless-proxy',
         };
     } catch (error) {
-        console.error('[SERP] Vercel proxy failed:', error);
+        console.error('[SERP] Serverless proxy failed:', error);
         return null;
     }
 }
@@ -497,7 +502,7 @@ async function searchVercelProxy(options: SerpOptions): Promise<SerpResponse | n
 /**
  * Search the web using self-hosted SERP scrapers
  * Tries providers in order: 
- *   Cache → Vercel Proxy → Novexity → SearxNG → 
+ *   Cache → Serverless Proxy (Netlify/Vercel) → Novexity → SearxNG → 
  *   PUBLIC SearXNG (FREE!) → Serper → Mock
  */
 export async function searchSERP(options: SerpOptions): Promise<SerpResponse> {
@@ -507,8 +512,8 @@ export async function searchSERP(options: SerpOptions): Promise<SerpResponse> {
     const cached = getFromCache(options);
     if (cached) return cached;
 
-    // Try Vercel serverless proxy (when on Vercel)
-    let result = await searchVercelProxy(options);
+    // Try serverless proxy first (avoids CORS in production)
+    let result = await searchServerlessProxy(options);
     if (result && result.organic.length > 0) {
         saveToCache(options, result);
         return result;
