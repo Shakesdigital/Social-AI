@@ -14,7 +14,10 @@ import {
     Timer,
     Pencil,
     Trash2,
-    Save
+    Save,
+    Send,
+    ExternalLink,
+    AlertCircle
 } from 'lucide-react';
 import { CompanyProfile, SocialPost, AutoPilotConfig } from '../types';
 import {
@@ -23,6 +26,14 @@ import {
     generatePostImage,
     generateBatchContent
 } from '../services/openaiService';
+import {
+    publishToSocialMedia,
+    isPlatformConfigured,
+    isPublishingConfigured,
+    getConfiguredPlatforms,
+    SOCIAL_PLATFORMS_CONFIG,
+    PublishResult
+} from '../services/socialPublishService';
 
 interface CalendarViewProps {
     profile: CompanyProfile;
@@ -431,6 +442,85 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
         }
     };
 
+    // State to track publishing posts
+    const [publishingPosts, setPublishingPosts] = useState<Set<string>>(new Set());
+
+    // Publish a post to its social media platform
+    const handlePublishPost = async (postId: string) => {
+        const post = posts.find(p => p.id === postId);
+        if (!post) {
+            console.error('[Publish] Post not found:', postId);
+            return;
+        }
+
+        // Check if platform is configured
+        if (!isPlatformConfigured(post.platform.toLowerCase())) {
+            alert(`${post.platform} publishing is not configured. Please add your API credentials in the environment variables.`);
+            return;
+        }
+
+        // Mark as publishing
+        setPublishingPosts(prev => new Set(prev).add(postId));
+        setPosts(prev => prev.map(p =>
+            p.id === postId ? { ...p, status: 'Publishing' as const } : p
+        ));
+
+        try {
+            console.log(`[Publish] Publishing to ${post.platform}...`);
+
+            const result = await publishToSocialMedia(post.platform.toLowerCase(), {
+                caption: post.caption,
+                imageUrl: post.imageUrl,
+                platform: post.platform,
+            });
+
+            if (result.success) {
+                console.log(`[Publish] Success! Post ID: ${result.postId}`);
+                setPosts(prev => prev.map(p =>
+                    p.id === postId ? {
+                        ...p,
+                        status: 'Published' as const,
+                        publishedAt: new Date(),
+                        externalPostId: result.postId,
+                        externalPostUrl: result.postUrl,
+                        publishError: undefined,
+                    } : p
+                ));
+                alert(`✅ Successfully published to ${post.platform}!`);
+            } else {
+                console.error(`[Publish] Failed:`, result.error);
+                setPosts(prev => prev.map(p =>
+                    p.id === postId ? {
+                        ...p,
+                        status: 'Failed' as const,
+                        publishError: result.error,
+                    } : p
+                ));
+                alert(`❌ Failed to publish to ${post.platform}: ${result.error}`);
+            }
+        } catch (error: any) {
+            console.error(`[Publish] Error:`, error);
+            setPosts(prev => prev.map(p =>
+                p.id === postId ? {
+                    ...p,
+                    status: 'Failed' as const,
+                    publishError: error.message || 'Unknown error',
+                } : p
+            ));
+            alert(`❌ Error publishing to ${post.platform}: ${error.message}`);
+        } finally {
+            setPublishingPosts(prev => {
+                const next = new Set(prev);
+                next.delete(postId);
+                return next;
+            });
+        }
+    };
+
+    // Check if publishing is available
+    const publishingAvailable = isPublishingConfigured();
+    const configuredPlatformsList = getConfiguredPlatforms();
+
     return (
         <div className="p-4 sm:p-6 md:p-8 h-full flex flex-col relative">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
@@ -601,8 +691,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                     )}
                                 </div>
                                 {/* Content */}
-                                <div className="flex-1 min-w-0 pr-16">
-                                    <div className="flex items-center gap-2 mb-1">
+                                <div className="flex-1 min-w-0 pr-2">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
                                             post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
                                                 post.platform === 'Facebook' ? 'bg-blue-100 text-blue-600' :
@@ -614,12 +704,67 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                             }`}>
                                             {post.platform}
                                         </span>
-                                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full border border-teal-100">
-                                            Scheduled
+                                        {/* Dynamic Status Badge */}
+                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${post.status === 'Published' ? 'bg-green-50 text-green-700 border-green-100' :
+                                                post.status === 'Publishing' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
+                                                    post.status === 'Failed' ? 'bg-red-50 text-red-700 border-red-100' :
+                                                        'bg-teal-50 text-teal-700 border-teal-100'
+                                            }`}>
+                                            {post.status === 'Publishing' ? '⏳ Publishing...' :
+                                                post.status === 'Published' ? '✓ Published' :
+                                                    post.status === 'Failed' ? '✗ Failed' :
+                                                        'Scheduled'}
                                         </span>
                                     </div>
                                     <h4 className="font-semibold text-slate-900 mb-1 text-sm truncate">{post.topic}</h4>
                                     <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{post.caption}</p>
+                                    {/* Show error message if failed */}
+                                    {post.status === 'Failed' && post.publishError && (
+                                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                            <AlertCircle size={12} />
+                                            {post.publishError}
+                                        </p>
+                                    )}
+                                    {/* Show link if published */}
+                                    {post.status === 'Published' && post.externalPostUrl && (
+                                        <a
+                                            href={post.externalPostUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 mt-1 flex items-center gap-1"
+                                        >
+                                            <ExternalLink size={12} />
+                                            View on {post.platform}
+                                        </a>
+                                    )}
+                                </div>
+                                {/* Publish Button */}
+                                <div className="absolute top-2 right-2 flex gap-1">
+                                    {(post.status === 'Scheduled' || post.status === 'Failed') && isPlatformConfigured(post.platform.toLowerCase()) && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePublishPost(post.id);
+                                            }}
+                                            disabled={publishingPosts.has(post.id)}
+                                            className={`p-1.5 rounded-lg transition-all ${publishingPosts.has(post.id)
+                                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                    : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
+                                                }`}
+                                            title="Publish Now"
+                                        >
+                                            {publishingPosts.has(post.id) ? (
+                                                <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
+                                            ) : (
+                                                <Send size={14} />
+                                            )}
+                                        </button>
+                                    )}
+                                    {!isPlatformConfigured(post.platform.toLowerCase()) && post.status !== 'Published' && (
+                                        <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                            Not configured
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         ))}

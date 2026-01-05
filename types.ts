@@ -42,12 +42,18 @@ export interface MarketingStrategy {
 export interface SocialPost {
   id: string;
   date: Date;
-  platform: 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook';
+  platform: 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook' | 'TikTok' | 'YouTube';
   topic: string;
   caption: string;
   imagePrompt?: string;
   imageUrl?: string;
-  status: 'Draft' | 'PendingApproval' | 'Scheduled' | 'Published';
+  status: 'Draft' | 'PendingApproval' | 'Scheduled' | 'Published' | 'Publishing' | 'Failed';
+  // Publishing fields
+  publishedAt?: Date;
+  externalPostId?: string;
+  externalPostUrl?: string;
+  publishError?: string;
+  scheduledTime?: string; // HH:MM format for scheduling
 }
 
 // ============================================
