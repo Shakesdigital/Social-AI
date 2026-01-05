@@ -566,7 +566,7 @@ YOUR PERSONALITY:
 • Your humor is subtle and earned—never forced or cringy
 • You paint vivid pictures with your words
 
-${hasResearch ? '📚 RESEARCH PROVIDED: You have research findings above. Weave these facts into your storytelling naturally. Say things like "Recent data suggests...", "According to industry research...", "What the numbers tell us..."' : '📚 NO LIVE RESEARCH: Use your training knowledge carefully. Say things like "In my experience...", "What I\\'ve seen over the years...", "Time and again, I\\'ve noticed..."'}
+${hasResearch ? '📚 RESEARCH PROVIDED: You have research findings above. Weave these facts into your storytelling naturally. Say things like "Recent data suggests...", "According to industry research...", "What the numbers tell us..."' : '📚 NO LIVE RESEARCH: Use your training knowledge carefully. Say things like "In my experience...", "What I have seen over the years...", "Time and again, I have noticed..."'}
 
 ⚠️ FACT - CHECKING IS NON - NEGOTIABLE ⚠️
 
@@ -611,9 +611,9 @@ STORYTELLING TECHNIQUES:
 • You end with something memorable—NOT a boring "in conclusion" summary
 
 CRITICAL RULES:
-    1. ${ hasResearch ? 'USE the research provided—weave it into your storytelling naturally' : 'Be cautious with specific claims—hedge when uncertain, be general rather than wrong' }
+    1. ${hasResearch ? 'USE the research provided—weave it into your storytelling naturally' : 'Be cautious with specific claims—hedge when uncertain, be general rather than wrong'}
     2. FACT - CHECK everything(especially geography and statistics)
-    3. Hit ${ targetWordCount } words(range: 1, 200 - 2,000) - count carefully
+    3. Hit ${targetWordCount} words(range: 1, 200 - 2,000) - count carefully
     4. Stay 100 % focused on: "${topic.topic}"
     5. Sound unmistakably human—like Sarah Chen wrote this, not AI
     6. Tell a STORY, don't just list information
@@ -650,36 +650,36 @@ CRITICAL RULES:
     // Clean up markdown code blocks if wrapped
     if (content.startsWith('```')) {
         content = content.replace(/^```(?:markdown)?\s*/, '').replace(/\s*```$/, '');
-}
+    }
 
-// Calculate word count
-const actualWordCount = content.split(/\s+/).filter(w => w.length > 0).length;
-console.log('[Blog] Generated content word count:', actualWordCount);
+    // Calculate word count
+    const actualWordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+    console.log('[Blog] Generated content word count:', actualWordCount);
 
-// Generate excerpt from first paragraph
-const firstParagraph = content.match(/^#[^\n]+\n+([^\n#]+)/);
-const excerpt = firstParagraph
-    ? firstParagraph[1].slice(0, 150).trim() + '...'
-    : `Discover insights about ${topic.topic} in this comprehensive guide.`;
+    // Generate excerpt from first paragraph
+    const firstParagraph = content.match(/^#[^\n]+\n+([^\n#]+)/);
+    const excerpt = firstParagraph
+        ? firstParagraph[1].slice(0, 150).trim() + '...'
+        : `Discover insights about ${topic.topic} in this comprehensive guide.`;
 
-// Track in memory
-addGeneratedBlogTitle(blogTitle);
-incrementGeneratedCount('blogs', 1);
-trackAction(`Generated blog post: ${blogTitle}`);
+    // Track in memory
+    addGeneratedBlogTitle(blogTitle);
+    incrementGeneratedCount('blogs', 1);
+    trackAction(`Generated blog post: ${blogTitle}`);
 
-console.log('[Blog] Final blog stats - Title:', blogTitle, 'Words:', actualWordCount);
+    console.log('[Blog] Final blog stats - Title:', blogTitle, 'Words:', actualWordCount);
 
-return {
-    id: `post-${Date.now()}`,
-    title: blogTitle,
-    content: content || `# ${topic.topic}\n\nContent generation encountered an issue. Please try again.`,
-    excerpt,
-    seoKeywords: topic.relatedKeywords,
-    seoScore: actualWordCount >= 1200 ? 85 : 70,
-    trendingTopic: topic.topic,
-    status: 'Draft',
-    wordCount: actualWordCount
-};
+    return {
+        id: `post-${Date.now()}`,
+        title: blogTitle,
+        content: content || `# ${topic.topic}\n\nContent generation encountered an issue. Please try again.`,
+        excerpt,
+        seoKeywords: topic.relatedKeywords,
+        seoScore: actualWordCount >= 1200 ? 85 : 70,
+        trendingTopic: topic.topic,
+        status: 'Draft',
+        wordCount: actualWordCount
+    };
 }
 
 /**
