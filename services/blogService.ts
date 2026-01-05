@@ -282,17 +282,20 @@ function extractTopicsFromText(text: string, count: number): string[] {
 /**
  * Generate a professional blog post with human-like writing
  * RESEARCH-FIRST: Gather knowledge before writing
- * Target: 1,200-1,500 words - focused, accurate, and valuable
+ * FACT-CHECK: Verify content accuracy after drafting
+ * Target: 1,200-2,000 words - comprehensive, accurate, and engaging
+ * Voice: Professional blogger with 10+ years experience
  */
 export async function generateBlogPost(
     topic: TrendingTopic,
     profile: CompanyProfile,
-    wordCount: number = 1350
+    wordCount: number = 1600
 ): Promise<BlogPost> {
-    const targetWordCount = 1350; // Fixed for consistency
+    // Target range: 1200-2000 words (user preferred)
+    const targetWordCount = Math.max(1200, Math.min(wordCount, 2000));
 
-    console.log('[Blog] Starting blog generation for:', topic.topic);
-    console.log('[Blog] Target word count:', targetWordCount);
+    console.log('[Blog] Starting PROFESSIONAL blog generation for:', topic.topic);
+    console.log('[Blog] Target word count:', targetWordCount, '(range: 1200-2000)');
 
     // ═══════════════════════════════════════════════════════════
     // PHASE 1: DEEP RESEARCH - Gather knowledge before writing
@@ -383,8 +386,8 @@ REMEMBER: It's better to be generally accurate than specifically wrong.
     const businessContext = getBusinessContext(profile);
     const currentYear = new Date().getFullYear();
 
-    // PROFESSIONAL BLOGGER VOICE - Human touch + Focus + Word count + FACT-CHECKING + RESEARCH
-    const prompt = `Write a blog post like an experienced professional blogger would write it.
+    // PROFESSIONAL BLOGGER VOICE - 10+ years experience, storytelling, engagement, accuracy
+    const prompt = `Write a COMPREHENSIVE blog post like an experienced professional blogger with 10+ years of experience would write it.
 
 TOPIC: "${topic.topic}"
 BUSINESS: ${profile.name} (${profile.industry})
@@ -414,11 +417,26 @@ SPECIFIC RULES:
 YOUR CREDIBILITY DEPENDS ON ACCURACY. Wrong facts = lost trust.
 
 ═══════════════════════════════════════════════════════════
-WORD COUNT: 1,300-1,400 WORDS (MANDATORY)
+WORD COUNT: ${targetWordCount} WORDS (RANGE: 1,200-2,000 MANDATORY)
 ═══════════════════════════════════════════════════════════
 
-Each section = 200-250 words. Count as you write.
-Total: Intro (100) + 5 main sections (250 × 5 = 1,250) + Takeaways + Conclusion (100) = ~1,450 words
+Structure breakdown for ${targetWordCount} words:
+• Introduction with hook: 150-200 words
+• 5-7 meaty sections: 200-300 words each
+• Key Takeaways: 100 words
+• Conclusion: 150 words
+
+═══════════════════════════════════════════════════════════
+STORYTELLING & ENGAGEMENT
+═══════════════════════════════════════════════════════════
+
+Tell a STORY, don't just list facts. Include:
+• An engaging hook that draws readers in immediately
+• Personal anecdotes or observations where appropriate
+• Vivid descriptions that paint a picture
+• Rhetorical questions that make readers think
+• Metaphors and analogies to explain complex concepts
+• Emotional connection—make readers feel something
 
 ═══════════════════════════════════════════════════════════
 TOPIC FOCUS: Stay 100% on topic
@@ -428,32 +446,63 @@ Every paragraph must directly address "${topic.topic}"
 Don't wander. Readers came for this specific topic.
 
 ═══════════════════════════════════════════════════════════
-STRUCTURE:
+STRUCTURE (${targetWordCount}+ words):
 ═══════════════════════════════════════════════════════════
 
-# [Compelling title about ${topic.topic}]
+# [Power-word title that promises value about ${topic.topic}]
 
-[Intro - 100 words. Open with a hook that grabs attention. Use a factually accurate question or stat.]
+[Introduction - 150-200 words]
+• Open with a HOOK: a surprising fact, a relatable story, or a provocative question
+• Paint a picture—make the reader feel something immediately
+• Preview what they'll learn (without spoiling everything)
+• End intro with a compelling reason to keep reading
 
-## [Section 1: Understanding ${topic.topic.split(':')[0]}]
-[250 words. Explain the core concept. Only include verified facts.]
+## [Section 1: The Foundation - Understanding ${topic.topic.split(':')[0]}]
+[250-300 words. Story-driven explanation of the core concept.]
+• Use an analogy or metaphor to make it click
+• Include a brief story or example
+• Verified facts woven naturally into narrative
 
-## [Section 2: What You Need to Know Right Now]
-[250 words. Key facts and current trends. Verify any numbers or claims.]
+## [Section 2: Why This Matters Now More Than Ever]
+[250-300 words. Create urgency and relevance.]
+• Current trends and developments (research-backed)
+• Why readers should care TODAY
+• What's at stake if they ignore this
 
-## [Section 3: How to Put This Into Practice]
-[250 words. Concrete, actionable steps. Be specific but accurate.]
+## [Section 3: The Step-by-Step Process]
+[250-300 words. Actionable how-to guidance.]
+• Numbered steps or clear progression
+• Specific, not vague advice
+• Include a mini case study or example
 
-## [Section 4: Mistakes to Avoid]
-[250 words. What trips people up? Share wisdom from experience.]
+## [Section 4: Common Pitfalls and How to Avoid Them]
+[250-300 words. Share hard-earned wisdom.]
+• "In my experience, people often..." 
+• Real mistakes with real consequences
+• Prevention strategies
 
-## [Section 5: What the Best Do Differently]
-[250 words. Expert-level insights. Verify any specific claims.]
+## [Section 5: Advanced Strategies (What Experts Know)]
+[250-300 words. Elevate the content.]
+• Insights that separate beginners from pros
+• Nuanced understanding of the topic
+• Future-looking perspective
+
+## [Section 6: Real-World Examples] (if space allows)
+[200-250 words. Concrete proof and inspiration.]
+• Specific examples (verified facts only)
+• Results or outcomes when possible
 
 ## Key Takeaways
-- [4-5 actionable bullet points from this article - all facts must be accurate]
+Use bullet points or numbered list:
+- [5-7 actionable insights distilled from the article]
+- [Each should be standalone valuable]
+- [All claims must be factually accurate]
 
-[Conclusion - 100 words. Bring it home. End with something memorable.]
+[Conclusion - 150 words]
+• Don't summarize—inspire action
+• Circle back to the opening hook
+• End with a memorable thought or call to action
+• Leave readers thinking
 
 ═══════════════════════════════════════════════════════════
 WRITE LIKE A PROFESSIONAL BLOGGER (NOT AI):
@@ -501,57 +550,78 @@ Write the complete blog post now (1,300-1,400 words, focused on "${topic.topic}"
 
     const response = await callLLM(prompt, {
         type: 'reasoning',
-        systemPrompt: `You are Sarah Chen, an experienced professional blogger who has been writing about ${profile.industry} for over a decade. You've built a reputation for content that's both ACCURATE and refreshingly human.
+        systemPrompt: `You are Sarah Chen, an ELITE professional blogger with 10+ years of experience writing about ${profile.industry}. Your articles have been read by millions. You've built a reputation for content that's ACCURATE, deeply engaging, and unmistakably human.
+
+YOUR TRACK RECORD:
+• 10+ years writing professionally about ${profile.industry}
+• Published in major publications
+• Known for storytelling that makes complex topics accessible
+• Zero tolerance for factual errors—your reputation depends on accuracy
 
 YOUR PERSONALITY:
-• You're the friend who happens to be an expert—approachable but knowledgeable
-• You write like you talk: naturally, with contractions and conversational rhythm
-• You're genuinely excited to share what you know
-• You have opinions and aren't afraid to share them (professionally)
-• You occasionally use humor—subtle, never forced
+• You're the friend who happens to be an expert—approachable but brilliant
+• You write like you talk: naturally, with contractions and conversational rhythm  
+• You're genuinely passionate about ${profile.industry}
+• You have opinions backed by experience and aren't afraid to share them
+• Your humor is subtle and earned—never forced or cringy
+• You paint vivid pictures with your words
 
-${hasResearch ? '📚 RESEARCH PROVIDED: You have research findings above. Weave these facts into your article naturally. Say things like "Recent data suggests..." or "According to industry research..."' : '📚 NO LIVE RESEARCH: Use your training knowledge carefully. Say things like "In my experience..." or "What I\'ve seen is..."'}
+${hasResearch ? '📚 RESEARCH PROVIDED: You have research findings above. Weave these facts into your storytelling naturally. Say things like "Recent data suggests...", "According to industry research...", "What the numbers tell us..."' : '📚 NO LIVE RESEARCH: Use your training knowledge carefully. Say things like "In my experience...", "What I\\'ve seen over the years...", "Time and again, I\\'ve noticed..."'}
 
-⚠️ FACT-CHECKING IS NON-NEGOTIABLE ⚠️
+⚠️ FACT - CHECKING IS NON - NEGOTIABLE ⚠️
 
 You've built your reputation on accuracy. Before writing ANY fact:
-• Geographic locations must be in the correct country (Serengeti = Tanzania, NOT Uganda)
+• Geographic locations must be in the correct country(Serengeti = Tanzania, NOT Uganda)
 • Don't invent statistics—use hedging: "approximately", "around", "experts suggest"
 • If unsure, be general rather than specifically wrong
 • Your credibility depends on this
 
-YOUR WRITING VOICE:
+YOUR WRITING VOICE(THE SARAH CHEN STYLE):
 • Use contractions naturally: "don't" not "do not", "you'll" not "you will"
 • Start sentences with "And" or "But" when it feels right
-• Vary sentence length: Short punchy ones. Then longer ones that develop the idea fully.
-• Use dashes—like this—for emphasis
+• Vary sentence length: Short punchy ones.Then longer ones that develop the idea fully and give the reader space to breathe.
+• Use dashes—like this—for emphasis and mid - thought elaboration
 • Ask rhetorical questions to engage: "So what does this mean for you?"
-• Include phrases like: "Here's the thing...", "What most people miss is...", "Let me be direct..."
+• Include conversational phrases: "Here's the thing...", "What most people miss is...", "Let me be direct..."
+• Use analogies and metaphors to make concepts click
+• Create vivid scenes when appropriate—help readers see, feel, experience
 
-YOUR SIGNATURE PHRASES:
-"Here's what I've learned after years of doing this..."
-"Most people make the same mistake here..."
-"What fascinates me about this is..."
-"Let me break this down for you..."
-"The key insight here is..."
+YOUR SIGNATURE PHRASES(use naturally, not forced):
+    "Here's what I've learned after years of doing this..."
+    "Most people make the same mistake here—and it's completely understandable..."
+    "What fascinates me about this is..."
+    "Let me break this down for you..."
+    "The key insight here is..."
+    "I've seen this pattern dozens of times..."
+    "If there's one thing I want you to take away..."
 
-STRUCTURE:
+STORYTELLING TECHNIQUES:
+• Open sections with hooks or mini - stories
+• Use specific examples and case studies
+• Create "aha moments" for readers
+• Build anticipation before revealing key insights
+• Paint pictures—don't just list facts
+• Make abstract concepts concrete through analogies
+
+    STRUCTURE:
 • Every article delivers exactly what the title promises—no bait and switch
-• You write tight paragraphs (2-4 sentences max)
+• You write tight paragraphs(2 - 4 sentences max)
 • You use specific examples, not vague generalities
-• You end with something memorable, not a boring summary
+• You include subheadings, bullet points, and lists for readability
+• You end with something memorable—NOT a boring "in conclusion" summary
 
 CRITICAL RULES:
-1. ${hasResearch ? 'USE the research provided—weave it in naturally' : 'Be cautious with specific claims—hedge when uncertain'}
-2. FACT-CHECK everything (especially geography and statistics)
-3. Hit EXACTLY 1,300-1,500 words (count carefully)
-4. Stay 100% focused on: "${topic.topic}"
-5. Sound unmistakably human—like Sarah Chen wrote this, not AI
-6. Use the natural transitions and phrases above
+    1. ${ hasResearch ? 'USE the research provided—weave it into your storytelling naturally' : 'Be cautious with specific claims—hedge when uncertain, be general rather than wrong' }
+    2. FACT - CHECK everything(especially geography and statistics)
+    3. Hit ${ targetWordCount } words(range: 1, 200 - 2,000) - count carefully
+    4. Stay 100 % focused on: "${topic.topic}"
+    5. Sound unmistakably human—like Sarah Chen wrote this, not AI
+    6. Tell a STORY, don't just list information
+    7. Use vivid language, analogies, and rhetorical elements
 
-Output in Markdown format. Start with # for the title.`,
-        temperature: hasResearch ? 0.85 : 0.75,  // Higher with research for creativity, lower without for caution
-        maxTokens: 10000
+    Output in Markdown format.Start with # for the title.`,
+        temperature: hasResearch ? 0.85 : 0.78,  // Higher with research for creativity, still creative without
+        maxTokens: 12000  // Increased for longer posts
     });
 
     console.log('[Blog] LLM response received, length:', response.text?.length || 0);
@@ -580,36 +650,36 @@ Output in Markdown format. Start with # for the title.`,
     // Clean up markdown code blocks if wrapped
     if (content.startsWith('```')) {
         content = content.replace(/^```(?:markdown)?\s*/, '').replace(/\s*```$/, '');
-    }
+}
 
-    // Calculate word count
-    const actualWordCount = content.split(/\s+/).filter(w => w.length > 0).length;
-    console.log('[Blog] Generated content word count:', actualWordCount);
+// Calculate word count
+const actualWordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+console.log('[Blog] Generated content word count:', actualWordCount);
 
-    // Generate excerpt from first paragraph
-    const firstParagraph = content.match(/^#[^\n]+\n+([^\n#]+)/);
-    const excerpt = firstParagraph
-        ? firstParagraph[1].slice(0, 150).trim() + '...'
-        : `Discover insights about ${topic.topic} in this comprehensive guide.`;
+// Generate excerpt from first paragraph
+const firstParagraph = content.match(/^#[^\n]+\n+([^\n#]+)/);
+const excerpt = firstParagraph
+    ? firstParagraph[1].slice(0, 150).trim() + '...'
+    : `Discover insights about ${topic.topic} in this comprehensive guide.`;
 
-    // Track in memory
-    addGeneratedBlogTitle(blogTitle);
-    incrementGeneratedCount('blogs', 1);
-    trackAction(`Generated blog post: ${blogTitle}`);
+// Track in memory
+addGeneratedBlogTitle(blogTitle);
+incrementGeneratedCount('blogs', 1);
+trackAction(`Generated blog post: ${blogTitle}`);
 
-    console.log('[Blog] Final blog stats - Title:', blogTitle, 'Words:', actualWordCount);
+console.log('[Blog] Final blog stats - Title:', blogTitle, 'Words:', actualWordCount);
 
-    return {
-        id: `post-${Date.now()}`,
-        title: blogTitle,
-        content: content || `# ${topic.topic}\n\nContent generation encountered an issue. Please try again.`,
-        excerpt,
-        seoKeywords: topic.relatedKeywords,
-        seoScore: actualWordCount >= 1200 ? 85 : 70,
-        trendingTopic: topic.topic,
-        status: 'Draft',
-        wordCount: actualWordCount
-    };
+return {
+    id: `post-${Date.now()}`,
+    title: blogTitle,
+    content: content || `# ${topic.topic}\n\nContent generation encountered an issue. Please try again.`,
+    excerpt,
+    seoKeywords: topic.relatedKeywords,
+    seoScore: actualWordCount >= 1200 ? 85 : 70,
+    trendingTopic: topic.topic,
+    status: 'Draft',
+    wordCount: actualWordCount
+};
 }
 
 /**
