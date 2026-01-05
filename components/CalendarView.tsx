@@ -17,7 +17,8 @@ import {
     Save,
     Send,
     ExternalLink,
-    AlertCircle
+    AlertCircle,
+    Link2
 } from 'lucide-react';
 import { CompanyProfile, SocialPost, AutoPilotConfig } from '../types';
 import {
@@ -526,7 +527,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
         <div className="p-4 sm:p-6 md:p-8 h-full flex flex-col relative">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                 <h1 className="text-xl sm:text-2xl font-bold font-display text-slate-900">Content Calendar</h1>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                    {/* Connect Accounts Button */}
+                    <button
+                        onClick={() => setShowConnectAccounts(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg transition-all text-xs sm:text-sm active:scale-95 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-indigo-300"
+                    >
+                        <Link2 size={16} />
+                        <span className="hidden sm:inline">Connect Accounts</span>
+                        <span className="sm:hidden">Connect</span>
+                    </button>
                     <button
                         onClick={() => setShowAutoPilotSettings(true)}
                         className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg transition-all text-xs sm:text-sm active:scale-95 ${autoPilotConfig.enabled ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
