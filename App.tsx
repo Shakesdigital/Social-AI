@@ -1314,7 +1314,8 @@ export default function App() {
         />
       );
     }
-    if (!profile && view !== AppView.ONBOARDING && view !== AppView.AUTH) return null;
+    // If no profile and not on allowed pages, return null (except for authenticated users who may be waiting for profile sync)
+    if (!profile && !isAuthenticated && view !== AppView.ONBOARDING && view !== AppView.AUTH) return null;
     switch (view) {
       case AppView.AUTH:
         return (
