@@ -1,14 +1,9 @@
 import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { schedule } from '@netlify/functions';
 
-/**
- * Scheduled Publishing Function
- * Runs every 5 minutes to check for and publish scheduled posts
- * 
- * Configure in netlify.toml:
- * [functions."publish-scheduler"]
- *   schedule = "*/5 * * * * "
-    */
+// Scheduled Publishing Function
+// Runs every 5 minutes to check for and publish scheduled posts
+// Configure in netlify.toml with schedule = "@every 5m"
 
 // Supabase client initialization
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
