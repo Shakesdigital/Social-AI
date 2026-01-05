@@ -1204,52 +1204,32 @@ export default function App() {
       return (
         <LandingPage
           onSignIn={() => {
-            // Both Sign In and Log In lead to auth page
+            // Sign In (for new users) - Always go to Auth page first
             // After auth, the system will auto-detect:
             // - Has profile → Dashboard
             // - No profile → Onboarding
 
-            if (isAuthenticated && user) {
-              // Already authenticated - check if has profile
-              console.log('[Landing] Already authenticated, checking profile...');
-              localStorage.removeItem('socialai_logged_out');
+            // Clear logged out flag
+            localStorage.removeItem('socialai_logged_out');
 
-              if (profile || allProfiles.length > 0) {
-                // Has profile → Dashboard
-                if (!activeProfileId && allProfiles.length > 0) {
-                  setActiveProfileId(allProfiles[0].id);
-                }
-                setView(AppView.DASHBOARD);
-              } else {
-                // No profile → Onboarding
-                setView(AppView.ONBOARDING);
-              }
-            } else {
-              // Need to authenticate first - set mode to signup for new users
-              setAuthMode('signin');
-              setView(AppView.AUTH);
-            }
+            // ALWAYS go to Auth page - don't bypass even if authenticated
+            // This ensures users see the auth page and can re-authenticate if needed
+            setAuthMode('signin');
+            setView(AppView.AUTH);
           }}
           onLogIn={() => {
-            // Same logic as onSignIn - auto-detect user type
+            // Log In (for existing users) - Always go to Auth page first
+            // After auth, the system will auto-detect:
+            // - Has profile → Dashboard
+            // - No profile → Onboarding
 
-            if (isAuthenticated && user) {
-              console.log('[Landing] Already authenticated, checking profile...');
-              localStorage.removeItem('socialai_logged_out');
+            // Clear logged out flag
+            localStorage.removeItem('socialai_logged_out');
 
-              if (profile || allProfiles.length > 0) {
-                if (!activeProfileId && allProfiles.length > 0) {
-                  setActiveProfileId(allProfiles[0].id);
-                }
-                setView(AppView.DASHBOARD);
-              } else {
-                setView(AppView.ONBOARDING);
-              }
-            } else {
-              // Set mode to login for existing users
-              setAuthMode('login');
-              setView(AppView.AUTH);
-            }
+            // ALWAYS go to Auth page - don't bypass even if authenticated
+            // This ensures users can properly log in/switch accounts
+            setAuthMode('login');
+            setView(AppView.AUTH);
           }}
           onContinueAsUser={(p) => {
             // Find this profile in allProfiles or add it
