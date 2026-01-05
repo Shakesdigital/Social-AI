@@ -707,27 +707,76 @@ export default function App() {
   };
 
 
+  // Initial view state - starts with LANDING, will be updated once auth is checked
   const [view, setView] = useState<AppView>(() => {
-    try {
-      // Check if this is an OAuth callback - if so, we need to handle auth
-      const isOAuthCallback = window.location.hash.includes('access_token');
-      if (isOAuthCallback) {
-        // Start in AUTH view so handleAuthChange will be triggered
-        return AppView.AUTH;
-      }
-
-      // Check if user has a profile and is not logged out
-      const hasProfile = !!localStorage.getItem('socialai_profile');
-      const isLoggedOut = localStorage.getItem('socialai_logged_out') === 'true';
-
-      // If logged out or no profile, go to landing
-      if (isLoggedOut || !hasProfile) {
-        return AppView.LANDING;
-      }
-
-      return AppView.DASHBOARD;
-    } catch (e) { return AppView.LANDING; }
+    // Check if this is an OAuth callback - if so, need to handle auth
+    const isOAuthCallback = window.location.hash.includes('access_token') ||
+      window.location.search.includes('code=');
+    if (isOAuthCallback) {
+      return AppView.AUTH;
+    }
+    // Start with LANDING - the useEffect below will redirect to DASHBOARD if authenticated
+    return AppView.LANDING;
   });
+
+  // Flag to track if we've done the initial auth check
+  const [initialAuthCheckDone, setInitialAuthCheckDone] = useState(false);
+
+  // Cloud-first auth check: On mount, check if user is authenticated and has a cloud profile
+  useEffect(() => {
+    const checkAuthAndProfile = async () => {
+      // Wait for auth loading to complete
+      if (authLoading) return;
+
+      // Mark that we've done the initial check
+      if (initialAuthCheckDone) return;
+      setInitialAuthCheckDone(true);
+
+      console.log('[InitAuth] Checking auth state:', { isAuthenticated, userId: user?.id });
+
+      if (!isAuthenticated || !user) {
+        // Not authenticated - stay on landing
+        console.log('[InitAuth] Not authenticated, staying on landing');
+        return;
+      }
+
+      // User is authenticated - check for cloud profile
+      console.log('[InitAuth] User authenticated, fetching cloud profile...');
+      try {
+        const cloudProfile = await fetchProfile(user.id);
+
+        if (cloudProfile) {
+          // User has a profile - go to dashboard
+          console.log('[InitAuth] Found cloud profile, going to dashboard');
+          const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
+          if (!existsLocally) {
+            setAllProfiles(prev => [cloudProfile, ...prev]);
+          }
+          setActiveProfileId(cloudProfile.id);
+          setView(AppView.DASHBOARD);
+        } else if (allProfiles.length > 0) {
+          // Has local profiles - go to dashboard
+          console.log('[InitAuth] Found local profiles, going to dashboard');
+          if (!activeProfileId) {
+            setActiveProfileId(allProfiles[0].id);
+          }
+          setView(AppView.DASHBOARD);
+        } else {
+          // Authenticated but no profile - go to onboarding
+          console.log('[InitAuth] Authenticated but no profile, going to onboarding');
+          setView(AppView.ONBOARDING);
+        }
+      } catch (e) {
+        console.error('[InitAuth] Error checking profile:', e);
+        // On error, check local profiles
+        if (allProfiles.length > 0) {
+          setView(AppView.DASHBOARD);
+        }
+      }
+    };
+
+    checkAuthAndProfile();
+  }, [authLoading, isAuthenticated, user, initialAuthCheckDone]);
 
   const [hasApiKey, setHasApiKey] = useState(true);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -1209,6 +1258,18 @@ export default function App() {
   }, [strategyState, isAuthenticated, user, activeProfileId]);
 
   const renderContent = () => {
+    // Show loading while checking authentication
+    if (authLoading || (isAuthenticated && !initialAuthCheckDone)) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-slate-50">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-600 font-medium">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
     if (view === AppView.LANDING) {
       return (
         <LandingPage
