@@ -1230,6 +1230,9 @@ export default function App() {
                     setAllProfiles(prev => [cloudProfile, ...prev]);
                   }
                   setActiveProfileId(cloudProfile.id);
+                  // Save to localStorage for page refresh
+                  localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
+                  localStorage.setItem('socialai_user_id', user.id);
                   setView(AppView.DASHBOARD);
                   return;
                 }
@@ -1273,6 +1276,9 @@ export default function App() {
                     setAllProfiles(prev => [cloudProfile, ...prev]);
                   }
                   setActiveProfileId(cloudProfile.id);
+                  // Save to localStorage for page refresh
+                  localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
+                  localStorage.setItem('socialai_user_id', user.id);
                   setView(AppView.DASHBOARD);
                   return;
                 }
@@ -1351,6 +1357,11 @@ export default function App() {
                       setAllProfiles(prev => [cloudProfile, ...prev]);
                     }
                     setActiveProfileId(cloudProfile.id);
+
+                    // CRITICAL: Save to localStorage so page refresh works
+                    localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
+                    localStorage.setItem('socialai_user_id', authUser.id);
+
                     setView(AppView.DASHBOARD);
                     setAuthMode(null);
                     return;
