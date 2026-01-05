@@ -1212,24 +1212,40 @@ export default function App() {
     if (view === AppView.LANDING) {
       return (
         <LandingPage
-          onSignIn={() => {
+          onSignIn={async () => {
             // Sign In - Check if already authenticated first
             localStorage.removeItem('socialai_logged_out');
 
             if (isAuthenticated && user) {
-              // Already authenticated - check for profile and navigate directly
-              console.log('[Landing] onSignIn: Already authenticated, checking profile...');
+              // Already authenticated - fetch cloud profile to be sure
+              console.log('[Landing] onSignIn: Already authenticated, fetching cloud profile...');
 
+              try {
+                const cloudProfile = await fetchProfile(user.id);
+                if (cloudProfile) {
+                  // Returning user with cloud profile → Dashboard
+                  console.log('[Landing] Found cloud profile, going to dashboard');
+                  const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
+                  if (!existsLocally) {
+                    setAllProfiles(prev => [cloudProfile, ...prev]);
+                  }
+                  setActiveProfileId(cloudProfile.id);
+                  setView(AppView.DASHBOARD);
+                  return;
+                }
+              } catch (e) {
+                console.log('[Landing] Error fetching cloud profile:', e);
+              }
+
+              // Check local profiles
               if (profile || allProfiles.length > 0) {
-                // Has profile → Dashboard directly
-                console.log('[Landing] Has profile, going to dashboard');
+                console.log('[Landing] Has local profile, going to dashboard');
                 if (!activeProfileId && allProfiles.length > 0) {
                   setActiveProfileId(allProfiles[0].id);
                 }
                 setView(AppView.DASHBOARD);
               } else {
-                // No profile → Onboarding directly
-                console.log('[Landing] No profile, going to onboarding');
+                console.log('[Landing] No profile found, going to onboarding');
                 setView(AppView.ONBOARDING);
               }
             } else {
@@ -1239,24 +1255,40 @@ export default function App() {
               setView(AppView.AUTH);
             }
           }}
-          onLogIn={() => {
+          onLogIn={async () => {
             // Log In - Check if already authenticated first
             localStorage.removeItem('socialai_logged_out');
 
             if (isAuthenticated && user) {
-              // Already authenticated - check for profile and navigate directly
-              console.log('[Landing] onLogIn: Already authenticated, checking profile...');
+              // Already authenticated - fetch cloud profile to be sure
+              console.log('[Landing] onLogIn: Already authenticated, fetching cloud profile...');
 
+              try {
+                const cloudProfile = await fetchProfile(user.id);
+                if (cloudProfile) {
+                  // Returning user with cloud profile → Dashboard
+                  console.log('[Landing] Found cloud profile, going to dashboard');
+                  const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
+                  if (!existsLocally) {
+                    setAllProfiles(prev => [cloudProfile, ...prev]);
+                  }
+                  setActiveProfileId(cloudProfile.id);
+                  setView(AppView.DASHBOARD);
+                  return;
+                }
+              } catch (e) {
+                console.log('[Landing] Error fetching cloud profile:', e);
+              }
+
+              // Check local profiles
               if (profile || allProfiles.length > 0) {
-                // Has profile → Dashboard directly
-                console.log('[Landing] Has profile, going to dashboard');
+                console.log('[Landing] Has local profile, going to dashboard');
                 if (!activeProfileId && allProfiles.length > 0) {
                   setActiveProfileId(allProfiles[0].id);
                 }
                 setView(AppView.DASHBOARD);
               } else {
-                // No profile → Onboarding directly
-                console.log('[Landing] No profile, going to onboarding');
+                console.log('[Landing] No profile found, going to onboarding');
                 setView(AppView.ONBOARDING);
               }
             } else {
