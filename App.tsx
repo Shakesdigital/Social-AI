@@ -45,6 +45,7 @@ import { generateMarketResearch, generateMarketingStrategy, generateContentTopic
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
 import { fetchAllProfileData, saveUserData, DataType } from './services/dataService';
+import { supabase } from './services/supabaseClient';
 import ReactMarkdown from 'react-markdown';
 import { InlineChat } from './components/InlineChat';
 
@@ -1212,32 +1213,58 @@ export default function App() {
       return (
         <LandingPage
           onSignIn={() => {
-            // Sign In (for new users) - Always go to Auth page first
-            // After auth, the system will auto-detect:
-            // - Has profile → Dashboard
-            // - No profile → Onboarding
-
-            // Clear logged out flag
+            // Sign In - Check if already authenticated first
             localStorage.removeItem('socialai_logged_out');
 
-            // ALWAYS go to Auth page - don't bypass even if authenticated
-            // This ensures users see the auth page and can re-authenticate if needed
-            setAuthMode('signin');
-            setView(AppView.AUTH);
+            if (isAuthenticated && user) {
+              // Already authenticated - check for profile and navigate directly
+              console.log('[Landing] onSignIn: Already authenticated, checking profile...');
+
+              if (profile || allProfiles.length > 0) {
+                // Has profile → Dashboard directly
+                console.log('[Landing] Has profile, going to dashboard');
+                if (!activeProfileId && allProfiles.length > 0) {
+                  setActiveProfileId(allProfiles[0].id);
+                }
+                setView(AppView.DASHBOARD);
+              } else {
+                // No profile → Onboarding directly
+                console.log('[Landing] No profile, going to onboarding');
+                setView(AppView.ONBOARDING);
+              }
+            } else {
+              // Not authenticated → Auth page
+              console.log('[Landing] onSignIn: Not authenticated, going to auth page');
+              setAuthMode('signin');
+              setView(AppView.AUTH);
+            }
           }}
           onLogIn={() => {
-            // Log In (for existing users) - Always go to Auth page first
-            // After auth, the system will auto-detect:
-            // - Has profile → Dashboard
-            // - No profile → Onboarding
-
-            // Clear logged out flag
+            // Log In - Check if already authenticated first
             localStorage.removeItem('socialai_logged_out');
 
-            // ALWAYS go to Auth page - don't bypass even if authenticated
-            // This ensures users can properly log in/switch accounts
-            setAuthMode('login');
-            setView(AppView.AUTH);
+            if (isAuthenticated && user) {
+              // Already authenticated - check for profile and navigate directly
+              console.log('[Landing] onLogIn: Already authenticated, checking profile...');
+
+              if (profile || allProfiles.length > 0) {
+                // Has profile → Dashboard directly
+                console.log('[Landing] Has profile, going to dashboard');
+                if (!activeProfileId && allProfiles.length > 0) {
+                  setActiveProfileId(allProfiles[0].id);
+                }
+                setView(AppView.DASHBOARD);
+              } else {
+                // No profile → Onboarding directly
+                console.log('[Landing] No profile, going to onboarding');
+                setView(AppView.ONBOARDING);
+              }
+            } else {
+              // Not authenticated → Auth page
+              console.log('[Landing] onLogIn: Not authenticated, going to auth page');
+              setAuthMode('login');
+              setView(AppView.AUTH);
+            }
           }}
           onContinueAsUser={(p) => {
             // Find this profile in allProfiles or add it
@@ -1269,18 +1296,47 @@ export default function App() {
               localStorage.removeItem('socialai_logged_out');
 
               // Wait a moment for auth state to settle
-              await new Promise(resolve => setTimeout(resolve, 100));
+              await new Promise(resolve => setTimeout(resolve, 300));
 
-              // Check if user has any profiles
+              // Get the authenticated user
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              console.log('[AuthPage] Got user:', authUser?.id);
+
+              if (authUser) {
+                // Try to fetch cloud profile for this user
+                try {
+                  console.log('[AuthPage] Fetching cloud profile...');
+                  const cloudProfile = await fetchProfile(authUser.id);
+
+                  if (cloudProfile) {
+                    // User has a cloud profile - they're a returning user
+                    console.log('[AuthPage] Found cloud profile, going to dashboard');
+
+                    // Add to local profiles if needed
+                    const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
+                    if (!existsLocally) {
+                      setAllProfiles(prev => [cloudProfile, ...prev]);
+                    }
+                    setActiveProfileId(cloudProfile.id);
+                    setView(AppView.DASHBOARD);
+                    setAuthMode(null);
+                    return;
+                  }
+                } catch (e) {
+                  console.log('[AuthPage] Error fetching cloud profile:', e);
+                }
+              }
+
+              // No cloud profile - check local profiles
               if (profile || allProfiles.length > 0) {
-                // Has profile -> Dashboard
-                console.log('[AuthPage] User has profile, going to dashboard');
+                // Has local profile -> Dashboard
+                console.log('[AuthPage] User has local profile, going to dashboard');
                 if (!activeProfileId && allProfiles.length > 0) {
                   setActiveProfileId(allProfiles[0].id);
                 }
                 setView(AppView.DASHBOARD);
               } else {
-                // No profile -> Onboarding  
+                // No profile anywhere -> Onboarding
                 console.log('[AuthPage] No profile found, going to onboarding');
                 setView(AppView.ONBOARDING);
               }
