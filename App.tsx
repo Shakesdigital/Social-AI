@@ -801,14 +801,22 @@ export default function App() {
     const searchParams = new URLSearchParams(window.location.search);
     const hasAuthCode = searchParams.has('code') || searchParams.has('access_token');
 
-    // Determine if we should handle this auth state change
-    const shouldHandle = view === AppView.AUTH || ((isOAuthCallback || hasAuthCode) && !oauthHandled);
+    // CRITICAL FIX: Only auto-handle auth when there's an actual OAuth callback
+    // Don't trigger when user intentionally navigates to AUTH page
+    // This prevents the race condition where clicking login sends user to onboarding
+    const isActualAuthCallback = (isOAuthCallback || hasAuthCode) && !oauthHandled;
+
+    // We should only handle auth state change when:
+    // 1. There's an OAuth callback (user completed external auth like Google)
+    // 2. NOT when user is just viewing the auth page intentionally
+    const shouldHandle = isActualAuthCallback;
 
     console.log('[Auth Effect] Should handle?', shouldHandle, {
       view,
       isOAuthCallback,
       hasAuthCode,
       oauthHandled,
+      isActualAuthCallback,
       hash: hash.substring(0, 50)
     });
 
@@ -825,7 +833,7 @@ export default function App() {
 
     // CRITICAL: Check if we already processed auth for this exact user
     // This prevents the effect from running multiple times and creating duplicates
-    if (authHandledForUserRef.current === user.id && !isOAuthCallback && !hasAuthCode) {
+    if (authHandledForUserRef.current === user.id && !isActualAuthCallback) {
       console.log('[Auth Effect] Already handled auth for this user, skipping');
       return;
     }
@@ -1253,11 +1261,32 @@ export default function App() {
         return (
           <AuthPage
             authMode={authMode}
-            onSuccess={() => {
-              // After login, the useEffect will handle navigation based on profile existence
-              // This is called for email/password login (not OAuth)
-              // The auth state change will trigger handleAuthChange
-              console.log('[AuthPage] Login success, waiting for auth state to update...');
+            onSuccess={async () => {
+              // Handle navigation after successful email/password login
+              console.log('[AuthPage] Login success, checking for profile...');
+
+              // Clear the logged out flag
+              localStorage.removeItem('socialai_logged_out');
+
+              // Wait a moment for auth state to settle
+              await new Promise(resolve => setTimeout(resolve, 100));
+
+              // Check if user has any profiles
+              if (profile || allProfiles.length > 0) {
+                // Has profile -> Dashboard
+                console.log('[AuthPage] User has profile, going to dashboard');
+                if (!activeProfileId && allProfiles.length > 0) {
+                  setActiveProfileId(allProfiles[0].id);
+                }
+                setView(AppView.DASHBOARD);
+              } else {
+                // No profile -> Onboarding  
+                console.log('[AuthPage] No profile found, going to onboarding');
+                setView(AppView.ONBOARDING);
+              }
+
+              // Clear auth mode
+              setAuthMode(null);
             }}
             onBack={() => {
               setAuthMode(null);
