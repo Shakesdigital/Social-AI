@@ -34,6 +34,7 @@ import {
     SOCIAL_PLATFORMS_CONFIG,
     PublishResult
 } from '../services/socialPublishService';
+import SocialConnectionModal from './SocialConnectionModal';
 
 interface CalendarViewProps {
     profile: CompanyProfile;
@@ -706,9 +707,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                         </span>
                                         {/* Dynamic Status Badge */}
                                         <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${post.status === 'Published' ? 'bg-green-50 text-green-700 border-green-100' :
-                                                post.status === 'Publishing' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
-                                                    post.status === 'Failed' ? 'bg-red-50 text-red-700 border-red-100' :
-                                                        'bg-teal-50 text-teal-700 border-teal-100'
+                                            post.status === 'Publishing' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
+                                                post.status === 'Failed' ? 'bg-red-50 text-red-700 border-red-100' :
+                                                    'bg-teal-50 text-teal-700 border-teal-100'
                                             }`}>
                                             {post.status === 'Publishing' ? '⏳ Publishing...' :
                                                 post.status === 'Published' ? '✓ Published' :
@@ -748,8 +749,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                             }}
                                             disabled={publishingPosts.has(post.id)}
                                             className={`p-1.5 rounded-lg transition-all ${publishingPosts.has(post.id)
-                                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                    : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
                                                 }`}
                                             title="Publish Now"
                                         >
@@ -1488,6 +1489,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                     </div>
                 </div>
             )}
+
+            {/* Social Connection Modal */}
+            <SocialConnectionModal
+                isOpen={showConnectAccounts}
+                onClose={() => setShowConnectAccounts(false)}
+                userId={undefined} // Pass user ID from auth context when available
+                profileId={profile?.id}
+            />
         </div>
     );
 };
