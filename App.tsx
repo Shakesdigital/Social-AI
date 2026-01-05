@@ -45,7 +45,7 @@ import { generateMarketResearch, generateMarketingStrategy, generateContentTopic
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
 import { fetchAllProfileData, saveUserData, DataType } from './services/dataService';
-import { supabase } from './services/supabaseClient';
+import { supabase } from './services/supabase';
 import ReactMarkdown from 'react-markdown';
 import { InlineChat } from './components/InlineChat';
 
