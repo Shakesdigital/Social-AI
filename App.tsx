@@ -742,34 +742,68 @@ export default function App() {
 
       // User is authenticated - check for cloud profile
       console.log('[InitAuth] User authenticated, fetching cloud profile...');
+      
+      // CRITICAL: Check if local profiles belong to this user
+      // If they belong to a different user, we should NOT use them
+      const storedUserId = localStorage.getItem('socialai_user_id');
+      const localProfilesBelongToThisUser = storedUserId === user.id;
+      const effectiveLocalProfiles = localProfilesBelongToThisUser ? allProfiles : [];
+      
+      console.log('[InitAuth] User check:', { 
+        storedUserId, 
+        currentUserId: user.id, 
+        localProfilesBelongToThisUser,
+        localProfilesCount: allProfiles.length,
+        effectiveLocalProfilesCount: effectiveLocalProfiles.length 
+      });
+      
       try {
         const cloudProfile = await fetchProfile(user.id);
 
         if (cloudProfile) {
-          // User has a profile - go to dashboard
+          // User has a cloud profile - go to dashboard
           console.log('[InitAuth] Found cloud profile, going to dashboard');
           const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
           if (!existsLocally) {
-            setAllProfiles(prev => [cloudProfile, ...prev]);
+            // Clear old profiles from different user and add this user's profile
+            if (!localProfilesBelongToThisUser && allProfiles.length > 0) {
+              console.log('[InitAuth] Clearing old profiles from different user');
+              setAllProfiles([cloudProfile]);
+            } else {
+              setAllProfiles(prev => [cloudProfile, ...prev]);
+            }
           }
           setActiveProfileId(cloudProfile.id);
+          // Save current user ID so we know these profiles belong to this user
+          localStorage.setItem('socialai_user_id', user.id);
           setView(AppView.DASHBOARD);
-        } else if (allProfiles.length > 0) {
-          // Has local profiles - go to dashboard
-          console.log('[InitAuth] Found local profiles, going to dashboard');
+        } else if (effectiveLocalProfiles.length > 0) {
+          // Has local profiles that BELONG TO THIS USER - go to dashboard
+          console.log('[InitAuth] Found local profiles for this user, going to dashboard');
           if (!activeProfileId) {
-            setActiveProfileId(allProfiles[0].id);
+            setActiveProfileId(effectiveLocalProfiles[0].id);
           }
           setView(AppView.DASHBOARD);
         } else {
-          // Authenticated but no profile - go to onboarding
-          console.log('[InitAuth] Authenticated but no profile, going to onboarding');
+          // Authenticated but no profile (or profiles belong to different user) - go to onboarding
+          console.log('[InitAuth] New user or no profiles for this user, going to onboarding');
+          // Clear any old profiles from a different user
+          if (allProfiles.length > 0 && !localProfilesBelongToThisUser) {
+            console.log('[InitAuth] Clearing old profiles from previous user');
+            setAllProfiles([]);
+            setActiveProfileId(null);
+            // Clear localStorage for fresh start
+            localStorage.removeItem('socialai_profiles');
+            localStorage.removeItem('socialai_profile');
+          }
+          // Save current user ID
+          localStorage.setItem('socialai_user_id', user.id);
           setView(AppView.ONBOARDING);
         }
       } catch (e) {
         console.error('[InitAuth] Error checking profile:', e);
-        // On error, check local profiles
-        if (allProfiles.length > 0) {
+        // On error, check local profiles ONLY if they belong to this user
+        if (effectiveLocalProfiles.length > 0) {
           setView(AppView.DASHBOARD);
         }
       }
