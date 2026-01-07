@@ -743,6 +743,17 @@ export default function App() {
       // User is authenticated - check for CLOUD profile (source of truth)
       console.log('[InitAuth] User authenticated, fetching cloud profile...');
 
+      // First, check if we have local profiles for this user (as potential fallback)
+      const storedUserId = localStorage.getItem('socialai_user_id');
+      const hasLocalProfilesForThisUser = storedUserId === user.id && allProfiles.length > 0;
+
+      console.log('[InitAuth] Local profile check:', {
+        storedUserId,
+        currentUserId: user.id,
+        hasLocalProfilesForThisUser,
+        localProfilesCount: allProfiles.length
+      });
+
       try {
         const cloudProfile = await fetchProfile(user.id);
         console.log('[InitAuth] Cloud profile result:', cloudProfile ? 'Found' : 'Not found');
@@ -762,20 +773,28 @@ export default function App() {
           // Save user ID for cache purposes
           localStorage.setItem('socialai_user_id', user.id);
           setView(AppView.DASHBOARD);
+        } else if (hasLocalProfilesForThisUser) {
+          // EXISTING USER: No cloud profile BUT has local profiles -> Dashboard
+          // This handles the case where profile wasn't saved to cloud or cloud fetch failed silently
+          console.log('[InitAuth] No cloud profile but has local profiles for this user, going to dashboard');
+          if (!activeProfileId) {
+            setActiveProfileId(allProfiles[0].id);
+          }
+          // Try to sync local profile to cloud for future logins
+          console.log('[InitAuth] Attempting to sync local profile to cloud...');
+          saveProfile(user.id, allProfiles[0]).catch(e => console.warn('[InitAuth] Failed to sync profile to cloud:', e));
+          setView(AppView.DASHBOARD);
         } else {
-          // NEW USER: No cloud profile -> Onboarding
-          console.log('[InitAuth] New user - no cloud profile, going to onboarding');
+          // NEW USER: No cloud profile and no local profiles -> Onboarding
+          console.log('[InitAuth] New user - no profiles found, going to onboarding');
 
           // Clear any stale local profiles from different users
-          if (allProfiles.length > 0) {
-            const storedUserId = localStorage.getItem('socialai_user_id');
-            if (storedUserId !== user.id) {
-              console.log('[InitAuth] Clearing stale profiles from different user');
-              setAllProfiles([]);
-              setActiveProfileId(null);
-              localStorage.removeItem('socialai_profiles');
-              localStorage.removeItem('socialai_profile');
-            }
+          if (allProfiles.length > 0 && storedUserId !== user.id) {
+            console.log('[InitAuth] Clearing stale profiles from different user');
+            setAllProfiles([]);
+            setActiveProfileId(null);
+            localStorage.removeItem('socialai_profiles');
+            localStorage.removeItem('socialai_profile');
           }
 
           localStorage.setItem('socialai_user_id', user.id);
@@ -785,9 +804,7 @@ export default function App() {
         console.error('[InitAuth] Error fetching cloud profile:', e);
 
         // FALLBACK: Cloud fetch failed, check local profiles as backup
-        // Only use local profiles if they belong to this user
-        const storedUserId = localStorage.getItem('socialai_user_id');
-        if (storedUserId === user.id && allProfiles.length > 0) {
+        if (hasLocalProfilesForThisUser) {
           console.log('[InitAuth] Cloud failed, using local profiles as fallback');
           if (!activeProfileId) {
             setActiveProfileId(allProfiles[0].id);
@@ -796,6 +813,7 @@ export default function App() {
         } else {
           // Can't determine - go to onboarding (user can create profile)
           console.log('[InitAuth] Cloud failed, no local fallback, going to onboarding');
+          localStorage.setItem('socialai_user_id', user.id);
           setView(AppView.ONBOARDING);
         }
       }
@@ -1039,23 +1057,22 @@ export default function App() {
 
         console.log('[Auth] Navigating to DASHBOARD');
         setView(AppView.DASHBOARD);
-      } else if (cloudFetchFailed && currentLocalProfiles.length > 0) {
-        // FALLBACK: Cloud fetch failed but we have local profiles for this user
-        console.log('[Auth] Cloud failed, using local profiles as fallback');
+      } else if (currentLocalProfiles.length > 0) {
+        // EXISTING USER: No cloud profile BUT has local profiles -> Dashboard
+        // This handles cases where profile wasn't saved to cloud or same user re-logging in
+        console.log('[Auth] No cloud profile but has local profiles, using as fallback');
         const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
           ? activeProfileId
           : currentLocalProfiles[0].id;
         setActiveProfileId(targetProfileId);
+        // Try to sync local profile to cloud for future logins
+        console.log('[Auth] Attempting to sync local profile to cloud...');
+        saveProfile(user.id, currentLocalProfiles[0]).catch(e => console.warn('[Auth] Failed to sync profile to cloud:', e));
         console.log('[Auth] Navigating to DASHBOARD (local fallback)');
         setView(AppView.DASHBOARD);
       } else {
-        // NEW USER: No cloud profile -> Onboarding
-        console.log('[Auth] New user - no cloud profile, routing to onboarding');
-        // Clear any stale local profiles
-        if (allProfiles.length > 0) {
-          setAllProfiles([]);
-          setActiveProfileId(null);
-        }
+        // NEW USER: No cloud profile and no local profiles -> Onboarding
+        console.log('[Auth] New user - no profiles found, routing to onboarding');
         setView(AppView.ONBOARDING);
       }
 
