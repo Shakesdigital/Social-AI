@@ -205,3 +205,78 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
         return false;
     }
 };
+
+// Check if user account was created within the last N minutes (helps identify new signups)
+export const isNewlyCreatedAccount = async (thresholdMinutes: number = 2): Promise<boolean> => {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+
+        const createdAt = new Date(user.created_at);
+        const now = new Date();
+        const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+
+        const isNew = ageMinutes < thresholdMinutes;
+        console.log('[AuthService] Account age check:', {
+            createdAt: user.created_at,
+            ageMinutes: ageMinutes.toFixed(1),
+            isNew
+        });
+        return isNew;
+    } catch (e) {
+        console.error('[AuthService] Error checking account age:', e);
+        return false;
+    }
+};
+
+// Get detailed auth event info for routing decisions
+export type AuthEventType = 'SIGNED_IN' | 'SIGNED_UP' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED' | 'PASSWORD_RECOVERY';
+
+export interface AuthEventInfo {
+    event: AuthEventType;
+    user: AuthUser | null;
+    isNewSignup: boolean;
+    onboardingCompleted: boolean;
+}
+
+// Enhanced auth state change listener with more context
+export const onAuthStateChangeDetailed = (
+    callback: (eventInfo: AuthEventInfo) => void
+): (() => void) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        let user: AuthUser | null = null;
+        let isNewSignup = false;
+        let onboardingCompleted = false;
+
+        if (session?.user) {
+            user = toAuthUser(session.user);
+
+            // Check if this is a new signup
+            const createdAt = new Date(session.user.created_at);
+            const now = new Date();
+            const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+            isNewSignup = ageMinutes < 2; // Account created within last 2 minutes
+
+            // Check onboarding status from metadata
+            onboardingCompleted = session.user.user_metadata?.onboarding_completed === true;
+        }
+
+        const eventInfo: AuthEventInfo = {
+            event: event as AuthEventType,
+            user,
+            isNewSignup,
+            onboardingCompleted
+        };
+
+        console.log('[AuthService] Auth event:', {
+            event,
+            userId: user?.id?.substring(0, 8) || 'none',
+            isNewSignup,
+            onboardingCompleted
+        });
+
+        callback(eventInfo);
+    });
+
+    return () => subscription.unsubscribe();
+};

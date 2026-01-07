@@ -39,6 +39,7 @@ import { AuthPage } from './components/AuthPage';
 import { UserMenu } from './components/UserMenu';
 import { PricingPage } from './components/PricingPage';
 import { UpgradeModal } from './components/UpgradeModal';
+import { SessionConflictModal } from './components/SessionConflictModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useSubscription } from './contexts/SubscriptionContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
@@ -47,6 +48,16 @@ import { fetchProfile, saveProfile } from './services/profileService';
 import { markOnboardingComplete, hasCompletedOnboarding } from './services/authService';
 import { fetchAllProfileData, saveUserData, DataType } from './services/dataService';
 import { supabase } from './services/supabase';
+import {
+  createSession,
+  clearCurrentSession,
+  getCurrentSession,
+  markSessionOnboardingComplete,
+  determineUserRoute,
+  getAndClearSessionConflict,
+  setSessionConflict,
+  hasSessionOnboardingCompleted
+} from './services/sessionService';
 import ReactMarkdown from 'react-markdown';
 import { InlineChat } from './components/InlineChat';
 
@@ -723,7 +734,11 @@ export default function App() {
   // Flag to track if we've done the initial auth check
   const [initialAuthCheckDone, setInitialAuthCheckDone] = useState(false);
 
+  // State for showing session conflict modal
+  const [sessionConflictEmail, setSessionConflictEmail] = useState<string | null>(null);
+
   // Cloud-first auth check: On mount, check if user is authenticated and has a cloud profile
+  // Uses session management service for proper multi-account handling
   useEffect(() => {
     const checkAuthAndProfile = async () => {
       // Wait for auth loading to complete
@@ -741,81 +756,108 @@ export default function App() {
         return;
       }
 
-      // User is authenticated - check for CLOUD profile (source of truth)
-      console.log('[InitAuth] User authenticated, fetching cloud profile...');
+      // User is authenticated - use session management for proper routing
+      console.log('[InitAuth] User authenticated, checking session...');
 
-      // Check if this is a DIFFERENT user than what's stored locally
+      // Check for session conflict (different user was logged in before)
+      const currentSession = getCurrentSession();
       const storedUserId = localStorage.getItem('socialai_user_id');
       const isDifferentUser = storedUserId && storedUserId !== user.id;
 
-      console.log('[InitAuth] User check:', {
+      console.log('[InitAuth] Session check:', {
         storedUserId,
         currentUserId: user.id,
         isDifferentUser,
+        hasCurrentSession: !!currentSession,
         localProfilesCount: allProfiles.length
       });
 
-      // CRITICAL: If different user, IMMEDIATELY clear all local data
+      // CRITICAL: Handle user switching - clear data from previous user
       if (isDifferentUser) {
-        console.log('[InitAuth] Different user detected! Clearing all local data...');
+        console.log('[InitAuth] Different user detected! Clearing previous user data...');
+
+        // Store conflict info for potential modal display
+        if (currentSession && currentSession.email) {
+          setSessionConflictEmail(currentSession.email);
+          setSessionConflict(currentSession.email);
+        }
+
+        // Clear all local data from previous user
         setAllProfiles([]);
         setActiveProfileId(null);
+        setCalendarState(null);
+        setLeadsState(null);
+        setEmailState(null);
+        setBlogState(null);
+        setResearchState(null);
+        setStrategyState(null);
         localStorage.removeItem('socialai_profiles');
         localStorage.removeItem('socialai_profile');
-        // Don't set user ID yet - we'll set it after determining the flow
       }
 
-      // After cleanup, check if we have local profiles for THIS user
+      // Determine if this user has local profiles (after potential cleanup)
       const hasLocalProfilesForThisUser = !isDifferentUser && storedUserId === user.id && allProfiles.length > 0;
 
       try {
-        const cloudProfile = await fetchProfile(user.id);
-        console.log('[InitAuth] Cloud profile result:', cloudProfile ? 'Found' : 'Not found');
+        // Fetch cloud profile and check onboarding status
+        const [cloudProfile, onboardingCompleted] = await Promise.all([
+          fetchProfile(user.id),
+          hasCompletedOnboarding()
+        ]);
 
-        if (cloudProfile) {
-          // EXISTING USER: Has cloud profile -> Dashboard
-          console.log('[InitAuth] Existing user - cloud profile found, going to dashboard');
+        console.log('[InitAuth] Cloud check results:', {
+          hasCloudProfile: !!cloudProfile,
+          onboardingCompleted
+        });
 
-          // Set up local profile state from cloud
-          const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
-          if (!existsLocally) {
-            // Replace any stale local profiles with cloud profile
-            setAllProfiles([cloudProfile]);
-          }
-          setActiveProfileId(cloudProfile.id);
+        // Use session service to determine routing
+        const routingDecision = await determineUserRoute(
+          user.id,
+          user.email,
+          user.created,
+          !!cloudProfile,
+          hasLocalProfilesForThisUser,
+          onboardingCompleted
+        );
 
-          // Save user ID for cache purposes
-          localStorage.setItem('socialai_user_id', user.id);
-          setView(AppView.DASHBOARD);
-        } else if (hasLocalProfilesForThisUser) {
-          // EXISTING USER: No cloud profile BUT has local profiles -> Dashboard
-          // This handles the case where profile wasn't saved to cloud or cloud fetch failed silently
-          console.log('[InitAuth] No cloud profile but has local profiles for this user, going to dashboard');
-          if (!activeProfileId) {
-            setActiveProfileId(allProfiles[0].id);
-          }
-          // Try to sync local profile to cloud for future logins
-          console.log('[InitAuth] Attempting to sync local profile to cloud...');
-          saveProfile(user.id, allProfiles[0]).catch(e => console.warn('[InitAuth] Failed to sync profile to cloud:', e));
-          setView(AppView.DASHBOARD);
-        } else {
-          // No cloud profile and no local profiles
-          // SIMPLE CHECK: If account was created more than 2 minutes ago, user is EXISTING
-          const accountCreatedAt = new Date(user.created);
-          const now = new Date();
-          const accountAgeMinutes = (now.getTime() - accountCreatedAt.getTime()) / (1000 * 60);
+        console.log('[InitAuth] Routing decision:', routingDecision);
 
-          console.log('[InitAuth] Account age check:', {
-            created: user.created,
-            ageMinutes: accountAgeMinutes.toFixed(1),
-            isExistingUser: accountAgeMinutes > 2
-          });
+        // Create session for this user
+        const sessionResult = createSession(
+          user.id,
+          user.email,
+          routingDecision.isNewUser,
+          routingDecision.route === 'dashboard' || onboardingCompleted
+        );
 
-          if (accountAgeMinutes > 2) {
-            // EXISTING USER: Account is older than 2 minutes - they've been here before
-            // Their profile data was lost but they should go to dashboard
-            console.log('[InitAuth] Existing user detected (account age > 2 min), creating recovery profile');
+        // Handle session conflict notification
+        if (sessionResult.hasConflict && sessionResult.conflictingUser) {
+          setSessionConflictEmail(sessionResult.conflictingUser);
+        }
 
+        // Save user ID
+        localStorage.setItem('socialai_user_id', user.id);
+
+        if (routingDecision.route === 'dashboard') {
+          // EXISTING USER -> Dashboard
+          if (cloudProfile) {
+            // Set up local profile state from cloud
+            const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
+            if (!existsLocally || isDifferentUser) {
+              setAllProfiles([cloudProfile]);
+            }
+            setActiveProfileId(cloudProfile.id);
+          } else if (hasLocalProfilesForThisUser) {
+            // Use local profiles
+            if (!activeProfileId) {
+              setActiveProfileId(allProfiles[0].id);
+            }
+            // Sync to cloud
+            saveProfile(user.id, allProfiles[0]).catch(e =>
+              console.warn('[InitAuth] Failed to sync profile to cloud:', e)
+            );
+          } else {
+            // Create recovery profile for existing user with lost data
             const recoveryProfile: CompanyProfile = {
               id: 'profile_' + user.id.substring(0, 8),
               name: user.name || user.email?.split('@')[0] || 'My Business',
@@ -829,44 +871,39 @@ export default function App() {
 
             setAllProfiles([recoveryProfile]);
             setActiveProfileId(recoveryProfile.id);
-            localStorage.setItem('socialai_user_id', user.id);
 
-            // Try to save to cloud and mark onboarding complete
-            saveProfile(user.id, recoveryProfile).catch(e => console.warn('[InitAuth] Failed to save recovery profile:', e));
-            markOnboardingComplete().catch(e => console.warn('[InitAuth] Failed to mark onboarding complete:', e));
-
-            setView(AppView.DASHBOARD);
-          } else {
-            // NEW USER: Account was just created - go to onboarding
-            console.log('[InitAuth] New user - account just created, going to onboarding');
-
-            // Clear any stale local profiles from different users
-            if (allProfiles.length > 0 && storedUserId !== user.id) {
-              console.log('[InitAuth] Clearing stale profiles from different user');
-              setAllProfiles([]);
-              setActiveProfileId(null);
-              localStorage.removeItem('socialai_profiles');
-              localStorage.removeItem('socialai_profile');
-            }
-
-            localStorage.setItem('socialai_user_id', user.id);
-            setView(AppView.ONBOARDING);
+            // Save recovery profile
+            saveProfile(user.id, recoveryProfile).catch(e =>
+              console.warn('[InitAuth] Failed to save recovery profile:', e)
+            );
+            markOnboardingComplete().catch(e =>
+              console.warn('[InitAuth] Failed to mark onboarding complete:', e)
+            );
           }
+
+          console.log('[InitAuth] Routing to DASHBOARD');
+          setView(AppView.DASHBOARD);
+        } else {
+          // NEW USER -> Onboarding
+          console.log('[InitAuth] Routing to ONBOARDING');
+          setView(AppView.ONBOARDING);
         }
       } catch (e) {
-        console.error('[InitAuth] Error fetching cloud profile:', e);
+        console.error('[InitAuth] Error during auth check:', e);
 
-        // FALLBACK: Cloud fetch failed, check local profiles as backup
+        // FALLBACK: Use local data if available
         if (hasLocalProfilesForThisUser) {
-          console.log('[InitAuth] Cloud failed, using local profiles as fallback');
+          console.log('[InitAuth] Error occurred, using local profiles as fallback');
           if (!activeProfileId) {
             setActiveProfileId(allProfiles[0].id);
           }
+          createSession(user.id, user.email, false, true);
           setView(AppView.DASHBOARD);
         } else {
-          // Can't determine - go to onboarding (user can create profile)
-          console.log('[InitAuth] Cloud failed, no local fallback, going to onboarding');
+          // Can't determine - go to onboarding
+          console.log('[InitAuth] Error occurred, no local fallback, going to onboarding');
           localStorage.setItem('socialai_user_id', user.id);
+          createSession(user.id, user.email, true, false);
           setView(AppView.ONBOARDING);
         }
       }
@@ -997,7 +1034,8 @@ export default function App() {
       // User is authenticated
       localStorage.removeItem('socialai_logged_out');
 
-      // Check if this is the same user or a different user
+      // Check for session conflict (different user was logged in)
+      const currentSession = getCurrentSession();
       const storedUserId = localStorage.getItem('socialai_user_id');
       const isDifferentUser = storedUserId && storedUserId !== user.id;
       const isFirstTimeUser = !storedUserId;
@@ -1008,27 +1046,40 @@ export default function App() {
       console.log('[Auth] Is first time user:', isFirstTimeUser);
       console.log('[Auth] Local profiles count:', allProfiles.length);
 
-      // === STEP 1: Fetch cloud profile FIRST (before clearing anything) ===
+      // === STEP 1: Handle session conflict notification ===
+      if (isDifferentUser && currentSession && currentSession.email) {
+        console.log('[Auth] Session conflict detected:', currentSession.email, '->', user.email);
+        setSessionConflictEmail(currentSession.email);
+        setSessionConflict(currentSession.email);
+      }
+
+      // === STEP 2: Fetch cloud profile FIRST (before clearing anything) ===
       console.log('[Auth] Fetching profile from Supabase for user:', user.id);
       let cloudProfile = null;
-      let cloudFetchFailed = false;
+      let onboardingCompleted = false;
 
       try {
         // Add timeout for privacy browsers that might block Supabase
         const profilePromise = fetchProfile(user.id);
+        const onboardingPromise = hasCompletedOnboarding();
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
         );
 
-        cloudProfile = await Promise.race([profilePromise, timeoutPromise]) as any;
+        const [profileResult, onboardingResult] = await Promise.all([
+          Promise.race([profilePromise, timeoutPromise]),
+          onboardingPromise.catch(() => false)
+        ]) as [any, boolean];
+
+        cloudProfile = profileResult;
+        onboardingCompleted = onboardingResult;
         console.log('[Auth] Cloud profile fetched:', cloudProfile ? 'Found' : 'Not found');
+        console.log('[Auth] Onboarding completed:', onboardingCompleted);
       } catch (e: any) {
         console.warn('[Auth] Error fetching profile (might be blocked by browser):', e.message);
-        cloudFetchFailed = true;
       }
 
-      // === STEP 2: Handle user switching ===
-      // ALWAYS clear local data when switching to a different user
+      // === STEP 3: Handle user switching - clear data from previous user ===
       let currentLocalProfiles = allProfiles;
 
       if (isDifferentUser || isFirstTimeUser) {
@@ -1043,90 +1094,100 @@ export default function App() {
       // Save current user ID
       localStorage.setItem('socialai_user_id', user.id);
 
-      // === STEP 3: Route based on CLOUD profile (source of truth) ===
-      console.log('[Auth] Profile check:', { hasCloudProfile: !!cloudProfile, cloudFetchFailed });
+      // === STEP 4: Use session service for routing decision ===
+      const routingDecision = await determineUserRoute(
+        user.id,
+        user.email,
+        user.created,
+        !!cloudProfile,
+        currentLocalProfiles.length > 0,
+        onboardingCompleted
+      );
 
-      if (cloudProfile) {
-        // EXISTING USER: Has cloud profile -> Dashboard
-        console.log('[Auth] Existing user - cloud profile found, routing to dashboard');
+      console.log('[Auth] Routing decision:', routingDecision);
 
-        const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
+      // Create session for this user
+      const sessionResult = createSession(
+        user.id,
+        user.email,
+        routingDecision.isNewUser,
+        routingDecision.route === 'dashboard' || onboardingCompleted
+      );
 
-        // Set up local profile state from cloud (replace any stale local profiles)
-        const newProfile = {
-          ...cloudProfile,
-          id: cloudProfileId,
-          createdAt: cloudProfile.createdAt || new Date().toISOString()
-        };
-        setAllProfiles([newProfile]);
-        setActiveProfileId(cloudProfileId);
+      // Additional conflict notification from session service
+      if (sessionResult.hasConflict && sessionResult.conflictingUser && !sessionConflictEmail) {
+        setSessionConflictEmail(sessionResult.conflictingUser);
+      }
 
-        // Fetch additional cloud data for this profile
-        console.log('[Auth] Fetching cloud data for profile:', cloudProfileId);
-        try {
-          const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
-          const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
-          console.log('[Auth] Cloud data loaded:', loadedTypes);
+      // === STEP 5: Route based on decision ===
+      if (routingDecision.route === 'dashboard') {
+        if (cloudProfile) {
+          // EXISTING USER: Has cloud profile -> Dashboard
+          console.log('[Auth] Existing user - cloud profile found, routing to dashboard');
 
-          if (cloudData.calendar) {
-            setCalendarState(cloudData.calendar);
-            localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
+          const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
+
+          // Set up local profile state from cloud (replace any stale local profiles)
+          const newProfile = {
+            ...cloudProfile,
+            id: cloudProfileId,
+            createdAt: cloudProfile.createdAt || new Date().toISOString()
+          };
+          setAllProfiles([newProfile]);
+          setActiveProfileId(cloudProfileId);
+
+          // Fetch additional cloud data for this profile
+          console.log('[Auth] Fetching cloud data for profile:', cloudProfileId);
+          try {
+            const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
+            const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
+            console.log('[Auth] Cloud data loaded:', loadedTypes);
+
+            if (cloudData.calendar) {
+              setCalendarState(cloudData.calendar);
+              localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
+            }
+            if (cloudData.leads) {
+              setLeadsState(cloudData.leads);
+              localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
+            }
+            if (cloudData.email) {
+              setEmailState(cloudData.email);
+              localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
+            }
+            if (cloudData.blog) {
+              setBlogState(cloudData.blog);
+              localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
+            }
+            if (cloudData.research) {
+              setResearchState(cloudData.research);
+              localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
+            }
+            if (cloudData.strategy) {
+              setStrategyState(cloudData.strategy);
+              localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
+            }
+          } catch (e) {
+            console.error('[Auth] Error fetching cloud data:', e);
           }
-          if (cloudData.leads) {
-            setLeadsState(cloudData.leads);
-            localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
-          }
-          if (cloudData.email) {
-            setEmailState(cloudData.email);
-            localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
-          }
-          if (cloudData.blog) {
-            setBlogState(cloudData.blog);
-            localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
-          }
-          if (cloudData.research) {
-            setResearchState(cloudData.research);
-            localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
-          }
-          if (cloudData.strategy) {
-            setStrategyState(cloudData.strategy);
-            localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
-          }
-        } catch (e) {
-          console.error('[Auth] Error fetching cloud data:', e);
-        }
 
-        console.log('[Auth] Navigating to DASHBOARD');
-        setView(AppView.DASHBOARD);
-      } else if (currentLocalProfiles.length > 0) {
-        // EXISTING USER: No cloud profile BUT has local profiles -> Dashboard
-        // This handles cases where profile wasn't saved to cloud or same user re-logging in
-        console.log('[Auth] No cloud profile but has local profiles, using as fallback');
-        const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
-          ? activeProfileId
-          : currentLocalProfiles[0].id;
-        setActiveProfileId(targetProfileId);
-        // Try to sync local profile to cloud for future logins
-        console.log('[Auth] Attempting to sync local profile to cloud...');
-        saveProfile(user.id, currentLocalProfiles[0]).catch(e => console.warn('[Auth] Failed to sync profile to cloud:', e));
-        console.log('[Auth] Navigating to DASHBOARD (local fallback)');
-        setView(AppView.DASHBOARD);
-      } else {
-        // No cloud profile and no local profiles
-        // SIMPLE CHECK: If account was created more than 2 minutes ago, user is EXISTING
-        const accountCreatedAt = new Date(user.created);
-        const now = new Date();
-        const accountAgeMinutes = (now.getTime() - accountCreatedAt.getTime()) / (1000 * 60);
-
-        console.log('[Auth] Account age check:', {
-          created: user.created,
-          ageMinutes: accountAgeMinutes.toFixed(1),
-          isExistingUser: accountAgeMinutes > 2
-        });
-
-        if (accountAgeMinutes > 2) {
-          // EXISTING USER: Account is older than 2 minutes - they've been here before
-          console.log('[Auth] Existing user detected (account age > 2 min), creating recovery profile');
+          console.log('[Auth] Navigating to DASHBOARD');
+          setView(AppView.DASHBOARD);
+        } else if (currentLocalProfiles.length > 0) {
+          // EXISTING USER: No cloud profile BUT has local profiles -> Dashboard
+          console.log('[Auth] No cloud profile but has local profiles, using as fallback');
+          const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
+            ? activeProfileId
+            : currentLocalProfiles[0].id;
+          setActiveProfileId(targetProfileId);
+          // Try to sync local profile to cloud for future logins
+          console.log('[Auth] Attempting to sync local profile to cloud...');
+          saveProfile(user.id, currentLocalProfiles[0]).catch(e => console.warn('[Auth] Failed to sync profile to cloud:', e));
+          console.log('[Auth] Navigating to DASHBOARD (local fallback)');
+          setView(AppView.DASHBOARD);
+        } else {
+          // EXISTING USER with lost data - create recovery profile
+          console.log('[Auth] Existing user detected, creating recovery profile');
 
           const recoveryProfile: CompanyProfile = {
             id: 'profile_' + user.id.substring(0, 8),
@@ -1148,11 +1209,11 @@ export default function App() {
 
           console.log('[Auth] Navigating to DASHBOARD (recovery)');
           setView(AppView.DASHBOARD);
-        } else {
-          // NEW USER: Account was just created - go to onboarding
-          console.log('[Auth] New user - account just created, routing to onboarding');
-          setView(AppView.ONBOARDING);
         }
+      } else {
+        // NEW USER: Account was just created - go to onboarding
+        console.log('[Auth] New user - routing to onboarding');
+        setView(AppView.ONBOARDING);
       }
 
       // Clear auth mode after handling
@@ -1207,12 +1268,20 @@ export default function App() {
       // CRITICAL: Mark onboarding complete in user metadata (reliable fallback)
       console.log('[Onboarding] Marking onboarding complete in user metadata...');
       await markOnboardingComplete();
+
+      // Also mark in session service
+      markSessionOnboardingComplete();
     }
 
     setView(AppView.DASHBOARD);
   };
 
   const handleLogout = async () => {
+    console.log('[Logout] Starting logout process...');
+
+    // Clear the current session in session service
+    clearCurrentSession();
+
     // Log out from Supabase
     await authLogout();
 
@@ -1222,6 +1291,12 @@ export default function App() {
 
     // Reset OAuth handled so next user can sign in with OAuth
     setOauthHandled(false);
+
+    // Reset auth handled ref
+    authHandledForUserRef.current = null;
+
+    // Clear session conflict email
+    setSessionConflictEmail(null);
 
     // Clear active profile but preserve profiles for returning user
     setActiveProfileId(null);
@@ -1234,6 +1309,7 @@ export default function App() {
     setResearchState(null);
     setStrategyState(null);
 
+    console.log('[Logout] Logout complete, redirecting to landing');
     setView(AppView.LANDING);
   };
 
@@ -1732,6 +1808,14 @@ export default function App() {
       <LiveAssistant isOpen={isLiveOpen} onClose={() => setIsLiveOpen(false)} />
       {view !== AppView.LANDING && view !== AppView.ONBOARDING && view !== AppView.AUTH && <ChatBot />}
       {showDiagnostics && <LLMDiagnostics onClose={() => setShowDiagnostics(false)} />}
+
+      {/* Session Conflict Modal - Shows when user switches accounts on same browser */}
+      {sessionConflictEmail && (
+        <SessionConflictModal
+          conflictingEmail={sessionConflictEmail}
+          onDismiss={() => setSessionConflictEmail(null)}
+        />
+      )}
     </div >
   );
 }
