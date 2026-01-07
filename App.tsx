@@ -786,15 +786,22 @@ export default function App() {
           saveProfile(user.id, allProfiles[0]).catch(e => console.warn('[InitAuth] Failed to sync profile to cloud:', e));
           setView(AppView.DASHBOARD);
         } else {
-          // No cloud profile and no local profiles - check user metadata as FINAL fallback
-          console.log('[InitAuth] No profiles found, checking user metadata for onboarding status...');
+          // No cloud profile and no local profiles
+          // SIMPLE CHECK: If account was created more than 2 minutes ago, user is EXISTING
+          const accountCreatedAt = new Date(user.created);
+          const now = new Date();
+          const accountAgeMinutes = (now.getTime() - accountCreatedAt.getTime()) / (1000 * 60);
 
-          const onboardingCompleted = await hasCompletedOnboarding();
+          console.log('[InitAuth] Account age check:', {
+            created: user.created,
+            ageMinutes: accountAgeMinutes.toFixed(1),
+            isExistingUser: accountAgeMinutes > 2
+          });
 
-          if (onboardingCompleted) {
-            // User HAS completed onboarding before - their profile data was lost
-            // Create a minimal profile and take them to dashboard
-            console.log('[InitAuth] User has completed onboarding before (from metadata), creating recovery profile');
+          if (accountAgeMinutes > 2) {
+            // EXISTING USER: Account is older than 2 minutes - they've been here before
+            // Their profile data was lost but they should go to dashboard
+            console.log('[InitAuth] Existing user detected (account age > 2 min), creating recovery profile');
 
             const recoveryProfile: CompanyProfile = {
               id: 'profile_' + user.id.substring(0, 8),
@@ -811,13 +818,14 @@ export default function App() {
             setActiveProfileId(recoveryProfile.id);
             localStorage.setItem('socialai_user_id', user.id);
 
-            // Try to save to cloud
+            // Try to save to cloud and mark onboarding complete
             saveProfile(user.id, recoveryProfile).catch(e => console.warn('[InitAuth] Failed to save recovery profile:', e));
+            markOnboardingComplete().catch(e => console.warn('[InitAuth] Failed to mark onboarding complete:', e));
 
             setView(AppView.DASHBOARD);
           } else {
-            // NEW USER: No cloud profile, no local profiles, never completed onboarding -> Onboarding
-            console.log('[InitAuth] New user - never completed onboarding, going to onboarding');
+            // NEW USER: Account was just created - go to onboarding
+            console.log('[InitAuth] New user - account just created, going to onboarding');
 
             // Clear any stale local profiles from different users
             if (allProfiles.length > 0 && storedUserId !== user.id) {
@@ -1103,15 +1111,21 @@ export default function App() {
         console.log('[Auth] Navigating to DASHBOARD (local fallback)');
         setView(AppView.DASHBOARD);
       } else {
-        // No cloud profile and no local profiles - check user metadata as FINAL fallback
-        console.log('[Auth] No profiles found, checking user metadata for onboarding status...');
+        // No cloud profile and no local profiles
+        // SIMPLE CHECK: If account was created more than 2 minutes ago, user is EXISTING
+        const accountCreatedAt = new Date(user.created);
+        const now = new Date();
+        const accountAgeMinutes = (now.getTime() - accountCreatedAt.getTime()) / (1000 * 60);
 
-        const onboardingCompleted = await hasCompletedOnboarding();
+        console.log('[Auth] Account age check:', {
+          created: user.created,
+          ageMinutes: accountAgeMinutes.toFixed(1),
+          isExistingUser: accountAgeMinutes > 2
+        });
 
-        if (onboardingCompleted) {
-          // User HAS completed onboarding before - their profile data was lost
-          // Create a minimal profile and take them to dashboard
-          console.log('[Auth] User has completed onboarding before (from metadata), creating recovery profile');
+        if (accountAgeMinutes > 2) {
+          // EXISTING USER: Account is older than 2 minutes - they've been here before
+          console.log('[Auth] Existing user detected (account age > 2 min), creating recovery profile');
 
           const recoveryProfile: CompanyProfile = {
             id: 'profile_' + user.id.substring(0, 8),
@@ -1127,14 +1141,15 @@ export default function App() {
           setAllProfiles([recoveryProfile]);
           setActiveProfileId(recoveryProfile.id);
 
-          // Try to save to cloud
+          // Try to save to cloud and mark onboarding complete
           saveProfile(user.id, recoveryProfile).catch(e => console.warn('[Auth] Failed to save recovery profile:', e));
+          markOnboardingComplete().catch(e => console.warn('[Auth] Failed to mark onboarding complete:', e));
 
           console.log('[Auth] Navigating to DASHBOARD (recovery)');
           setView(AppView.DASHBOARD);
         } else {
-          // NEW USER: Never completed onboarding -> Onboarding
-          console.log('[Auth] New user - never completed onboarding, routing to onboarding');
+          // NEW USER: Account was just created - go to onboarding
+          console.log('[Auth] New user - account just created, routing to onboarding');
           setView(AppView.ONBOARDING);
         }
       }
