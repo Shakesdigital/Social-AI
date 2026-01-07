@@ -168,3 +168,40 @@ export const updateProfile = async (updates: { name?: string; avatar?: string })
         throw new Error(error.message || 'Failed to update profile');
     }
 };
+
+// Mark onboarding as completed in user metadata
+export const markOnboardingComplete = async (): Promise<boolean> => {
+    try {
+        const { error } = await supabase.auth.updateUser({
+            data: {
+                onboarding_completed: true,
+                onboarding_completed_at: new Date().toISOString(),
+            },
+        });
+
+        if (error) {
+            console.error('[AuthService] Failed to mark onboarding complete:', error);
+            return false;
+        }
+        console.log('[AuthService] Onboarding marked as complete in user metadata');
+        return true;
+    } catch (e) {
+        console.error('[AuthService] Error marking onboarding complete:', e);
+        return false;
+    }
+};
+
+// Check if user has completed onboarding (from user metadata)
+export const hasCompletedOnboarding = async (): Promise<boolean> => {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+
+        const completed = user.user_metadata?.onboarding_completed === true;
+        console.log('[AuthService] Onboarding completed check:', completed);
+        return completed;
+    } catch (e) {
+        console.error('[AuthService] Error checking onboarding status:', e);
+        return false;
+    }
+};

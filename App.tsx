@@ -44,6 +44,7 @@ import { useSubscription } from './contexts/SubscriptionContext';
 import { generateMarketResearch, generateMarketingStrategy, generateContentTopics, generatePostCaption, generatePostImage, generateBatchContent } from './services/openaiService';
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, saveProfile } from './services/profileService';
+import { markOnboardingComplete, hasCompletedOnboarding } from './services/authService';
 import { fetchAllProfileData, saveUserData, DataType } from './services/dataService';
 import { supabase } from './services/supabase';
 import ReactMarkdown from 'react-markdown';
@@ -785,20 +786,51 @@ export default function App() {
           saveProfile(user.id, allProfiles[0]).catch(e => console.warn('[InitAuth] Failed to sync profile to cloud:', e));
           setView(AppView.DASHBOARD);
         } else {
-          // NEW USER: No cloud profile and no local profiles -> Onboarding
-          console.log('[InitAuth] New user - no profiles found, going to onboarding');
+          // No cloud profile and no local profiles - check user metadata as FINAL fallback
+          console.log('[InitAuth] No profiles found, checking user metadata for onboarding status...');
 
-          // Clear any stale local profiles from different users
-          if (allProfiles.length > 0 && storedUserId !== user.id) {
-            console.log('[InitAuth] Clearing stale profiles from different user');
-            setAllProfiles([]);
-            setActiveProfileId(null);
-            localStorage.removeItem('socialai_profiles');
-            localStorage.removeItem('socialai_profile');
+          const onboardingCompleted = await hasCompletedOnboarding();
+
+          if (onboardingCompleted) {
+            // User HAS completed onboarding before - their profile data was lost
+            // Create a minimal profile and take them to dashboard
+            console.log('[InitAuth] User has completed onboarding before (from metadata), creating recovery profile');
+
+            const recoveryProfile: CompanyProfile = {
+              id: 'profile_' + user.id.substring(0, 8),
+              name: user.name || user.email?.split('@')[0] || 'My Business',
+              industry: '',
+              description: '',
+              targetAudience: '',
+              brandVoice: '',
+              goals: '',
+              createdAt: new Date().toISOString()
+            };
+
+            setAllProfiles([recoveryProfile]);
+            setActiveProfileId(recoveryProfile.id);
+            localStorage.setItem('socialai_user_id', user.id);
+
+            // Try to save to cloud
+            saveProfile(user.id, recoveryProfile).catch(e => console.warn('[InitAuth] Failed to save recovery profile:', e));
+
+            setView(AppView.DASHBOARD);
+          } else {
+            // NEW USER: No cloud profile, no local profiles, never completed onboarding -> Onboarding
+            console.log('[InitAuth] New user - never completed onboarding, going to onboarding');
+
+            // Clear any stale local profiles from different users
+            if (allProfiles.length > 0 && storedUserId !== user.id) {
+              console.log('[InitAuth] Clearing stale profiles from different user');
+              setAllProfiles([]);
+              setActiveProfileId(null);
+              localStorage.removeItem('socialai_profiles');
+              localStorage.removeItem('socialai_profile');
+            }
+
+            localStorage.setItem('socialai_user_id', user.id);
+            setView(AppView.ONBOARDING);
           }
-
-          localStorage.setItem('socialai_user_id', user.id);
-          setView(AppView.ONBOARDING);
         }
       } catch (e) {
         console.error('[InitAuth] Error fetching cloud profile:', e);
@@ -1071,9 +1103,40 @@ export default function App() {
         console.log('[Auth] Navigating to DASHBOARD (local fallback)');
         setView(AppView.DASHBOARD);
       } else {
-        // NEW USER: No cloud profile and no local profiles -> Onboarding
-        console.log('[Auth] New user - no profiles found, routing to onboarding');
-        setView(AppView.ONBOARDING);
+        // No cloud profile and no local profiles - check user metadata as FINAL fallback
+        console.log('[Auth] No profiles found, checking user metadata for onboarding status...');
+
+        const onboardingCompleted = await hasCompletedOnboarding();
+
+        if (onboardingCompleted) {
+          // User HAS completed onboarding before - their profile data was lost
+          // Create a minimal profile and take them to dashboard
+          console.log('[Auth] User has completed onboarding before (from metadata), creating recovery profile');
+
+          const recoveryProfile: CompanyProfile = {
+            id: 'profile_' + user.id.substring(0, 8),
+            name: user.name || user.email?.split('@')[0] || 'My Business',
+            industry: '',
+            description: '',
+            targetAudience: '',
+            brandVoice: '',
+            goals: '',
+            createdAt: new Date().toISOString()
+          };
+
+          setAllProfiles([recoveryProfile]);
+          setActiveProfileId(recoveryProfile.id);
+
+          // Try to save to cloud
+          saveProfile(user.id, recoveryProfile).catch(e => console.warn('[Auth] Failed to save recovery profile:', e));
+
+          console.log('[Auth] Navigating to DASHBOARD (recovery)');
+          setView(AppView.DASHBOARD);
+        } else {
+          // NEW USER: Never completed onboarding -> Onboarding
+          console.log('[Auth] New user - never completed onboarding, routing to onboarding');
+          setView(AppView.ONBOARDING);
+        }
       }
 
       // Clear auth mode after handling
@@ -1124,6 +1187,10 @@ export default function App() {
 
       console.log('[Onboarding] Saving profile to Supabase...');
       await saveProfile(user.id, newProfile);
+
+      // CRITICAL: Mark onboarding complete in user metadata (reliable fallback)
+      console.log('[Onboarding] Marking onboarding complete in user metadata...');
+      await markOnboardingComplete();
     }
 
     setView(AppView.DASHBOARD);
