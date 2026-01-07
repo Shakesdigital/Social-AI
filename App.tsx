@@ -731,8 +731,8 @@ export default function App() {
     return AppView.LANDING;
   });
 
-  // Flag to track if we've done the initial auth check
-  const [initialAuthCheckDone, setInitialAuthCheckDone] = useState(false);
+  // Flag to track which user we've done the initial auth check for
+  const [lastCheckedUserId, setLastCheckedUserId] = useState<string | null>(null);
 
   // State for showing session conflict modal
   const [sessionConflictEmail, setSessionConflictEmail] = useState<string | null>(null);
@@ -744,17 +744,27 @@ export default function App() {
       // Wait for auth loading to complete
       if (authLoading) return;
 
-      // Mark that we've done the initial check
-      if (initialAuthCheckDone) return;
-      setInitialAuthCheckDone(true);
-
-      console.log('[InitAuth] Checking auth state:', { isAuthenticated, userId: user?.id });
+      console.log('[InitAuth] Checking auth state:', { isAuthenticated, userId: user?.id, lastCheckedUserId });
 
       if (!isAuthenticated || !user) {
         // Not authenticated - stay on landing
         console.log('[InitAuth] Not authenticated, staying on landing');
+        // Reset last checked user so we re-check when someone logs in
+        if (lastCheckedUserId) {
+          setLastCheckedUserId(null);
+        }
         return;
       }
+
+      // CRITICAL: Check if we've already processed this specific user
+      // If a DIFFERENT user logs in, we need to re-run the check
+      if (lastCheckedUserId === user.id) {
+        console.log('[InitAuth] Already checked this user, skipping');
+        return;
+      }
+
+      // Mark that we're checking this user
+      setLastCheckedUserId(user.id);
 
       // User is authenticated - use session management for proper routing
       console.log('[InitAuth] User authenticated, checking session...');
@@ -910,7 +920,7 @@ export default function App() {
     };
 
     checkAuthAndProfile();
-  }, [authLoading, isAuthenticated, user, initialAuthCheckDone]);
+  }, [authLoading, isAuthenticated, user, lastCheckedUserId]);
 
   const [hasApiKey, setHasApiKey] = useState(true);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -1015,17 +1025,45 @@ export default function App() {
       return;
     }
 
+    // CRITICAL: Check if a DIFFERENT user is now authenticated
+    // This handles the case where user A logs out and user B logs in on same browser
+    const storedUserId = localStorage.getItem('socialai_user_id');
+    const isDifferentUserLoggingIn = storedUserId && storedUserId !== user.id;
+
+    console.log('[Auth Effect] User switch check:', {
+      storedUserId,
+      currentUserId: user.id,
+      isDifferentUserLoggingIn,
+      previouslyHandledUser: authHandledForUserRef.current
+    });
+
+    // If a different user is logging in, we MUST handle it to switch data
+    if (isDifferentUserLoggingIn) {
+      console.log('[Auth Effect] Different user detected! Must handle user switch.');
+      // Reset the handled ref so we process this new user
+      authHandledForUserRef.current = null;
+    }
+
     // CRITICAL: Check if we already processed auth for this exact user
-    // This prevents the effect from running multiple times and creating duplicates
-    if (authHandledForUserRef.current === user.id && !isActualAuthCallback) {
+    // But ONLY skip if it's the SAME user and not an OAuth callback
+    if (authHandledForUserRef.current === user.id && !isActualAuthCallback && !isDifferentUserLoggingIn) {
       console.log('[Auth Effect] Already handled auth for this user, skipping');
       return;
     }
 
-    if (!shouldHandle) {
-      console.log('[Auth Effect] shouldHandle is false, skipping navigation');
+    // Handle auth change if:
+    // 1. There's an OAuth callback (user completed external auth like Google)
+    // 2. A different user is logging in (user switch scenario)
+    // 3. We haven't handled this user yet and they're authenticated
+    const shouldHandleAuth = isActualAuthCallback || isDifferentUserLoggingIn ||
+      (isAuthenticated && authHandledForUserRef.current !== user.id);
+
+    if (!shouldHandleAuth) {
+      console.log('[Auth Effect] shouldHandleAuth is false, skipping navigation');
       return;
     }
+
+    console.log('[Auth Effect] Proceeding with auth handling...');
 
     const handleAuthChange = async () => {
       console.log('[Auth] Starting handleAuthChange...');
@@ -1294,6 +1332,9 @@ export default function App() {
 
     // Reset auth handled ref
     authHandledForUserRef.current = null;
+
+    // Reset last checked user so new user gets properly checked
+    setLastCheckedUserId(null);
 
     // Clear session conflict email
     setSessionConflictEmail(null);
@@ -1576,47 +1617,134 @@ export default function App() {
               const { data: { user: authUser } } = await supabase.auth.getUser();
               console.log('[AuthPage] Got user:', authUser?.id);
 
-              if (authUser) {
-                // Try to fetch cloud profile for this user
-                try {
-                  console.log('[AuthPage] Fetching cloud profile...');
-                  const cloudProfile = await fetchProfile(authUser.id);
-
-                  if (cloudProfile) {
-                    // User has a cloud profile - they're a returning user
-                    console.log('[AuthPage] Found cloud profile, going to dashboard');
-
-                    // Add to local profiles if needed
-                    const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
-                    if (!existsLocally) {
-                      setAllProfiles(prev => [cloudProfile, ...prev]);
-                    }
-                    setActiveProfileId(cloudProfile.id);
-
-                    // CRITICAL: Save to localStorage so page refresh works
-                    localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
-                    localStorage.setItem('socialai_user_id', authUser.id);
-
-                    setView(AppView.DASHBOARD);
-                    setAuthMode(null);
-                    return;
-                  }
-                } catch (e) {
-                  console.log('[AuthPage] Error fetching cloud profile:', e);
-                }
+              if (!authUser) {
+                // No user - something went wrong
+                console.log('[AuthPage] No user found after login');
+                setView(AppView.LANDING);
+                setAuthMode(null);
+                return;
               }
 
-              // No cloud profile - check local profiles
-              if (profile || allProfiles.length > 0) {
-                // Has local profile -> Dashboard
-                console.log('[AuthPage] User has local profile, going to dashboard');
-                if (!activeProfileId && allProfiles.length > 0) {
-                  setActiveProfileId(allProfiles[0].id);
+              // CRITICAL: Check if this is a DIFFERENT user than before
+              const storedUserId = localStorage.getItem('socialai_user_id');
+              const isDifferentUser = storedUserId && storedUserId !== authUser.id;
+
+              console.log('[AuthPage] User switch check:', {
+                storedUserId,
+                currentUserId: authUser.id,
+                isDifferentUser,
+                localProfilesCount: allProfiles.length
+              });
+
+              // If different user, CLEAR ALL OLD DATA
+              if (isDifferentUser) {
+                console.log('[AuthPage] Different user detected! Clearing old user data...');
+
+                // Show session conflict notification
+                const currentSession = getCurrentSession();
+                if (currentSession && currentSession.email) {
+                  setSessionConflictEmail(currentSession.email);
+                  setSessionConflict(currentSession.email);
                 }
-                setView(AppView.DASHBOARD);
+
+                // Clear all old profiles and state
+                setAllProfiles([]);
+                setActiveProfileId(null);
+                setCalendarState(null);
+                setLeadsState(null);
+                setEmailState(null);
+                setBlogState(null);
+                setResearchState(null);
+                setStrategyState(null);
+                localStorage.removeItem('socialai_profiles');
+                localStorage.removeItem('socialai_profile');
+              }
+
+              // Save current user ID
+              localStorage.setItem('socialai_user_id', authUser.id);
+
+              // Try to fetch cloud profile for this user
+              let cloudProfile = null;
+              let onboardingCompleted = false;
+
+              try {
+                console.log('[AuthPage] Fetching cloud profile...');
+                const [profileResult, onboardingResult] = await Promise.all([
+                  fetchProfile(authUser.id),
+                  hasCompletedOnboarding().catch(() => false)
+                ]);
+                cloudProfile = profileResult;
+                onboardingCompleted = onboardingResult;
+                console.log('[AuthPage] Cloud profile:', cloudProfile ? 'Found' : 'Not found');
+                console.log('[AuthPage] Onboarding completed:', onboardingCompleted);
+              } catch (e) {
+                console.log('[AuthPage] Error fetching cloud profile:', e);
+              }
+
+              // Use session service for routing decision
+              const routingDecision = await determineUserRoute(
+                authUser.id,
+                authUser.email || '',
+                authUser.created_at,
+                !!cloudProfile,
+                !isDifferentUser && allProfiles.length > 0, // Only count local profiles if same user
+                onboardingCompleted
+              );
+
+              console.log('[AuthPage] Routing decision:', routingDecision);
+
+              // Create session
+              createSession(
+                authUser.id,
+                authUser.email || '',
+                routingDecision.isNewUser,
+                routingDecision.route === 'dashboard'
+              );
+
+              // Reset auth check state so useEffect can run for this new user
+              setLastCheckedUserId(authUser.id);
+              authHandledForUserRef.current = authUser.id;
+
+              if (routingDecision.route === 'dashboard') {
+                if (cloudProfile) {
+                  // User has a cloud profile - they're a returning user
+                  console.log('[AuthPage] Found cloud profile, going to dashboard');
+
+                  // Set up profile state from cloud
+                  setAllProfiles([cloudProfile]);
+                  setActiveProfileId(cloudProfile.id);
+                  localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
+
+                  setView(AppView.DASHBOARD);
+                } else if (!isDifferentUser && allProfiles.length > 0) {
+                  // Same user with local profiles
+                  console.log('[AuthPage] Same user with local profile, going to dashboard');
+                  if (!activeProfileId) {
+                    setActiveProfileId(allProfiles[0].id);
+                  }
+                  setView(AppView.DASHBOARD);
+                } else {
+                  // Existing user but no profile (data lost) - create recovery profile
+                  console.log('[AuthPage] Existing user, creating recovery profile');
+                  const recoveryProfile: CompanyProfile = {
+                    id: 'profile_' + authUser.id.substring(0, 8),
+                    name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'My Business',
+                    industry: '',
+                    description: '',
+                    targetAudience: '',
+                    brandVoice: '',
+                    goals: '',
+                    createdAt: new Date().toISOString()
+                  };
+                  setAllProfiles([recoveryProfile]);
+                  setActiveProfileId(recoveryProfile.id);
+                  saveProfile(authUser.id, recoveryProfile).catch(e => console.warn('Failed to save recovery profile:', e));
+                  markOnboardingComplete().catch(e => console.warn('Failed to mark onboarding complete:', e));
+                  setView(AppView.DASHBOARD);
+                }
               } else {
-                // No profile anywhere -> Onboarding
-                console.log('[AuthPage] No profile found, going to onboarding');
+                // New user - go to onboarding
+                console.log('[AuthPage] New user, going to onboarding');
                 setView(AppView.ONBOARDING);
               }
 
