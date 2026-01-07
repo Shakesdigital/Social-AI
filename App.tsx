@@ -740,71 +740,63 @@ export default function App() {
         return;
       }
 
-      // User is authenticated - check for cloud profile
+      // User is authenticated - check for CLOUD profile (source of truth)
       console.log('[InitAuth] User authenticated, fetching cloud profile...');
-      
-      // CRITICAL: Check if local profiles belong to this user
-      // If they belong to a different user, we should NOT use them
-      const storedUserId = localStorage.getItem('socialai_user_id');
-      const localProfilesBelongToThisUser = storedUserId === user.id;
-      const effectiveLocalProfiles = localProfilesBelongToThisUser ? allProfiles : [];
-      
-      console.log('[InitAuth] User check:', { 
-        storedUserId, 
-        currentUserId: user.id, 
-        localProfilesBelongToThisUser,
-        localProfilesCount: allProfiles.length,
-        effectiveLocalProfilesCount: effectiveLocalProfiles.length 
-      });
-      
+
       try {
         const cloudProfile = await fetchProfile(user.id);
+        console.log('[InitAuth] Cloud profile result:', cloudProfile ? 'Found' : 'Not found');
 
         if (cloudProfile) {
-          // User has a cloud profile - go to dashboard
-          console.log('[InitAuth] Found cloud profile, going to dashboard');
+          // EXISTING USER: Has cloud profile -> Dashboard
+          console.log('[InitAuth] Existing user - cloud profile found, going to dashboard');
+
+          // Set up local profile state from cloud
           const existsLocally = allProfiles.some(p => p.id === cloudProfile.id);
           if (!existsLocally) {
-            // Clear old profiles from different user and add this user's profile
-            if (!localProfilesBelongToThisUser && allProfiles.length > 0) {
-              console.log('[InitAuth] Clearing old profiles from different user');
-              setAllProfiles([cloudProfile]);
-            } else {
-              setAllProfiles(prev => [cloudProfile, ...prev]);
-            }
+            // Replace any stale local profiles with cloud profile
+            setAllProfiles([cloudProfile]);
           }
           setActiveProfileId(cloudProfile.id);
-          // Save current user ID so we know these profiles belong to this user
+
+          // Save user ID for cache purposes
           localStorage.setItem('socialai_user_id', user.id);
           setView(AppView.DASHBOARD);
-        } else if (effectiveLocalProfiles.length > 0) {
-          // Has local profiles that BELONG TO THIS USER - go to dashboard
-          console.log('[InitAuth] Found local profiles for this user, going to dashboard');
-          if (!activeProfileId) {
-            setActiveProfileId(effectiveLocalProfiles[0].id);
-          }
-          setView(AppView.DASHBOARD);
         } else {
-          // Authenticated but no profile (or profiles belong to different user) - go to onboarding
-          console.log('[InitAuth] New user or no profiles for this user, going to onboarding');
-          // Clear any old profiles from a different user
-          if (allProfiles.length > 0 && !localProfilesBelongToThisUser) {
-            console.log('[InitAuth] Clearing old profiles from previous user');
-            setAllProfiles([]);
-            setActiveProfileId(null);
-            // Clear localStorage for fresh start
-            localStorage.removeItem('socialai_profiles');
-            localStorage.removeItem('socialai_profile');
+          // NEW USER: No cloud profile -> Onboarding
+          console.log('[InitAuth] New user - no cloud profile, going to onboarding');
+
+          // Clear any stale local profiles from different users
+          if (allProfiles.length > 0) {
+            const storedUserId = localStorage.getItem('socialai_user_id');
+            if (storedUserId !== user.id) {
+              console.log('[InitAuth] Clearing stale profiles from different user');
+              setAllProfiles([]);
+              setActiveProfileId(null);
+              localStorage.removeItem('socialai_profiles');
+              localStorage.removeItem('socialai_profile');
+            }
           }
-          // Save current user ID
+
           localStorage.setItem('socialai_user_id', user.id);
           setView(AppView.ONBOARDING);
         }
       } catch (e) {
-        console.error('[InitAuth] Error checking profile:', e);
-        // On error, check local profiles ONLY if they belong to this user
-        if (effectiveLocalProfiles.length > 0) {
+        console.error('[InitAuth] Error fetching cloud profile:', e);
+
+        // FALLBACK: Cloud fetch failed, check local profiles as backup
+        // Only use local profiles if they belong to this user
+        const storedUserId = localStorage.getItem('socialai_user_id');
+        if (storedUserId === user.id && allProfiles.length > 0) {
+          console.log('[InitAuth] Cloud failed, using local profiles as fallback');
+          if (!activeProfileId) {
+            setActiveProfileId(allProfiles[0].id);
+          }
           setView(AppView.DASHBOARD);
+        } else {
+          // Can't determine - go to onboarding (user can create profile)
+          console.log('[InitAuth] Cloud failed, no local fallback, going to onboarding');
+          setView(AppView.ONBOARDING);
         }
       }
     };
@@ -992,106 +984,78 @@ export default function App() {
       // Save current user ID
       localStorage.setItem('socialai_user_id', user.id);
 
-      // === STEP 3: Determine if user is existing or new ===
-      const hasCloudProfile = !!cloudProfile;
-      const hasLocalProfiles = currentLocalProfiles.length > 0;
-      const isExistingUser = hasCloudProfile || hasLocalProfiles;
+      // === STEP 3: Route based on CLOUD profile (source of truth) ===
+      console.log('[Auth] Profile check:', { hasCloudProfile: !!cloudProfile, cloudFetchFailed });
 
-      console.log('[Auth] Profile check:', { hasCloudProfile, hasLocalProfiles, isExistingUser, cloudFetchFailed });
+      if (cloudProfile) {
+        // EXISTING USER: Has cloud profile -> Dashboard
+        console.log('[Auth] Existing user - cloud profile found, routing to dashboard');
 
-      // === STEP 4: Route based on user status ===
-      if (isExistingUser) {
-        // EXISTING USER: Has profile somewhere -> Dashboard
-        console.log('[Auth] Existing user detected - routing to dashboard');
+        const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
 
-        let targetProfileId: string;
+        // Set up local profile state from cloud (replace any stale local profiles)
+        const newProfile = {
+          ...cloudProfile,
+          id: cloudProfileId,
+          createdAt: cloudProfile.createdAt || new Date().toISOString()
+        };
+        setAllProfiles([newProfile]);
+        setActiveProfileId(cloudProfileId);
 
-        if (cloudProfile) {
-          // Use cloud profile - SET it as the only profile for this user
-          const cloudProfileId = cloudProfile.id || 'profile_' + Date.now();
+        // Fetch additional cloud data for this profile
+        console.log('[Auth] Fetching cloud data for profile:', cloudProfileId);
+        try {
+          const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
+          const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
+          console.log('[Auth] Cloud data loaded:', loadedTypes);
 
-          // Check if we already have this profile (avoid duplicates)
-          const existingProfiles = allProfiles.filter(
-            p => p.id === cloudProfileId || (p.name === cloudProfile.name && p.industry === cloudProfile.industry)
-          );
-
-          if (existingProfiles.length === 0) {
-            // Profile doesn't exist locally - add it
-            const newProfile = {
-              ...cloudProfile,
-              id: cloudProfileId,
-              createdAt: cloudProfile.createdAt || new Date().toISOString()
-            };
-
-            // If we cleared profiles (different user), start fresh with just this profile
-            if (isDifferentUser) {
-              setAllProfiles([newProfile]);
-            } else {
-              // Same user, add to existing profiles
-              setAllProfiles(prev => [...prev, newProfile]);
-            }
-            console.log('[Auth] Added cloud profile with ID:', cloudProfileId);
-          } else if (isDifferentUser) {
-            // Different user but profile exists - set ONLY this profile (clear others)
-            setAllProfiles([existingProfiles[0]]);
-            console.log('[Auth] Reset to single cloud profile for different user');
+          if (cloudData.calendar) {
+            setCalendarState(cloudData.calendar);
+            localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
           }
-
-          setActiveProfileId(cloudProfileId);
-          targetProfileId = cloudProfileId;
-        } else {
-          // Use first local profile (fallback for blocked Supabase)
-          targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
-            ? activeProfileId
-            : currentLocalProfiles[0].id;
-          setActiveProfileId(targetProfileId);
-          console.log('[Auth] Using local profile (cloud fetch failed/blocked):', targetProfileId);
-        }
-
-        // Fetch data for this profile
-        if (!cloudFetchFailed) {
-          console.log('[Auth] Fetching cloud data for profile:', targetProfileId);
-          try {
-            const cloudData = await fetchAllProfileData(user.id, targetProfileId);
-            const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
-            console.log('[Auth] Cloud data loaded:', loadedTypes);
-
-            if (cloudData.calendar) {
-              setCalendarState(cloudData.calendar);
-              localStorage.setItem(`socialai_calendar_${targetProfileId}`, JSON.stringify(cloudData.calendar));
-            }
-            if (cloudData.leads) {
-              setLeadsState(cloudData.leads);
-              localStorage.setItem(`socialai_leads_${targetProfileId}`, JSON.stringify(cloudData.leads));
-            }
-            if (cloudData.email) {
-              setEmailState(cloudData.email);
-              localStorage.setItem(`socialai_email_${targetProfileId}`, JSON.stringify(cloudData.email));
-            }
-            if (cloudData.blog) {
-              setBlogState(cloudData.blog);
-              localStorage.setItem(`socialai_blog_${targetProfileId}`, JSON.stringify(cloudData.blog));
-            }
-            if (cloudData.research) {
-              setResearchState(cloudData.research);
-              localStorage.setItem(`socialai_research_${targetProfileId}`, JSON.stringify(cloudData.research));
-            }
-            if (cloudData.strategy) {
-              setStrategyState(cloudData.strategy);
-              localStorage.setItem(`socialai_strategy_${targetProfileId}`, JSON.stringify(cloudData.strategy));
-            }
-          } catch (e) {
-            console.error('[Auth] Error fetching cloud data:', e);
+          if (cloudData.leads) {
+            setLeadsState(cloudData.leads);
+            localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
           }
-        } else {
-          console.log('[Auth] Skipping cloud data fetch (Supabase blocked)');
+          if (cloudData.email) {
+            setEmailState(cloudData.email);
+            localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
+          }
+          if (cloudData.blog) {
+            setBlogState(cloudData.blog);
+            localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
+          }
+          if (cloudData.research) {
+            setResearchState(cloudData.research);
+            localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
+          }
+          if (cloudData.strategy) {
+            setStrategyState(cloudData.strategy);
+            localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
+          }
+        } catch (e) {
+          console.error('[Auth] Error fetching cloud data:', e);
         }
 
         console.log('[Auth] Navigating to DASHBOARD');
         setView(AppView.DASHBOARD);
+      } else if (cloudFetchFailed && currentLocalProfiles.length > 0) {
+        // FALLBACK: Cloud fetch failed but we have local profiles for this user
+        console.log('[Auth] Cloud failed, using local profiles as fallback');
+        const targetProfileId = activeProfileId && currentLocalProfiles.find(p => p.id === activeProfileId)
+          ? activeProfileId
+          : currentLocalProfiles[0].id;
+        setActiveProfileId(targetProfileId);
+        console.log('[Auth] Navigating to DASHBOARD (local fallback)');
+        setView(AppView.DASHBOARD);
       } else {
-        // NEW USER: No profile anywhere -> Onboarding
-        console.log('[Auth] New user detected (no profiles) - routing to onboarding');
+        // NEW USER: No cloud profile -> Onboarding
+        console.log('[Auth] New user - no cloud profile, routing to onboarding');
+        // Clear any stale local profiles
+        if (allProfiles.length > 0) {
+          setAllProfiles([]);
+          setActiveProfileId(null);
+        }
         setView(AppView.ONBOARDING);
       }
 
