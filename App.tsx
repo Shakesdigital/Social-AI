@@ -1474,7 +1474,7 @@ export default function App() {
 
   const renderContent = () => {
     // Show loading while checking authentication
-    if (authLoading || (isAuthenticated && !initialAuthCheckDone)) {
+    if (authLoading || (isAuthenticated && user && lastCheckedUserId !== user.id)) {
       return (
         <div className="h-screen flex items-center justify-center bg-slate-50">
           <div className="text-center">
