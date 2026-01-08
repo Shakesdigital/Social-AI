@@ -213,6 +213,95 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
     // Delete a post
     const handleDeletePost = (postId: string) => {
         setPosts(prev => prev.filter(p => p.id !== postId));
+        setSelectedPosts(prev => {
+            const next = new Set(prev);
+            next.delete(postId);
+            return next;
+        });
+    };
+
+    // Delete a topic
+    const handleDeleteTopic = (topicIndex: number) => {
+        setTopics(prev => prev.filter((_, index) => index !== topicIndex));
+        setSelectedTopics(prev => {
+            const next = new Set(prev);
+            next.delete(topicIndex);
+            return next;
+        });
+    };
+
+    // Selection state for topics and posts
+    const [selectedTopics, setSelectedTopics] = useState<Set<number>>(new Set());
+    const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
+
+    // Topic selection handlers
+    const handleSelectTopic = (index: number) => {
+        setSelectedTopics(prev => {
+            const next = new Set(prev);
+            if (next.has(index)) next.delete(index);
+            else next.add(index);
+            return next;
+        });
+    };
+
+    const handleSelectAllTopics = () => {
+        if (selectedTopics.size === topics.length) {
+            setSelectedTopics(new Set());
+        } else {
+            setSelectedTopics(new Set(topics.map((_, i) => i)));
+        }
+    };
+
+    const handleDeleteSelectedTopics = () => {
+        if (selectedTopics.size === 0) return;
+        const confirm = window.confirm(`Delete ${selectedTopics.size} selected topic(s)?`);
+        if (confirm) {
+            setTopics(prev => prev.filter((_, index) => !selectedTopics.has(index)));
+            setSelectedTopics(new Set());
+        }
+    };
+
+    const handleClearAllTopics = () => {
+        const confirm = window.confirm('Delete all topic ideas? This cannot be undone.');
+        if (confirm) {
+            setTopics([]);
+            setSelectedTopics(new Set());
+        }
+    };
+
+    // Post selection handlers
+    const handleSelectPost = (id: string) => {
+        setSelectedPosts(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleSelectAllPosts = () => {
+        if (selectedPosts.size === posts.length) {
+            setSelectedPosts(new Set());
+        } else {
+            setSelectedPosts(new Set(posts.map(p => p.id)));
+        }
+    };
+
+    const handleDeleteSelectedPosts = () => {
+        if (selectedPosts.size === 0) return;
+        const confirm = window.confirm(`Delete ${selectedPosts.size} selected post(s)?`);
+        if (confirm) {
+            setPosts(prev => prev.filter(p => !selectedPosts.has(p.id)));
+            setSelectedPosts(new Set());
+        }
+    };
+
+    const handleClearAllPosts = () => {
+        const confirm = window.confirm('Delete all scheduled posts? This cannot be undone.');
+        if (confirm) {
+            setPosts([]);
+            setSelectedPosts(new Set());
+        }
     };
 
     // Handle image upload for edit
@@ -578,20 +667,73 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                             {topics.length}
                         </span>
                     </h3>
+
+                    {/* Topic Actions Bar */}
+                    {topics.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-2 rounded-lg border border-slate-200">
+                            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedTopics.size === topics.length && topics.length > 0}
+                                    onChange={handleSelectAllTopics}
+                                    className="rounded border-slate-300"
+                                />
+                                Select All ({selectedTopics.size})
+                            </label>
+                            <div className="flex gap-1">
+                                {selectedTopics.size > 0 && (
+                                    <button
+                                        onClick={handleDeleteSelectedTopics}
+                                        className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 text-xs active:scale-95 transition-all"
+                                    >
+                                        <Trash2 size={12} />
+                                        Delete ({selectedTopics.size})
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleClearAllTopics}
+                                    className="px-2 py-1 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 text-xs transition-all"
+                                    title="Clear all topics"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {topics.length === 0 && (
                         <div className="bg-white/50 border border-dashed border-slate-200 p-6 sm:p-8 rounded-xl text-center">
                             <p className="text-slate-400 italic text-xs sm:text-sm">No topics yet. Click generate ideas to get started.</p>
                         </div>
                     )}
                     {topics.map((t, i) => (
-                        <div key={i} className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center gap-3 hover:border-brand-300 transition-all active:scale-[0.98]">
-                            <span className="text-xs sm:text-sm text-slate-800 font-medium">{t}</span>
-                            <button
-                                onClick={() => openCreator(t)}
-                                className="bg-brand-50 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-brand-600 hover:text-white active:scale-95 whitespace-nowrap"
-                            >
-                                Create
-                            </button>
+                        <div
+                            key={i}
+                            className={`bg-white p-3 sm:p-4 rounded-xl border shadow-sm flex items-center gap-3 transition-all active:scale-[0.98] ${selectedTopics.has(i) ? 'border-brand-400 ring-2 ring-brand-100' : 'border-slate-200 hover:border-brand-300'
+                                }`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={selectedTopics.has(i)}
+                                onChange={() => handleSelectTopic(i)}
+                                className="rounded border-slate-300 shrink-0"
+                            />
+                            <span className="text-xs sm:text-sm text-slate-800 font-medium flex-1">{t}</span>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleDeleteTopic(i)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                                    title="Delete topic"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                                <button
+                                    onClick={() => openCreator(t)}
+                                    className="bg-brand-50 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-brand-600 hover:text-white active:scale-95 whitespace-nowrap"
+                                >
+                                    Create
+                                </button>
+                            </div>
                         </div>
                     ))}
 
@@ -624,15 +766,51 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
 
                 {/* Right Column - Schedule */}
                 <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
-                        <h3 className="font-semibold text-slate-800">Upcoming Posts</h3>
-                        {pendingPosts.length > 0 && !showReviewDashboard && (
-                            <button
-                                onClick={() => setShowReviewDashboard(true)}
-                                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse"
-                            >
-                                <Sparkles size={12} /> {pendingPosts.length} Pending Review
-                            </button>
+                    <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/30">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="font-semibold text-slate-800">Upcoming Posts</h3>
+                            {pendingPosts.length > 0 && !showReviewDashboard && (
+                                <button
+                                    onClick={() => setShowReviewDashboard(true)}
+                                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse"
+                                >
+                                    <Sparkles size={12} /> {pendingPosts.length} Pending Review
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Post Actions Bar */}
+                        {posts.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-2 rounded-lg border border-slate-200">
+                                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedPosts.size === posts.length && posts.length > 0}
+                                        onChange={handleSelectAllPosts}
+                                        className="rounded border-slate-300"
+                                    />
+                                    Select All ({selectedPosts.size} selected)
+                                </label>
+                                <div className="flex gap-1">
+                                    {selectedPosts.size > 0 && (
+                                        <button
+                                            onClick={handleDeleteSelectedPosts}
+                                            className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 text-xs active:scale-95 transition-all"
+                                        >
+                                            <Trash2 size={12} />
+                                            Delete ({selectedPosts.size})
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleClearAllPosts}
+                                        className="px-2 py-1 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 text-xs transition-all"
+                                        title="Clear all posts"
+                                    >
+                                        <Trash2 size={12} />
+                                        <span className="hidden sm:inline">Clear All</span>
+                                    </button>
+                                </div>
+                            </div>
                         )}
                     </div>
 
@@ -644,23 +822,61 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                             </div>
                         )}
                         {posts.map(post => (
-                            <div key={post.id} className="flex gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all group relative">
-                                {/* Action buttons - show on hover */}
-                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div
+                                key={post.id}
+                                className={`flex gap-4 p-4 border rounded-xl transition-all group relative ${selectedPosts.has(post.id) ? 'border-brand-400 ring-2 ring-brand-100 bg-brand-50/30' : 'border-slate-100 hover:bg-slate-50'
+                                    }`}
+                            >
+                                {/* Checkbox */}
+                                <div className="flex items-start pt-1 shrink-0">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedPosts.has(post.id)}
+                                        onChange={() => handleSelectPost(post.id)}
+                                        className="rounded border-slate-300"
+                                    />
+                                </div>
+                                {/* Action buttons - always visible */}
+                                <div className="absolute top-2 right-2 flex gap-1">
                                     <button
                                         onClick={() => handleEditPost(post)}
-                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-brand-600 hover:border-brand-300 transition-all shadow-sm"
+                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-brand-600 hover:border-brand-300 transition-all shadow-sm"
                                         title="Edit post"
                                     >
                                         <Pencil size={14} />
                                     </button>
                                     <button
                                         onClick={() => handleDeletePost(post.id)}
-                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-red-600 hover:border-red-300 transition-all shadow-sm"
+                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-red-600 hover:border-red-300 transition-all shadow-sm"
                                         title="Delete post"
                                     >
                                         <Trash2 size={14} />
                                     </button>
+                                    {(post.status === 'Scheduled' || post.status === 'Failed') && isPlatformConfigured(post.platform.toLowerCase()) && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePublishPost(post.id);
+                                            }}
+                                            disabled={publishingPosts.has(post.id)}
+                                            className={`p-1.5 rounded-lg transition-all ${publishingPosts.has(post.id)
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
+                                                }`}
+                                            title="Publish Now"
+                                        >
+                                            {publishingPosts.has(post.id) ? (
+                                                <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
+                                            ) : (
+                                                <Send size={14} />
+                                            )}
+                                        </button>
+                                    )}
+                                    {!isPlatformConfigured(post.platform.toLowerCase()) && post.status !== 'Published' && (
+                                        <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                            Not configured
+                                        </span>
+                                    )}
                                 </div>
                                 {/* Date column */}
                                 <div className="w-16 flex-shrink-0 text-center">
@@ -702,7 +918,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                     )}
                                 </div>
                                 {/* Content */}
-                                <div className="flex-1 min-w-0 pr-2">
+                                <div className="flex-1 min-w-0 pr-16">
                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${post.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' :
                                             post.platform === 'LinkedIn' ? 'bg-blue-100 text-blue-700' :
@@ -747,34 +963,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                             <ExternalLink size={12} />
                                             View on {post.platform}
                                         </a>
-                                    )}
-                                </div>
-                                {/* Publish Button */}
-                                <div className="absolute top-2 right-2 flex gap-1">
-                                    {(post.status === 'Scheduled' || post.status === 'Failed') && isPlatformConfigured(post.platform.toLowerCase()) && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handlePublishPost(post.id);
-                                            }}
-                                            disabled={publishingPosts.has(post.id)}
-                                            className={`p-1.5 rounded-lg transition-all ${publishingPosts.has(post.id)
-                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
-                                                }`}
-                                            title="Publish Now"
-                                        >
-                                            {publishingPosts.has(post.id) ? (
-                                                <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
-                                            ) : (
-                                                <Send size={14} />
-                                            )}
-                                        </button>
-                                    )}
-                                    {!isPlatformConfigured(post.platform.toLowerCase()) && post.status !== 'Published' && (
-                                        <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                                            Not configured
-                                        </span>
                                     )}
                                 </div>
                             </div>
@@ -1148,8 +1336,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                             </div>
                                         </div>
                                         <div className="flex gap-1.5">
-                                            <button onClick={() => handleRejectSingle(post.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><XCircle size={18} /></button>
-                                            <button onClick={() => handleApproveSingle(post.id)} className="p-1.5 text-slate-400 hover:text-teal-500 hover:bg-teal-50 rounded-lg transition-all"><CheckCircle size={18} /></button>
+                                            <button
+                                                onClick={() => handleRejectSingle(post.id)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                title="Delete post"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                            <button onClick={() => handleRejectSingle(post.id)} className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all" title="Reject post"><XCircle size={18} /></button>
+                                            <button onClick={() => handleApproveSingle(post.id)} className="p-1.5 text-slate-400 hover:text-teal-500 hover:bg-teal-50 rounded-lg transition-all" title="Approve post"><CheckCircle size={18} /></button>
                                         </div>
                                     </div>
                                     <div className="p-5 flex gap-5">
