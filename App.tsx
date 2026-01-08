@@ -643,26 +643,55 @@ export default function App() {
     const syncFromCloud = async () => {
       if (!isAuthenticated || !user || authLoading) return;
 
-      // Only fetch if we don't have profiles locally OR if this is a fresh session
-      const hasLocalProfiles = allProfiles.length > 0;
-      const wasJustAuthenticated = !localStorage.getItem('socialai_last_cloud_sync');
+      console.log('='.repeat(60));
+      console.log('[PROFILE RECOVERY] Checking cloud database for profiles...');
+      console.log('[PROFILE RECOVERY] User ID:', user.id);
+      console.log('[PROFILE RECOVERY] User Email:', user.email);
+      console.log('='.repeat(60));
 
-      if (!hasLocalProfiles || wasJustAuthenticated) {
-        console.log('[Profile] Fetching profiles from cloud...');
-        try {
-          const cloudProfiles = await fetchAllProfiles(user.id);
-          if (cloudProfiles.length > 0) {
-            console.log(`[Profile] Recovered ${cloudProfiles.length} profile(s) from cloud`);
+      try {
+        // ALWAYS fetch from cloud to see what's there
+        const cloudProfiles = await fetchAllProfiles(user.id);
+
+        console.log('[PROFILE RECOVERY] Found', cloudProfiles.length, 'profile(s) in cloud:');
+        if (cloudProfiles.length > 0) {
+          cloudProfiles.forEach((p, i) => {
+            console.log(`  [${i + 1}] ID: ${p.id}`);
+            console.log(`      Name: ${p.name}`);
+            console.log(`      Industry: ${p.industry}`);
+            console.log(`      Created: ${p.createdAt}`);
+            console.log('');
+          });
+
+          // Check if we need to recover
+          const hasLocalProfiles = allProfiles.length > 0;
+          if (!hasLocalProfiles) {
+            console.log('[PROFILE RECOVERY] ✅ Recovering', cloudProfiles.length, 'profile(s) from cloud!');
             setAllProfiles(cloudProfiles);
-            // Set active profile if none set
-            if (!activeProfileId || !cloudProfiles.some(p => p.id === activeProfileId)) {
+            setActiveProfileId(cloudProfiles[0].id);
+          } else {
+            console.log('[PROFILE RECOVERY] Local profiles exist, merging with cloud...');
+            // Merge: add any cloud profiles that don't exist locally
+            const localIds = new Set(allProfiles.map(p => p.id));
+            const newProfiles = cloudProfiles.filter(p => !localIds.has(p.id));
+            if (newProfiles.length > 0) {
+              console.log('[PROFILE RECOVERY] ✅ Recovered', newProfiles.length, 'additional profile(s) from cloud!');
+              setAllProfiles(prev => [...prev, ...newProfiles]);
+            }
+            // Also update local profile if none set
+            if (!activeProfileId || !allProfiles.some(p => p.id === activeProfileId)) {
               setActiveProfileId(cloudProfiles[0].id);
             }
           }
-        } catch (e) {
-          console.warn('[Profile] Failed to fetch profiles from cloud:', e);
+        } else {
+          console.log('[PROFILE RECOVERY] ⚠️ No profiles found in cloud database for this user.');
+          console.log('[PROFILE RECOVERY] Local profiles count:', allProfiles.length);
         }
+      } catch (e) {
+        console.error('[PROFILE RECOVERY] ❌ Failed to fetch profiles from cloud:', e);
       }
+
+      console.log('='.repeat(60));
 
       // Mark that we've synced
       localStorage.setItem('socialai_last_cloud_sync', new Date().toISOString());
