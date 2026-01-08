@@ -28,6 +28,10 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
     const [editedContent, setEditedContent] = useState('');
     const [error, setError] = useState<string | null>(null);
 
+    // Selection state for multi-select delete pattern
+    const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
+    const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
+
     // Notify parent of state changes for persistence
     useEffect(() => {
         if (onStateChange) {
@@ -205,9 +209,95 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
     const handleDeletePost = (postId: string) => {
         if (window.confirm('Are you sure you want to delete this blog post?')) {
             setPosts(prev => prev.filter(p => p.id !== postId));
+            setSelectedPosts(prev => {
+                const next = new Set(prev);
+                next.delete(postId);
+                return next;
+            });
             if (selectedPost?.id === postId) {
                 setSelectedPost(null);
             }
+        }
+    };
+
+    // Topic selection handlers
+    const handleSelectTopic = (topicId: string) => {
+        setSelectedTopics(prev => {
+            const next = new Set(prev);
+            if (next.has(topicId)) next.delete(topicId);
+            else next.add(topicId);
+            return next;
+        });
+    };
+
+    const handleSelectAllTopics = () => {
+        if (selectedTopics.size === topics.length) {
+            setSelectedTopics(new Set());
+        } else {
+            setSelectedTopics(new Set(topics.map(t => t.id)));
+        }
+    };
+
+    const handleDeleteTopic = (topicId: string) => {
+        setTopics(prev => prev.filter(t => t.id !== topicId));
+        setSelectedTopics(prev => {
+            const next = new Set(prev);
+            next.delete(topicId);
+            return next;
+        });
+    };
+
+    const handleDeleteSelectedTopics = () => {
+        if (selectedTopics.size === 0) return;
+        if (window.confirm(`Delete ${selectedTopics.size} selected topic(s)?`)) {
+            setTopics(prev => prev.filter(t => !selectedTopics.has(t.id)));
+            setSelectedTopics(new Set());
+        }
+    };
+
+    const handleClearAllTopics = () => {
+        if (topics.length === 0) return;
+        if (window.confirm('Delete all trending topics? This cannot be undone.')) {
+            setTopics([]);
+            setSelectedTopics(new Set());
+        }
+    };
+
+    // Post selection handlers
+    const handleSelectPost = (postId: string) => {
+        setSelectedPosts(prev => {
+            const next = new Set(prev);
+            if (next.has(postId)) next.delete(postId);
+            else next.add(postId);
+            return next;
+        });
+    };
+
+    const handleSelectAllPosts = () => {
+        if (selectedPosts.size === posts.length) {
+            setSelectedPosts(new Set());
+        } else {
+            setSelectedPosts(new Set(posts.map(p => p.id)));
+        }
+    };
+
+    const handleDeleteSelectedPosts = () => {
+        if (selectedPosts.size === 0) return;
+        if (window.confirm(`Delete ${selectedPosts.size} selected post(s)?`)) {
+            setPosts(prev => prev.filter(p => !selectedPosts.has(p.id)));
+            if (selectedPost && selectedPosts.has(selectedPost.id)) {
+                setSelectedPost(null);
+            }
+            setSelectedPosts(new Set());
+        }
+    };
+
+    const handleClearAllPosts = () => {
+        if (posts.length === 0) return;
+        if (window.confirm('Delete all generated posts? This cannot be undone.')) {
+            setPosts([]);
+            setSelectedPosts(new Set());
+            setSelectedPost(null);
         }
     };
 
@@ -311,14 +401,71 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                             )}
                         </div>
 
+                        {/* Topics Actions Bar */}
+                        {topics.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200 mb-3">
+                                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedTopics.size === topics.length && topics.length > 0}
+                                        onChange={handleSelectAllTopics}
+                                        className="rounded border-slate-300"
+                                    />
+                                    Select All ({selectedTopics.size})
+                                </label>
+                                <div className="flex gap-1">
+                                    {selectedTopics.size > 0 && (
+                                        <button
+                                            onClick={handleDeleteSelectedTopics}
+                                            className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 text-xs active:scale-95 transition-all"
+                                        >
+                                            <Trash2 size={12} />
+                                            Delete ({selectedTopics.size})
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleClearAllTopics}
+                                        className="px-2 py-1 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 text-xs transition-all"
+                                        title="Clear all topics"
+                                    >
+                                        <Trash2 size={12} />
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-2 max-h-80 overflow-y-auto">
                             {topics.map(topic => (
-                                <div key={topic.id} className="p-3 border border-slate-200 rounded-lg hover:border-brand-300 transition-colors">
+                                <div
+                                    key={topic.id}
+                                    className={`p-3 border rounded-lg transition-colors ${selectedTopics.has(topic.id)
+                                        ? 'border-brand-400 ring-2 ring-brand-100 bg-brand-50/30'
+                                        : 'border-slate-200 hover:border-brand-300'
+                                        }`}
+                                >
                                     <div className="flex justify-between items-start mb-2">
-                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getScoreColor(topic.trendScore)}`}>
-                                            {topic.trendScore}%
-                                        </span>
-                                        <span className="text-xs text-slate-500">{topic.category}</span>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTopics.has(topic.id)}
+                                                onChange={() => handleSelectTopic(topic.id)}
+                                                className="rounded border-slate-300"
+                                            />
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getScoreColor(topic.trendScore)}`}>
+                                                {topic.trendScore}%
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-xs text-slate-500">{topic.category}</span>
+                                            <button
+                                                onClick={() => handleDeleteTopic(topic.id)}
+                                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                title="Delete topic"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     </div>
                                     <p className="text-sm font-medium text-slate-800 mb-2">{topic.topic}</p>
                                     <div className="flex flex-wrap gap-1 mb-2">
@@ -378,27 +525,87 @@ export const BlogView: React.FC<BlogViewProps> = ({ profile, onAddToCalendar, sa
                             <FileText size={18} />
                             Generated Posts ({posts.length})
                         </h3>
+
+                        {/* Posts Actions Bar */}
+                        {posts.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200 mb-3">
+                                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedPosts.size === posts.length && posts.length > 0}
+                                        onChange={handleSelectAllPosts}
+                                        className="rounded border-slate-300"
+                                    />
+                                    Select All ({selectedPosts.size})
+                                </label>
+                                <div className="flex gap-1">
+                                    {selectedPosts.size > 0 && (
+                                        <button
+                                            onClick={handleDeleteSelectedPosts}
+                                            className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 text-xs active:scale-95 transition-all"
+                                        >
+                                            <Trash2 size={12} />
+                                            Delete ({selectedPosts.size})
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleClearAllPosts}
+                                        className="px-2 py-1 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 text-xs transition-all"
+                                        title="Clear all posts"
+                                    >
+                                        <Trash2 size={12} />
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-2 max-h-64 overflow-y-auto">
                             {posts.map(post => (
-                                <button
+                                <div
                                     key={post.id}
-                                    onClick={() => setSelectedPost(post)}
-                                    className={`w-full text-left p-3 rounded-lg transition-colors ${selectedPost?.id === post.id
-                                        ? 'bg-brand-50 border-brand-300 border'
-                                        : 'border border-slate-200 hover:border-slate-300'
+                                    className={`p-3 rounded-lg transition-colors ${selectedPosts.has(post.id)
+                                            ? 'bg-brand-50 border-brand-400 ring-2 ring-brand-100 border'
+                                            : selectedPost?.id === post.id
+                                                ? 'bg-brand-50 border-brand-300 border'
+                                                : 'border border-slate-200 hover:border-slate-300'
                                         }`}
                                 >
-                                    <p className="text-sm font-medium text-slate-800 line-clamp-2">{post.title}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-xs px-1.5 py-0.5 rounded ${post.status === 'Published' ? 'bg-green-100 text-green-700' :
-                                            post.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
-                                                'bg-slate-100 text-slate-600'
-                                            }`}>
-                                            {post.status}
-                                        </span>
-                                        <span className="text-xs text-slate-500">{post.wordCount} words</span>
+                                    <div className="flex items-start gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedPosts.has(post.id)}
+                                            onChange={() => handleSelectPost(post.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="rounded border-slate-300 mt-0.5 shrink-0"
+                                        />
+                                        <div
+                                            className="flex-1 cursor-pointer"
+                                            onClick={() => setSelectedPost(post)}
+                                        >
+                                            <p className="text-sm font-medium text-slate-800 line-clamp-2">{post.title}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className={`text-xs px-1.5 py-0.5 rounded ${post.status === 'Published' ? 'bg-green-100 text-green-700' :
+                                                    post.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                    {post.status}
+                                                </span>
+                                                <span className="text-xs text-slate-500">{post.wordCount} words</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeletePost(post.id);
+                                            }}
+                                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors shrink-0"
+                                            title="Delete post"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                     </div>
-                                </button>
+                                </div>
                             ))}
                             {posts.length === 0 && (
                                 <p className="text-sm text-slate-500 text-center py-4">
