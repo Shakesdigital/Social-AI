@@ -149,7 +149,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                             </button>
                         </div>
 
-                        {/* Divider */}
+                        {/* 
+                        ============================================
+                        EMAIL/PASSWORD LOGIN TEMPORARILY DISABLED
+                        The redirect after login was not working.
+                        Only OAuth (Google/GitHub) is available.
+                        ============================================
+                        */}
+
+                        {/* Divider - DISABLED
                         <div className="relative my-6">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-slate-200"></div>
@@ -158,10 +166,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                                 <span className="px-4 bg-white text-slate-400">or use email</span>
                             </div>
                         </div>
+                        */}
 
-                        {/* Email Form */}
+                        {/* Email Form - DISABLED
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Error Display */}
                             {error && (
                                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm">
                                     <AlertCircle size={16} className="shrink-0" />
@@ -169,7 +177,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                                 </div>
                             )}
 
-                            {/* Name Field (Signup only) */}
                             {mode === 'signup' && (
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
@@ -186,7 +193,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                                 </div>
                             )}
 
-                            {/* Email Field */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
                                 <div className="relative">
@@ -202,7 +208,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                                 </div>
                             </div>
 
-                            {/* Password Field */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
                                 <div className="relative">
@@ -229,7 +234,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                                 )}
                             </div>
 
-                            {/* Submit Button */}
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
@@ -246,7 +250,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                             </button>
                         </form>
 
-                        {/* Switch Mode */}
                         <div className="mt-6 text-center">
                             <p className="text-slate-500">
                                 {mode === 'login' ? "I don't have an account." : 'I already have an account.'}
@@ -258,6 +261,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
                                 </button>
                             </p>
                         </div>
+                        */}
                     </div>
 
                     {/* Terms */}
