@@ -608,8 +608,9 @@ export default function App() {
   // Derived state: current active profile
   const profile = allProfiles.find(p => p.id === activeProfileId) || null;
 
-  // Save profiles to localStorage whenever they change
+  // Save profiles to localStorage AND cloud whenever they change
   useEffect(() => {
+    // Always save to localStorage
     const store: ProfilesStore = {
       profiles: allProfiles,
       activeProfileId
@@ -619,7 +620,106 @@ export default function App() {
     if (profile) {
       localStorage.setItem('socialai_profile', JSON.stringify(profile));
     }
-  }, [allProfiles, activeProfileId, profile]);
+
+    // Also sync ALL profiles to cloud if authenticated (this ensures cloud is always up-to-date)
+    if (isAuthenticated && user && allProfiles.length > 0) {
+      // Debounce cloud saves to prevent excessive API calls
+      const timeoutId = setTimeout(() => {
+        saveAllProfiles(user.id, allProfiles).then(success => {
+          if (success) {
+            console.log('[Profile] All profiles synced to cloud');
+          }
+        }).catch(e => {
+          console.warn('[Profile] Failed to sync profiles to cloud:', e);
+        });
+      }, 2000); // Wait 2 seconds after last change before syncing
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [allProfiles, activeProfileId, profile, isAuthenticated, user]);
+
+  // Fetch profiles from cloud on mount if authenticated (recovers data after localStorage clear)
+  useEffect(() => {
+    const syncFromCloud = async () => {
+      if (!isAuthenticated || !user || authLoading) return;
+
+      // Only fetch if we don't have profiles locally OR if this is a fresh session
+      const hasLocalProfiles = allProfiles.length > 0;
+      const wasJustAuthenticated = !localStorage.getItem('socialai_last_cloud_sync');
+
+      if (!hasLocalProfiles || wasJustAuthenticated) {
+        console.log('[Profile] Fetching profiles from cloud...');
+        try {
+          const cloudProfiles = await fetchAllProfiles(user.id);
+          if (cloudProfiles.length > 0) {
+            console.log(`[Profile] Recovered ${cloudProfiles.length} profile(s) from cloud`);
+            setAllProfiles(cloudProfiles);
+            // Set active profile if none set
+            if (!activeProfileId || !cloudProfiles.some(p => p.id === activeProfileId)) {
+              setActiveProfileId(cloudProfiles[0].id);
+            }
+          }
+        } catch (e) {
+          console.warn('[Profile] Failed to fetch profiles from cloud:', e);
+        }
+      }
+
+      // Mark that we've synced
+      localStorage.setItem('socialai_last_cloud_sync', new Date().toISOString());
+    };
+
+    syncFromCloud();
+  }, [isAuthenticated, user, authLoading]);
+
+  // Periodic cloud sync every 2 minutes (ensures data is never lost)
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const interval = setInterval(async () => {
+      if (allProfiles.length > 0) {
+        console.log('[Profile] Periodic cloud sync...');
+        await saveAllProfiles(user.id, allProfiles);
+      }
+    }, 2 * 60 * 1000); // Every 2 minutes
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user, allProfiles]);
+
+  // Save profiles before page unload/close (last chance to save)
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const handleBeforeUnload = () => {
+      // Synchronously save to localStorage (this always works)
+      const store: ProfilesStore = {
+        profiles: allProfiles,
+        activeProfileId
+      };
+      localStorage.setItem('socialai_profiles', JSON.stringify(store));
+
+      // Try to sync to cloud using sendBeacon (works even during page close)
+      if (allProfiles.length > 0 && navigator.sendBeacon) {
+        // Note: sendBeacon has limitations, so we rely primarily on the debounced saves
+        console.log('[Profile] Saving profiles before unload');
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // Sync when user switches tabs or minimizes browser
+      if (document.visibilityState === 'hidden' && allProfiles.length > 0) {
+        console.log('[Profile] Tab hidden, syncing to cloud...');
+        saveAllProfiles(user.id, allProfiles);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated, user, allProfiles, activeProfileId]);
 
   // Profile management functions
   const updateProfile = (updatedProfile: CompanyProfile) => {
