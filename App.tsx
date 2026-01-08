@@ -1492,7 +1492,8 @@ export default function App() {
 
   const renderContent = () => {
     // Show loading while checking authentication
-    if (authLoading || (isAuthenticated && user && lastCheckedUserId !== user.id)) {
+    // BUT don't block if user is on AUTH page - the auth page handles its own navigation
+    if (authLoading || (isAuthenticated && user && lastCheckedUserId !== user.id && view !== AppView.AUTH)) {
       return (
         <div className="h-screen flex items-center justify-center bg-slate-50">
           <div className="text-center">
