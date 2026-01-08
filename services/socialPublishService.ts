@@ -64,6 +64,12 @@ export const SOCIAL_PLATFORMS_CONFIG = {
         color: 'bg-red-600',
         enabled: () => !!getEnvVar('VITE_YOUTUBE_API_KEY'),
     },
+    whatsapp: {
+        name: 'WhatsApp',
+        icon: '💬',
+        color: 'bg-green-500',
+        enabled: () => !!getEnvVar('VITE_WHATSAPP_ACCESS_TOKEN'),
+    },
 };
 
 // Check if any publishing platform is configured
@@ -441,6 +447,30 @@ export async function publishToTikTok(content: PostContent): Promise<PublishResu
 }
 
 // ============================================
+// WHATSAPP PUBLISHING
+// ============================================
+
+export async function publishToWhatsApp(content: PostContent): Promise<PublishResult> {
+    const accessToken = getEnvVar('VITE_WHATSAPP_ACCESS_TOKEN');
+
+    if (!accessToken) {
+        return {
+            success: false,
+            platform: 'whatsapp',
+            error: 'WhatsApp Business API credentials not configured',
+        };
+    }
+
+    // WhatsApp Business API requires specific setup and typically uses templates
+    // This is a placeholder for future implementation
+    return {
+        success: false,
+        platform: 'whatsapp',
+        error: 'WhatsApp publishing via Business API is coming soon! For now, use the copy feature to share content.',
+    };
+}
+
+// ============================================
 // MAIN PUBLISH FUNCTION
 // ============================================
 
@@ -462,6 +492,8 @@ export async function publishToSocialMedia(
             return publishToLinkedIn(content);
         case 'tiktok':
             return publishToTikTok(content);
+        case 'whatsapp':
+            return publishToWhatsApp(content);
         default:
             return {
                 success: false,

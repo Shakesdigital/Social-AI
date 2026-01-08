@@ -28,6 +28,7 @@ export interface ContactInfo {
         instagram?: string;
         youtube?: string;
         tiktok?: string;
+        whatsapp?: string;
     };
     contactPage?: string;
 }
@@ -181,6 +182,7 @@ export function extractContactsFromText(text: string): ContactInfo {
         instagram: /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/gi,
         youtube: /(?:https?:\/\/)?(?:www\.)?youtube\.com\/(?:c\/|channel\/|@)?([a-zA-Z0-9_-]+)/gi,
         tiktok: /(?:https?:\/\/)?(?:www\.)?tiktok\.com\/@([a-zA-Z0-9_.]+)/gi,
+        whatsapp: /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com)\/([0-9]+)/gi,
     };
 
     for (const [platform, regex] of Object.entries(socialPatterns)) {
@@ -366,6 +368,7 @@ export function isSocialMediaUrl(url: string): boolean {
         'pinterest.com',
         'reddit.com',
         'threads.net',
+        'whatsapp.com', 'wa.me',
     ];
 
     const domain = extractDomain(url).toLowerCase();
@@ -387,6 +390,7 @@ export function getSocialPlatform(url: string): string | null {
     if (domain.includes('pinterest')) return 'Pinterest';
     if (domain.includes('reddit')) return 'Reddit';
     if (domain.includes('threads')) return 'Threads';
+    if (domain.includes('whatsapp') || domain.includes('wa.me')) return 'WhatsApp';
 
     return null;
 }

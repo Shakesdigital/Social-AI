@@ -53,6 +53,7 @@ const SOCIAL_PLATFORMS = [
     { id: 'YouTube', name: 'YouTube', color: 'bg-red-600', icon: '▶️' },
     { id: 'Pinterest', name: 'Pinterest', color: 'bg-red-500', icon: '📌' },
     { id: 'Threads', name: 'Threads', color: 'bg-slate-800', icon: '🧵' },
+    { id: 'WhatsApp', name: 'WhatsApp', color: 'bg-green-500', icon: '💬' },
 ];
 
 interface ConnectedAccount {
@@ -83,7 +84,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
             TikTok: 2,
             YouTube: 1,
             Pinterest: 3,
-            Threads: 2
+            Threads: 2,
+            WhatsApp: 2
         },
         autoApprove: false,
         isScheduled: false,
@@ -927,7 +929,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ profile, savedState,
                                                         post.platform === 'YouTube' ? 'bg-red-100 text-red-700' :
                                                             post.platform === 'Pinterest' ? 'bg-red-50 text-red-600' :
                                                                 post.platform === 'Threads' ? 'bg-slate-100 text-slate-700' :
-                                                                    'bg-slate-200 text-slate-700'
+                                                                    post.platform === 'WhatsApp' ? 'bg-green-100 text-green-700' :
+                                                                        'bg-slate-200 text-slate-700'
                                             }`}>
                                             {post.platform}
                                         </span>

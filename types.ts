@@ -19,6 +19,7 @@ export interface CompanyProfile {
     youtube?: string;
     pinterest?: string;
     threads?: string;
+    whatsapp?: string;
   };
 }
 
@@ -42,7 +43,7 @@ export interface MarketingStrategy {
 export interface SocialPost {
   id: string;
   date: Date;
-  platform: 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook' | 'TikTok' | 'YouTube';
+  platform: 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook' | 'TikTok' | 'YouTube' | 'Pinterest' | 'Threads' | 'WhatsApp';
   topic: string;
   caption: string;
   imagePrompt?: string;
@@ -182,6 +183,7 @@ export interface AutoPilotConfig {
     YouTube: number;
     Pinterest: number;
     Threads: number;
+    WhatsApp: number;
     [key: string]: number; // Allow dynamic platform access
   };
   autoApprove: boolean;
@@ -215,7 +217,7 @@ export interface LLMResponse {
 // SOCIAL MEDIA CONNECTION TYPES
 // ============================================
 
-export type SocialPlatform = 'instagram' | 'facebook' | 'twitter' | 'linkedin' | 'tiktok' | 'youtube' | 'pinterest' | 'threads';
+export type SocialPlatform = 'instagram' | 'facebook' | 'twitter' | 'linkedin' | 'tiktok' | 'youtube' | 'pinterest' | 'threads' | 'whatsapp';
 
 export interface SocialConnection {
   platform: SocialPlatform;
