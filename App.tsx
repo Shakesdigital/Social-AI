@@ -1623,94 +1623,56 @@ export default function App() {
           <AuthPage
             authMode={authMode}
             onSuccess={async () => {
+              // SIMPLIFIED: After successful email/password login, navigate to appropriate view
+              console.log('[AuthPage] Login success callback triggered');
+
+              // Clear auth mode immediately
+              setAuthMode(null);
+              localStorage.removeItem('socialai_logged_out');
+
               try {
-                // Handle navigation after successful email/password login
-                console.log('[AuthPage] Login success, checking for profile...');
+                // Small delay to let auth state settle
+                await new Promise(resolve => setTimeout(resolve, 200));
 
-                // Clear the logged out flag
-                localStorage.removeItem('socialai_logged_out');
-
-                // Wait a moment for auth state to settle
-                await new Promise(resolve => setTimeout(resolve, 300));
-
-                // Get the authenticated user - try direct Supabase first, fall back to auth context
-                let authUser = null;
-                try {
-                  const { data } = await supabase.auth.getUser();
-                  authUser = data?.user;
-                } catch (e) {
-                  console.warn('[AuthPage] supabase.auth.getUser() failed, using context user');
-                }
-
-                // FALLBACK: If direct Supabase call failed, use the context user
-                if (!authUser && user) {
-                  console.log('[AuthPage] Using auth context user as fallback');
-                  authUser = {
-                    id: user.id,
-                    email: user.email,
-                    created_at: user.created,
-                    user_metadata: { full_name: user.name }
-                  };
-                }
-
-                console.log('[AuthPage] Got user:', authUser?.id);
+                // Get the authenticated user directly from Supabase
+                const { data: { user: authUser } } = await supabase.auth.getUser();
 
                 if (!authUser) {
-                  // No user - something went wrong
-                  console.log('[AuthPage] No user found after login');
+                  console.error('[AuthPage] No user after login - going to landing');
                   setView(AppView.LANDING);
-                  setAuthMode(null);
                   return;
                 }
 
-                // Check stored user ID
-                const storedUserId = localStorage.getItem('socialai_user_id');
-                const isSameUser = storedUserId === authUser.id;
-                const isFirstTimeOnDevice = !storedUserId;
-
-                console.log('[AuthPage] User check:', {
-                  storedUserId,
-                  currentUserId: authUser.id,
-                  isSameUser,
-                  isFirstTimeOnDevice,
-                  localProfilesCount: allProfiles.length
-                });
-
-                // FIRST: Try to fetch cloud profile for this user (before clearing anything)
-                let cloudProfile = null;
-                let onboardingCompleted = false;
-
-                try {
-                  console.log('[AuthPage] Fetching cloud profile...');
-                  const [profileResult, onboardingResult] = await Promise.all([
-                    fetchProfile(authUser.id),
-                    hasCompletedOnboarding().catch(() => false)
-                  ]);
-                  cloudProfile = profileResult;
-                  onboardingCompleted = onboardingResult;
-                  console.log('[AuthPage] Cloud profile:', cloudProfile ? 'Found' : 'Not found');
-                  console.log('[AuthPage] Onboarding completed:', onboardingCompleted);
-                } catch (e) {
-                  console.log('[AuthPage] Error fetching cloud profile:', e);
-                }
+                console.log('[AuthPage] Got authenticated user:', authUser.id);
 
                 // Save current user ID
                 localStorage.setItem('socialai_user_id', authUser.id);
 
-                // CASE 1: User has a cloud profile - they're a returning user
+                // Try to fetch cloud profile
+                let cloudProfile = null;
+                try {
+                  cloudProfile = await fetchProfile(authUser.id);
+                  console.log('[AuthPage] Cloud profile:', cloudProfile ? 'Found' : 'Not found');
+                } catch (e) {
+                  console.warn('[AuthPage] Error fetching cloud profile:', e);
+                }
+
+                // Check if onboarding was completed
+                let onboardingCompleted = false;
+                try {
+                  onboardingCompleted = await hasCompletedOnboarding();
+                } catch (e) {
+                  console.warn('[AuthPage] Error checking onboarding:', e);
+                }
+
+                // Mark auth as handled
+                setLastCheckedUserId(authUser.id);
+                authHandledForUserRef.current = authUser.id;
+
+                // DECISION: Where to navigate?
                 if (cloudProfile) {
-                  console.log('[AuthPage] Found cloud profile, using it');
-
-                  // If different user than before, clear old data ONLY NOW that we have new user's data
-                  if (!isSameUser && !isFirstTimeOnDevice) {
-                    console.log('[AuthPage] Different user - clearing old local data');
-                    const currentSession = getCurrentSession();
-                    if (currentSession && currentSession.email) {
-                      setSessionConflictEmail(currentSession.email);
-                    }
-                  }
-
-                  // Set up profile state from cloud
+                  // Has cloud profile -> Dashboard
+                  console.log('[AuthPage] Cloud profile found - going to DASHBOARD');
                   setAllProfiles([cloudProfile]);
                   setActiveProfileId(cloudProfile.id);
                   localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
@@ -1718,58 +1680,25 @@ export default function App() {
                     profiles: [cloudProfile],
                     activeProfileId: cloudProfile.id
                   }));
-
-                  // Create session
                   createSession(authUser.id, authUser.email || '', false, true);
-                  setLastCheckedUserId(authUser.id);
-                  authHandledForUserRef.current = authUser.id;
-
                   setView(AppView.DASHBOARD);
-                  setAuthMode(null);
                   return;
                 }
 
-                // CASE 2: No cloud profile - check if same user with local profiles
-                if (isSameUser && allProfiles.length > 0) {
-                  console.log('[AuthPage] Same user with local profiles, using them');
-                  if (!activeProfileId) {
-                    setActiveProfileId(allProfiles[0].id);
-                  }
+                // Check if user is existing (account older than 2 minutes OR onboarding completed)
+                const accountAgeMs = Date.now() - new Date(authUser.created_at).getTime();
+                const accountAgeMinutes = accountAgeMs / (1000 * 60);
+                const isExistingUser = accountAgeMinutes > 2 || onboardingCompleted;
 
-                  // Try to sync to cloud
-                  saveProfile(authUser.id, allProfiles[0]).catch(e => console.warn('Sync failed:', e));
-
-                  createSession(authUser.id, authUser.email || '', false, true);
-                  setLastCheckedUserId(authUser.id);
-                  authHandledForUserRef.current = authUser.id;
-
-                  setView(AppView.DASHBOARD);
-                  setAuthMode(null);
-                  return;
-                }
-
-                // CASE 3: Check if this is an existing user (account age > 2 minutes)
-                const accountCreatedAt = new Date(authUser.created_at);
-                const accountAgeMinutes = (Date.now() - accountCreatedAt.getTime()) / (1000 * 60);
-                const isExistingAccount = accountAgeMinutes > 2 || onboardingCompleted;
-
-                console.log('[AuthPage] Account age check:', {
-                  created: authUser.created_at,
+                console.log('[AuthPage] Account check:', {
                   ageMinutes: accountAgeMinutes.toFixed(1),
-                  isExistingAccount,
-                  onboardingCompleted
+                  onboardingCompleted,
+                  isExistingUser
                 });
 
-                if (isExistingAccount) {
-                  // Existing user but no profile found - create recovery profile
-                  console.log('[AuthPage] Existing user without profile, creating recovery');
-
-                  // Clear old user data if different user
-                  if (!isSameUser && !isFirstTimeOnDevice) {
-                    setAllProfiles([]);
-                    setActiveProfileId(null);
-                  }
-
+                if (isExistingUser) {
+                  // Existing user without cloud profile - create recovery profile and go to dashboard
+                  console.log('[AuthPage] Existing user - creating recovery profile, going to DASHBOARD');
                   const recoveryProfile: CompanyProfile = {
                     id: 'profile_' + authUser.id.substring(0, 8),
                     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'My Business',
@@ -1780,60 +1709,38 @@ export default function App() {
                     goals: '',
                     createdAt: new Date().toISOString()
                   };
-
                   setAllProfiles([recoveryProfile]);
                   setActiveProfileId(recoveryProfile.id);
                   localStorage.setItem('socialai_profile', JSON.stringify(recoveryProfile));
-
-                  // Save to cloud
-                  saveProfile(authUser.id, recoveryProfile).catch(e => console.warn('Failed to save recovery profile:', e));
-                  markOnboardingComplete().catch(e => console.warn('Failed to mark onboarding complete:', e));
-
+                  saveProfile(authUser.id, recoveryProfile).catch(e => console.warn('Save failed:', e));
+                  markOnboardingComplete().catch(e => console.warn('Mark complete failed:', e));
                   createSession(authUser.id, authUser.email || '', false, true);
-                  setLastCheckedUserId(authUser.id);
-                  authHandledForUserRef.current = authUser.id;
-
                   setView(AppView.DASHBOARD);
-                  setAuthMode(null);
                   return;
                 }
 
-                // CASE 4: New user (account just created) - go to onboarding
-                console.log('[AuthPage] New user, going to onboarding');
-
-                // Clear any leftover data from different users
-                if (!isSameUser && !isFirstTimeOnDevice) {
-                  setAllProfiles([]);
-                  setActiveProfileId(null);
-                  localStorage.removeItem('socialai_profiles');
-                  localStorage.removeItem('socialai_profile');
-                }
-
+                // New user - go to onboarding
+                console.log('[AuthPage] New user - going to ONBOARDING');
                 createSession(authUser.id, authUser.email || '', true, false);
-                setLastCheckedUserId(authUser.id);
-                authHandledForUserRef.current = authUser.id;
-
                 setView(AppView.ONBOARDING);
-                setAuthMode(null);
-              } catch (error) {
-                // CRITICAL: If anything fails, don't leave user stuck on auth page
-                console.error('[AuthPage] Error in onSuccess handler:', error);
 
-                // Try to navigate based on what we have
-                if (user && profile) {
-                  // User and profile exist - go to dashboard
-                  console.log('[AuthPage] Error recovery: navigating to dashboard');
-                  setView(AppView.DASHBOARD);
-                } else if (user) {
-                  // User exists but no profile - go to onboarding
-                  console.log('[AuthPage] Error recovery: navigating to onboarding');
-                  setView(AppView.ONBOARDING);
-                } else {
-                  // No user - go to landing
-                  console.log('[AuthPage] Error recovery: navigating to landing');
+              } catch (error) {
+                console.error('[AuthPage] Critical error in onSuccess:', error);
+                // FAILSAFE: Always navigate somewhere
+                // Try to get current auth state and make a decision
+                try {
+                  const { data: { user: failsafeUser } } = await supabase.auth.getUser();
+                  if (failsafeUser) {
+                    console.log('[AuthPage] Failsafe: User exists, going to ONBOARDING');
+                    setView(AppView.ONBOARDING);
+                  } else {
+                    console.log('[AuthPage] Failsafe: No user, going to LANDING');
+                    setView(AppView.LANDING);
+                  }
+                } catch (e) {
+                  console.error('[AuthPage] Failsafe also failed, going to LANDING');
                   setView(AppView.LANDING);
                 }
-                setAuthMode(null);
               }
             }}
             onBack={() => {
