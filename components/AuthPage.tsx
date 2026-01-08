@@ -30,7 +30,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ authMode, onSuccess, onBack 
             } else {
                 await signup(email, password, name);
             }
-            onSuccess();
+            // IMPORTANT: Await onSuccess to properly handle any async errors during navigation
+            await onSuccess();
         } catch (err: any) {
             setError(err.message || 'Something went wrong');
         } finally {
