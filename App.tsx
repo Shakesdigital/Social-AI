@@ -72,7 +72,7 @@ const MarketMILogo = ({ className, onClick }: { className?: string; onClick?: ()
 );
 
 // Reusable App Header (matches Landing Page header)
-const AppHeader: React.FC<{ onLogoClick?: () => void }> = ({ onLogoClick }) => (
+const AppHeader: React.FC<{ onLogoClick?: () => void; onSkipToDashboard?: () => void }> = ({ onLogoClick, onSkipToDashboard }) => (
   <nav className="w-full bg-white/90 backdrop-blur-md border-b border-slate-100 shrink-0">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-16 md:h-20">
@@ -81,7 +81,16 @@ const AppHeader: React.FC<{ onLogoClick?: () => void }> = ({ onLogoClick }) => (
           <span className="font-bold text-xl text-slate-800">Market MI</span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-          <span className="text-brand-600">Dashboard</span>
+          {onSkipToDashboard ? (
+            <button
+              onClick={onSkipToDashboard}
+              className="text-brand-600 hover:text-brand-700 hover:underline transition-colors cursor-pointer"
+            >
+              Skip To Dashboard
+            </button>
+          ) : (
+            <span className="text-brand-600">Dashboard</span>
+          )}
         </div>
       </div>
     </div>
@@ -1796,7 +1805,32 @@ export default function App() {
       case AppView.ONBOARDING:
         return (
           <div className="h-screen flex flex-col bg-slate-50 overflow-y-auto">
-            <AppHeader onLogoClick={() => setView(AppView.LANDING)} />
+            <AppHeader
+              onLogoClick={() => setView(AppView.LANDING)}
+              onSkipToDashboard={() => {
+                // If user has a profile, go to dashboard; otherwise create a minimal profile first
+                if (profile) {
+                  setView(AppView.DASHBOARD);
+                } else if (user) {
+                  // Create a minimal profile so they can access the dashboard
+                  const minimalProfile: CompanyProfile = {
+                    id: 'profile_' + Date.now(),
+                    name: user.name || user.email?.split('@')[0] || 'My Business',
+                    industry: '',
+                    description: '',
+                    targetAudience: '',
+                    brandVoice: '',
+                    goals: '',
+                    createdAt: new Date().toISOString()
+                  };
+                  createNewProfile(minimalProfile);
+                  // Mark onboarding as complete since they're skipping
+                  markOnboardingComplete();
+                  markSessionOnboardingComplete();
+                  setView(AppView.DASHBOARD);
+                }
+              }}
+            />
             <main className="flex-1">
               <Onboarding onComplete={handleOnboardingComplete} />
             </main>
