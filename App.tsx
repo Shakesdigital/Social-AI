@@ -671,49 +671,92 @@ export default function App() {
       console.log('[PROFILE RECOVERY] Checking cloud database for profiles...');
       console.log('[PROFILE RECOVERY] User ID:', user.id);
       console.log('[PROFILE RECOVERY] User Email:', user.email);
+      console.log('[PROFILE RECOVERY] Current local profiles:', allProfiles.length);
       console.log('='.repeat(60));
 
       try {
-        // ALWAYS fetch from cloud - cloud is the source of truth
+        // Fetch from cloud
         const cloudProfiles = await fetchAllProfiles(user.id);
 
-        console.log('[PROFILE RECOVERY] Found', cloudProfiles.length, 'profile(s) in cloud:');
+        console.log('[PROFILE RECOVERY] Found', cloudProfiles.length, 'profile(s) in cloud');
+
         if (cloudProfiles.length > 0) {
           cloudProfiles.forEach((p, i) => {
-            console.log(`  [${i + 1}] ID: ${p.id}`);
-            console.log(`      Name: ${p.name}`);
-            console.log(`      Industry: ${p.industry}`);
-            console.log(`      Created: ${p.createdAt}`);
-            console.log('');
+            console.log(`  Cloud [${i + 1}]: ${p.name} (${p.id})`);
           });
+        }
 
-          // ALWAYS use cloud profiles as the source of truth
-          // This ensures we never lose data even if localStorage was cleared
-          console.log('[PROFILE RECOVERY] ✅ Setting profiles from cloud (source of truth)');
-          setAllProfiles(cloudProfiles);
+        // Get current local profiles (use a fresh read from state)
+        const currentLocalProfiles = allProfiles;
 
-          // Restore active profile - prefer what was stored locally if it exists in cloud
-          const storedProfilesData = localStorage.getItem('socialai_profiles');
-          let activeId = cloudProfiles[0].id;
-          if (storedProfilesData) {
-            try {
-              const parsed = JSON.parse(storedProfilesData);
-              if (parsed.activeProfileId && cloudProfiles.some(p => p.id === parsed.activeProfileId)) {
-                activeId = parsed.activeProfileId;
-              }
-            } catch (e) { /* ignore */ }
+        if (currentLocalProfiles.length > 0) {
+          currentLocalProfiles.forEach((p, i) => {
+            console.log(`  Local [${i + 1}]: ${p.name} (${p.id})`);
+          });
+        }
+
+        // MERGE STRATEGY:
+        // 1. Start with cloud profiles (they're the source of truth for saved profiles)
+        // 2. Add any local profiles that don't exist in cloud (newly created profiles)
+        // This prevents losing profiles that were just created but not synced yet
+
+        const cloudProfileIds = new Set(cloudProfiles.map(p => p.id));
+        const localOnlyProfiles = currentLocalProfiles.filter(p => !cloudProfileIds.has(p.id));
+
+        if (localOnlyProfiles.length > 0) {
+          console.log('[PROFILE RECOVERY] Found', localOnlyProfiles.length, 'local-only profile(s) to preserve');
+          localOnlyProfiles.forEach(p => console.log(`  - ${p.name} (${p.id})`));
+        }
+
+        // Merge: cloud profiles + local-only profiles
+        const mergedProfiles = [...cloudProfiles, ...localOnlyProfiles];
+
+        if (mergedProfiles.length > 0) {
+          console.log('[PROFILE RECOVERY] ✅ Setting', mergedProfiles.length, 'merged profile(s)');
+          setAllProfiles(mergedProfiles);
+
+          // Restore active profile - prefer current active, then localStorage, then first profile
+          let activeId = activeProfileId;
+
+          // If current active doesn't exist in merged, try localStorage
+          if (!activeId || !mergedProfiles.some(p => p.id === activeId)) {
+            const storedProfilesData = localStorage.getItem('socialai_profiles');
+            if (storedProfilesData) {
+              try {
+                const parsed = JSON.parse(storedProfilesData);
+                if (parsed.activeProfileId && mergedProfiles.some(p => p.id === parsed.activeProfileId)) {
+                  activeId = parsed.activeProfileId;
+                }
+              } catch (e) { /* ignore */ }
+            }
           }
+
+          // Fallback to first profile
+          if (!activeId || !mergedProfiles.some(p => p.id === activeId)) {
+            activeId = mergedProfiles[0].id;
+          }
+
           setActiveProfileId(activeId);
 
-          // Update localStorage to match cloud
+          // Update localStorage to match merged state
           localStorage.setItem('socialai_profiles', JSON.stringify({
-            profiles: cloudProfiles,
+            profiles: mergedProfiles,
             activeProfileId: activeId
           }));
 
-          console.log('[PROFILE RECOVERY] ✅ Profile state restored from cloud');
+          console.log('[PROFILE RECOVERY] ✅ Profile state restored, active:', activeId);
+
+          // Sync any local-only profiles to cloud
+          if (localOnlyProfiles.length > 0) {
+            console.log('[PROFILE RECOVERY] Syncing local-only profiles to cloud...');
+            for (const p of localOnlyProfiles) {
+              await saveProfile(user.id, p);
+            }
+          }
+        } else if (currentLocalProfiles.length === 0) {
+          console.log('[PROFILE RECOVERY] ⚠️ No profiles found anywhere for this user.');
         } else {
-          console.log('[PROFILE RECOVERY] ⚠️ No profiles found in cloud database for this user.');
+          console.log('[PROFILE RECOVERY] Using', currentLocalProfiles.length, 'local profile(s)');
         }
       } catch (e) {
         console.error('[PROFILE RECOVERY] ❌ Failed to fetch profiles from cloud:', e);
