@@ -616,6 +616,9 @@ export default function App() {
   // Derived state: current active profile
   const profile = allProfiles.find(p => p.id === activeProfileId) || null;
 
+  // Track if we've completed cloud sync (to prevent showing empty state before sync)
+  const [cloudSyncComplete, setCloudSyncComplete] = useState(false);
+
   // Save profiles to localStorage AND cloud whenever they change
   // CRITICAL: Only save when we have actual data to prevent overwriting with empty arrays
   useEffect(() => {
@@ -766,6 +769,7 @@ export default function App() {
 
       // Mark that we've synced
       localStorage.setItem('socialai_last_cloud_sync', new Date().toISOString());
+      setCloudSyncComplete(true);
     };
 
     syncFromCloud();
@@ -1388,13 +1392,23 @@ export default function App() {
       // === STEP 3: Handle user switching - clear data from previous user ===
       let currentLocalProfiles = allProfiles;
 
-      if (isDifferentUser || isFirstTimeUser) {
-        console.log('[Auth] Different/new user detected - clearing all local data');
+      // CRITICAL FIX: Only clear local data if a DIFFERENT user is logging in
+      // Do NOT clear for "first time user" - they might have cloud data from another device!
+      // If cloudProfile exists, the user has data in the cloud - don't clear anything
+      if (isDifferentUser && !cloudProfile) {
+        console.log('[Auth] Different user with no cloud profile - clearing local data');
         clearAllProfiles();
         currentLocalProfiles = [];
         localStorage.removeItem('socialai_profiles');
         localStorage.removeItem('socialai_profile');
         setOauthHandled(false);
+      } else if (isDifferentUser && cloudProfile) {
+        console.log('[Auth] Different user WITH cloud profile - will use their cloud data');
+        // Don't clear, just reset for later loading
+        currentLocalProfiles = [];
+      } else if (isFirstTimeUser) {
+        console.log('[Auth] First time on this device - checking for cloud profile');
+        // Don't clear anything - cloud profile will be loaded by other effects
       }
 
       // Save current user ID
