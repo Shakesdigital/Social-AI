@@ -122,6 +122,16 @@ function getFromCache(options: SerpOptions): SerpResponse | null {
             return null;
         }
 
+        // Check if cached data has mock URLs (example.com) - invalidate if so
+        const hasExampleUrls = parsed.data.organic?.some(r =>
+            r.url?.includes('example.com') || r.domain?.includes('example.com')
+        );
+        if (hasExampleUrls) {
+            console.log('[SERP Cache] Invalidating cached mock results for:', options.query);
+            localStorage.removeItem(key);
+            return null;
+        }
+
         console.log('[SERP Cache] Hit for:', options.query);
         return { ...parsed.data, provider: 'cache' };
     } catch (e) {
@@ -131,6 +141,12 @@ function getFromCache(options: SerpOptions): SerpResponse | null {
 
 function saveToCache(options: SerpOptions, data: SerpResponse): void {
     if (!SERP_CONFIG.cacheEnabled) return;
+
+    // NEVER cache mock results - they have fake example.com URLs
+    if (data.provider === 'mock') {
+        console.log('[SERP Cache] Skipping cache for mock results');
+        return;
+    }
 
     try {
         const key = getCacheKey(options);
