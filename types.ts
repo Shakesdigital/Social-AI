@@ -158,6 +158,7 @@ export enum AppView {
   ANALYTICS = 'ANALYTICS',
   SETTINGS = 'SETTINGS',
   PRICING = 'PRICING',
+  CLOUD_DIAGNOSTICS = 'CLOUD_DIAGNOSTICS',
 }
 
 export interface ImageGenerationConfig {

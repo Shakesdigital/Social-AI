@@ -35,6 +35,7 @@ import { ProfileSettings } from './components/ProfileSettings';
 import { AnalyticsView } from './components/AnalyticsView';
 import { ProfileSwitcher } from './components/ProfileSwitcher';
 import { LLMDiagnostics } from './components/LLMDiagnostics';
+import CloudDiagnostics from './components/CloudDiagnostics';
 import { AuthPage } from './components/AuthPage';
 import { UserMenu } from './components/UserMenu';
 import { PricingPage } from './components/PricingPage';
@@ -2012,7 +2013,7 @@ export default function App() {
           case AppView.EMAIL: return <EmailView key={activeProfileId} profile={profile!} leads={leadsForEmail} savedState={emailState} onStateChange={setEmailState} />;
           case AppView.BLOG: return <BlogView key={activeProfileId} profile={profile!} savedState={blogState} onStateChange={setBlogState} />;
           case AppView.ANALYTICS: return <AnalyticsView key={activeProfileId} profile={profile!} />;
-          case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} />;
+          case AppView.SETTINGS: return <ProfileSettings key={activeProfileId} profile={profile!} onSave={(updatedProfile) => updateProfile(updatedProfile)} onBack={() => setView(AppView.DASHBOARD)} onCloudDiagnostics={() => setView(AppView.CLOUD_DIAGNOSTICS)} />;
           default: return <div>Not Implemented</div>;
         }
       case AppView.PRICING:
@@ -2027,6 +2028,20 @@ export default function App() {
             onSignIn={() => setView(AppView.AUTH)}
             onLogIn={() => setView(AppView.AUTH)}
           />
+        );
+      case AppView.CLOUD_DIAGNOSTICS:
+        return (
+          <div className="min-h-screen bg-slate-50 py-8 px-4">
+            <div className="max-w-2xl mx-auto mb-4">
+              <button
+                onClick={() => setView(AppView.SETTINGS)}
+                className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1"
+              >
+                ← Back to Settings
+              </button>
+            </div>
+            <CloudDiagnostics />
+          </div>
         );
       default: return <div>Not Implemented</div>;
     }

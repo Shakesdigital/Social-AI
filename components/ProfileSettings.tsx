@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw, Globe, Link, Instagram, Facebook, Twitter, Linkedin, Youtube, Unlink } from 'lucide-react';
+import { User, Building2, Target, MessageSquare, Goal, Save, CheckCircle, ArrowLeft, Sparkles, RefreshCw, Globe, Link, Instagram, Facebook, Twitter, Linkedin, Youtube, Unlink, Cloud } from 'lucide-react';
 import { CompanyProfile, SocialPlatform } from '../types';
 import { getSocialConnections, isConnected, simulateConnect, disconnectPlatform } from '../services/socialPublishingService';
 import { GoogleWorkspaceIntegration } from './GoogleWorkspaceIntegration';
@@ -8,9 +8,10 @@ interface ProfileSettingsProps {
     profile: CompanyProfile;
     onSave: (profile: CompanyProfile) => void;
     onBack: () => void;
+    onCloudDiagnostics?: () => void;
 }
 
-export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSave, onBack }) => {
+export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSave, onBack, onCloudDiagnostics }) => {
     const [formData, setFormData] = useState<CompanyProfile>(profile);
     const [isSaving, setIsSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -469,6 +470,31 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onSav
                             </div>
                         </div>
                     </div>
+
+                    {/* Cloud Storage Diagnostics */}
+                    {onCloudDiagnostics && (
+                        <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 sm:p-6">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-slate-100 rounded-lg">
+                                    <Cloud size={20} className="text-slate-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-semibold text-slate-800 mb-1">Cloud Storage Status</h3>
+                                    <p className="text-sm text-slate-600 mb-3">
+                                        Check if your data is being saved to the cloud. Use this tool to diagnose any sync issues.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={onCloudDiagnostics}
+                                        className="bg-slate-200 text-slate-700 font-medium py-2 px-4 rounded-lg hover:bg-slate-300 transition-all text-sm flex items-center gap-2"
+                                    >
+                                        <Cloud size={16} />
+                                        Run Cloud Diagnostics
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-3 pt-4">
