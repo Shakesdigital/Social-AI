@@ -560,16 +560,22 @@ export default function App() {
 
   // Multi-profile state management
   const [allProfiles, setAllProfiles] = useState<CompanyProfile[]>(() => {
+    console.log('[Profile Init] Initializing profiles from localStorage...');
     try {
       // Try to load profiles store first
       const saved = localStorage.getItem('socialai_profiles');
       if (saved) {
         const store: ProfilesStore = JSON.parse(saved);
-        return store.profiles || [];
+        console.log(`[Profile Init] Found ${store.profiles?.length || 0} profile(s) in localStorage`);
+        if (store.profiles && store.profiles.length > 0) {
+          console.log('[Profile Init] Profiles:', store.profiles.map(p => ({ id: p.id, name: p.name })));
+          return store.profiles;
+        }
       }
       // Migrate from old single profile format
       const oldProfile = localStorage.getItem('socialai_profile');
       if (oldProfile) {
+        console.log('[Profile Init] Found old single profile format, migrating...');
         const parsed = JSON.parse(oldProfile);
         // Add ID if missing (migration)
         const migratedProfile = {
@@ -579,9 +585,10 @@ export default function App() {
         };
         return [migratedProfile];
       }
+      console.log('[Profile Init] No profiles found in localStorage');
       return [];
     } catch (e) {
-      console.error("Failed to load profiles", e);
+      console.error("[Profile Init] Failed to load profiles from localStorage:", e);
       return [];
     }
   });
@@ -609,30 +616,42 @@ export default function App() {
   const profile = allProfiles.find(p => p.id === activeProfileId) || null;
 
   // Save profiles to localStorage AND cloud whenever they change
+  // CRITICAL: Only save when we have actual data to prevent overwriting with empty arrays
   useEffect(() => {
-    // Always save to localStorage
+    // SAFETY: Don't save empty profiles - this would overwrite valid data!
+    if (allProfiles.length === 0) {
+      console.log('[Profile] Skipping save - no profiles to save');
+      return;
+    }
+
+    // Save to localStorage
     const store: ProfilesStore = {
       profiles: allProfiles,
       activeProfileId
     };
     localStorage.setItem('socialai_profiles', JSON.stringify(store));
+    console.log(`[Profile] Saved ${allProfiles.length} profile(s) to localStorage`);
+
     // Keep old format updated for backward compatibility
     if (profile) {
       localStorage.setItem('socialai_profile', JSON.stringify(profile));
     }
 
     // Also sync ALL profiles to cloud if authenticated (this ensures cloud is always up-to-date)
-    if (isAuthenticated && user && allProfiles.length > 0) {
+    if (isAuthenticated && user) {
       // Debounce cloud saves to prevent excessive API calls
       const timeoutId = setTimeout(() => {
+        console.log('[Profile] Syncing profiles to cloud...');
         saveAllProfiles(user.id, allProfiles).then(success => {
           if (success) {
-            console.log('[Profile] All profiles synced to cloud');
+            console.log('[Profile] ✅ All profiles synced to cloud successfully');
+          } else {
+            console.error('[Profile] ❌ Cloud sync returned false - check Supabase connection');
           }
         }).catch(e => {
-          console.warn('[Profile] Failed to sync profiles to cloud:', e);
+          console.error('[Profile] ❌ Failed to sync profiles to cloud:', e);
         });
-      }, 2000); // Wait 2 seconds after last change before syncing
+      }, 1000); // Wait 1 second after last change before syncing
 
       return () => clearTimeout(timeoutId);
     }

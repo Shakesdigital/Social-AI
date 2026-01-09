@@ -103,22 +103,30 @@ export const fetchAllProfiles = async (userId: string): Promise<CompanyProfile[]
 // Save profile to Supabase (supports multiple profiles per user)
 export const saveProfile = async (userId: string, profile: CompanyProfile): Promise<boolean> => {
     if (!isSupabaseConfigured()) {
-        console.log('[ProfileService] Supabase not configured, skipping save');
+        console.warn('[ProfileService] ⚠️ Supabase NOT configured - profiles will NOT persist to cloud!');
+        console.warn('[ProfileService] Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
         return false;
     }
+
+    console.log(`[ProfileService] Saving profile "${profile.name}" (${profile.id}) for user ${userId.substring(0, 8)}...`);
 
     try {
         // Use composite key: user_id + profile_id
         // First check if this profile already exists
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile, error: selectError } = await supabase
             .from('profiles')
             .select('id')
             .eq('user_id', userId)
             .eq('profile_id', profile.id)
             .single();
 
+        if (selectError && selectError.code !== 'PGRST116') {
+            console.error('[ProfileService] Error checking existing profile:', selectError);
+        }
+
         if (existingProfile) {
             // Update existing profile
+            console.log('[ProfileService] Profile exists, updating...');
             const { error } = await supabase
                 .from('profiles')
                 .update({
@@ -135,12 +143,13 @@ export const saveProfile = async (userId: string, profile: CompanyProfile): Prom
                 .eq('profile_id', profile.id);
 
             if (error) {
-                console.error('[ProfileService] Error updating profile:', error);
+                console.error('[ProfileService] ❌ Error updating profile:', error);
                 return false;
             }
-            console.log('[ProfileService] Profile updated successfully:', profile.id);
+            console.log('[ProfileService] ✅ Profile updated successfully:', profile.id);
         } else {
             // Insert new profile
+            console.log('[ProfileService] Profile is new, inserting...');
             const { error } = await supabase
                 .from('profiles')
                 .insert({
@@ -158,15 +167,16 @@ export const saveProfile = async (userId: string, profile: CompanyProfile): Prom
                 });
 
             if (error) {
-                console.error('[ProfileService] Error inserting profile:', error);
+                console.error('[ProfileService] ❌ Error inserting profile:', error);
+                console.error('[ProfileService] This might mean the profiles table is missing the profile_id column');
                 return false;
             }
-            console.log('[ProfileService] Profile inserted successfully:', profile.id);
+            console.log('[ProfileService] ✅ Profile inserted successfully:', profile.id);
         }
 
         return true;
     } catch (error) {
-        console.error('[ProfileService] Error saving profile:', error);
+        console.error('[ProfileService] ❌ Error saving profile:', error);
         return false;
     }
 };
