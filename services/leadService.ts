@@ -17,13 +17,14 @@ export async function generateLeads(
     let webContext = '';
     let competitorInsights = '';
     let verifiedLeads = '';
+    let outreachLeads: Awaited<ReturnType<typeof searchForOutreach>> = [];
 
     if (isWebResearchConfigured()) {
         console.log('[Leads] Enriching with validated web research...');
 
         // Search for real companies with verified contact info
         const searchQuery = `${criteria.industry} companies ${criteria.location} ${criteria.companySize} employees`;
-        const outreachLeads = await searchForOutreach(searchQuery, 8);
+        outreachLeads = await searchForOutreach(searchQuery, 8);
 
         if (outreachLeads.length > 0) {
             verifiedLeads = `
@@ -196,95 +197,80 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
         return undefined;
     }
 
-    // Step 4: Validate website AND LinkedIn URLs to ensure at least one is active
-    // ENHANCED MODE: Keep leads if website OR LinkedIn is active
-    console.log('[Leads] Validating website and LinkedIn URLs...');
+    // Step 4: First, try to create leads directly from web research results
+    // These are REAL companies from actual search results
+    const webResearchLeads: Lead[] = [];
 
-    // Collect all URLs to validate (websites + LinkedIn)
-    const allUrls: string[] = [];
-    leads.forEach(lead => {
-        if (lead.website && lead.website.startsWith('http')) {
-            allUrls.push(lead.website);
-        }
-        if (lead.linkedIn && lead.linkedIn.startsWith('http')) {
-            allUrls.push(lead.linkedIn);
-        }
-    });
+    if (isWebResearchConfigured() && outreachLeads.length > 0) {
+        console.log('[Leads] Creating leads from verified web research results...');
 
-    if (allUrls.length > 0) {
-        try {
-            const urlStatus = await validateUrls(allUrls, 5);
-
-            // Update leads with validation status for both website and LinkedIn
-            leads = leads.map(lead => {
-                const websiteActive = lead.website ? urlStatus.get(lead.website) === true : false;
-                const linkedInActive = lead.linkedIn ? urlStatus.get(lead.linkedIn) === true : false;
-
-                // A lead is valid if either website OR LinkedIn is active
-                const hasVerifiedContact = websiteActive || linkedInActive;
-
-                let notes = '';
-                if (websiteActive) notes += '✓ Website active • ';
-                else if (lead.website) notes += '⚠️ Website inactive • ';
-                if (linkedInActive) notes += '✓ LinkedIn active';
-                else if (lead.linkedIn) notes += '⚠️ LinkedIn inactive';
-
-                return {
-                    ...lead,
-                    isVerified: websiteActive,
-                    linkedInVerified: linkedInActive,
-                    hasBackupContact: hasVerifiedContact,
-                    notes: notes.trim().replace(/•\s*$/, '')
-                };
+        for (const outreach of outreachLeads) {
+            webResearchLeads.push({
+                id: `lead-${Date.now()}-web-${webResearchLeads.length}`,
+                companyName: outreach.name,
+                industry: criteria.industry,
+                location: criteria.location,
+                size: criteria.companySize,
+                contactEmail: outreach.contactInfo.emails?.[0],
+                contactName: undefined,
+                website: outreach.website,
+                linkedIn: outreach.contactInfo.socialLinks?.linkedin,
+                twitter: outreach.contactInfo.socialLinks?.twitter,
+                facebook: outreach.contactInfo.socialLinks?.facebook,
+                phone: outreach.contactInfo.phones?.[0],
+                summary: `Verified lead from web research. Contact confidence: ${outreach.confidence}.`,
+                outreachPotential: outreach.confidence === 'high' ? 'High' : outreach.confidence === 'medium' ? 'Medium' : 'Low',
+                createdAt: new Date(),
+                notes: '✓ Real company from web search',
+                isVerified: true,
+                hasBackupContact: true,
             });
-
-            // FLEXIBLE FILTERING: Keep leads with AT LEAST ONE verified contact (website OR LinkedIn)
-            const validLeads = leads.filter(lead => {
-                // Must have at least one working contact method
-                if (!lead.hasBackupContact) {
-                    // Check if it has any contact URLs at all
-                    const hasAnyUrl = lead.website || lead.linkedIn;
-                    if (!hasAnyUrl) {
-                        console.log(`[Leads] Filtered out "${lead.companyName}" - no contact URLs`);
-                    } else {
-                        console.log(`[Leads] Filtered out "${lead.companyName}" - all contacts inactive: Website: ${lead.website || 'none'}, LinkedIn: ${lead.linkedIn || 'none'}`);
-                    }
-                    return false;
-                }
-                return true;
-            });
-
-            const filteredCount = leads.length - validLeads.length;
-            const websiteOnlyCount = validLeads.filter(l => l.isVerified && !l.linkedInVerified).length;
-            const linkedInOnlyCount = validLeads.filter(l => !l.isVerified && l.linkedInVerified).length;
-            const bothActiveCount = validLeads.filter(l => l.isVerified && l.linkedInVerified).length;
-
-            console.log(`[Leads] URL Validation Complete: ${validLeads.length}/${leads.length} leads have at least one active contact`);
-            console.log(`[Leads] Breakdown: ${websiteOnlyCount} website-only, ${linkedInOnlyCount} LinkedIn-only, ${bothActiveCount} both active`);
-            if (filteredCount > 0) {
-                console.log(`[Leads] Filtered out ${filteredCount} leads with no active contacts`);
-            }
-            leads = validLeads;
-        } catch (e) {
-            console.warn('[Leads] URL validation failed, keeping leads with valid URL format:', e);
-            // On error, keep leads that at least have properly formatted URLs
-            leads = leads.filter(lead =>
-                (lead.website && lead.website.startsWith('http')) ||
-                (lead.linkedIn && lead.linkedIn.startsWith('http'))
-            );
         }
-    } else {
-        // No URLs to validate - filter out all leads
-        console.warn('[Leads] No valid URLs found in generated leads');
-        leads = [];
+
+        console.log(`[Leads] Created ${webResearchLeads.length} verified leads from web research`);
     }
 
-    // Track in memory to avoid future duplicates
-    addGeneratedLeads(leads);
-    incrementGeneratedCount('leads', leads.length);
-    trackAction(`Generated ${leads.length} verified leads for ${criteria.industry}`);
+    // If we have enough verified leads from web research, use those
+    if (webResearchLeads.length >= count * 0.7) { // At least 70% from web research
+        console.log('[Leads] Using primarily web research leads (verified real companies)');
+        addGeneratedLeads(webResearchLeads);
+        incrementGeneratedCount('leads', webResearchLeads.length);
+        trackAction(`Generated ${webResearchLeads.length} verified web research leads for ${criteria.industry}`);
+        return webResearchLeads.slice(0, count);
+    }
 
-    return leads;
+    // Step 5: For AI-generated leads, be less strict - mark as unverified but still useful
+    console.log('[Leads] Adding AI-suggested leads (marked as unverified suggestions)...');
+
+    // Mark AI leads as suggestions/unverified
+    leads = leads.map(lead => ({
+        ...lead,
+        notes: '💡 AI-suggested lead - verify before outreach',
+        isVerified: false,
+        hasBackupContact: false,
+    }));
+
+    // Combine: web research leads (verified) + AI leads (suggestions)
+    const combinedLeads = [...webResearchLeads, ...leads].slice(0, count);
+
+    // Only do light validation - check URL format, not actual connectivity
+    const finalLeads = combinedLeads.map(lead => {
+        const hasValidWebsite = lead.website && lead.website.startsWith('http');
+        const hasValidLinkedIn = lead.linkedIn && lead.linkedIn.includes('linkedin.com');
+        const hasEmail = !!lead.contactEmail;
+
+        return {
+            ...lead,
+            hasBackupContact: hasValidWebsite || hasValidLinkedIn || hasEmail,
+        };
+    });
+
+    // Track in memory to avoid future duplicates
+    addGeneratedLeads(finalLeads);
+    incrementGeneratedCount('leads', finalLeads.length);
+    trackAction(`Generated ${finalLeads.length} leads (${webResearchLeads.length} verified, ${leads.length} AI-suggested) for ${criteria.industry}`);
+
+    return finalLeads;
 }
 
 /**
