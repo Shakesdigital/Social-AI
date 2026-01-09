@@ -659,9 +659,13 @@ export default function App() {
   }, [allProfiles, activeProfileId, profile, isAuthenticated, user]);
 
   // Fetch profiles from cloud on mount if authenticated (recovers data after localStorage clear)
+  // This is the MOST IMPORTANT effect - cloud is the source of truth
   useEffect(() => {
     const syncFromCloud = async () => {
-      if (!isAuthenticated || !user || authLoading) return;
+      if (!isAuthenticated || !user || authLoading) {
+        console.log('[PROFILE RECOVERY] Skipping - not ready:', { isAuthenticated, hasUser: !!user, authLoading });
+        return;
+      }
 
       console.log('='.repeat(60));
       console.log('[PROFILE RECOVERY] Checking cloud database for profiles...');
@@ -670,7 +674,7 @@ export default function App() {
       console.log('='.repeat(60));
 
       try {
-        // ALWAYS fetch from cloud to see what's there
+        // ALWAYS fetch from cloud - cloud is the source of truth
         const cloudProfiles = await fetchAllProfiles(user.id);
 
         console.log('[PROFILE RECOVERY] Found', cloudProfiles.length, 'profile(s) in cloud:');
@@ -683,29 +687,33 @@ export default function App() {
             console.log('');
           });
 
-          // Check if we need to recover
-          const hasLocalProfiles = allProfiles.length > 0;
-          if (!hasLocalProfiles) {
-            console.log('[PROFILE RECOVERY] ✅ Recovering', cloudProfiles.length, 'profile(s) from cloud!');
-            setAllProfiles(cloudProfiles);
-            setActiveProfileId(cloudProfiles[0].id);
-          } else {
-            console.log('[PROFILE RECOVERY] Local profiles exist, merging with cloud...');
-            // Merge: add any cloud profiles that don't exist locally
-            const localIds = new Set(allProfiles.map(p => p.id));
-            const newProfiles = cloudProfiles.filter(p => !localIds.has(p.id));
-            if (newProfiles.length > 0) {
-              console.log('[PROFILE RECOVERY] ✅ Recovered', newProfiles.length, 'additional profile(s) from cloud!');
-              setAllProfiles(prev => [...prev, ...newProfiles]);
-            }
-            // Also update local profile if none set
-            if (!activeProfileId || !allProfiles.some(p => p.id === activeProfileId)) {
-              setActiveProfileId(cloudProfiles[0].id);
-            }
+          // ALWAYS use cloud profiles as the source of truth
+          // This ensures we never lose data even if localStorage was cleared
+          console.log('[PROFILE RECOVERY] ✅ Setting profiles from cloud (source of truth)');
+          setAllProfiles(cloudProfiles);
+
+          // Restore active profile - prefer what was stored locally if it exists in cloud
+          const storedProfilesData = localStorage.getItem('socialai_profiles');
+          let activeId = cloudProfiles[0].id;
+          if (storedProfilesData) {
+            try {
+              const parsed = JSON.parse(storedProfilesData);
+              if (parsed.activeProfileId && cloudProfiles.some(p => p.id === parsed.activeProfileId)) {
+                activeId = parsed.activeProfileId;
+              }
+            } catch (e) { /* ignore */ }
           }
+          setActiveProfileId(activeId);
+
+          // Update localStorage to match cloud
+          localStorage.setItem('socialai_profiles', JSON.stringify({
+            profiles: cloudProfiles,
+            activeProfileId: activeId
+          }));
+
+          console.log('[PROFILE RECOVERY] ✅ Profile state restored from cloud');
         } else {
           console.log('[PROFILE RECOVERY] ⚠️ No profiles found in cloud database for this user.');
-          console.log('[PROFILE RECOVERY] Local profiles count:', allProfiles.length);
         }
       } catch (e) {
         console.error('[PROFILE RECOVERY] ❌ Failed to fetch profiles from cloud:', e);
