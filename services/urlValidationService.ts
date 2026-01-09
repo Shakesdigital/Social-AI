@@ -102,17 +102,37 @@ export async function checkUrlActive(url: string, timeout = 5000): Promise<boole
         return cached.isActive;
     }
 
-    // Filter out common placeholder/fake domains
+    // Filter out common placeholder/fake domains and expired domain patterns
     const domain = extractDomainFromUrl(url).toLowerCase();
+
+    // Patterns for fake/placeholder domains
     const fakeDomainPatterns = [
         'example.com', 'sample.com', 'test.com', 'placeholder.com',
         'domain.com', 'company.com', 'yourcompany.com', 'website.com',
         'fake.com', 'dummy.com', 'acme.com', 'lorem.com',
-        'tempurl.', 'localhost', '127.0.0.1', '0.0.0.0'
+        'tempurl.', 'localhost', '127.0.0.1', '0.0.0.0',
+        // Common parked/expired domain indicators
+        'parked', 'forsale', 'expired', 'thisdomain', 'domainpending',
+        'hugedomains', 'afternic', 'godaddy.com/domainsearch', 'dan.com',
+        'sedo.com', 'domainmarket', 'buydomains'
+    ];
+
+    // Also filter domains that are just generic names with common TLDs
+    const genericPatterns = [
+        /^(www\.)?business\d*\.(com|net|org)$/,
+        /^(www\.)?company\d*\.(com|net|org)$/,
+        /^(www\.)?enterprise\d*\.(com|net|org)$/,
+        /^(www\.)?corp\d*\.(com|net|org)$/,
     ];
 
     if (fakeDomainPatterns.some(fake => domain.includes(fake))) {
         console.log(`[URL Check] Filtered suspicious domain: ${domain}`);
+        cacheUrlCheck(url, { isActive: false, timestamp: Date.now() });
+        return false;
+    }
+
+    if (genericPatterns.some(pattern => pattern.test(domain))) {
+        console.log(`[URL Check] Filtered generic domain: ${domain}`);
         cacheUrlCheck(url, { isActive: false, timestamp: Date.now() });
         return false;
     }

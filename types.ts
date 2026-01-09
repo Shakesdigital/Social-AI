@@ -71,11 +71,19 @@ export interface Lead {
   contactName?: string;
   website?: string;
   linkedIn?: string;
+  // Additional contact fields
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  phone?: string;
+  // Validation fields
   summary: string;
   outreachPotential: 'High' | 'Medium' | 'Low';
   createdAt: Date;
   notes?: string;
   isVerified?: boolean; // Whether website URL has been validated as active
+  linkedInVerified?: boolean; // Whether LinkedIn profile was validated
+  hasBackupContact?: boolean; // Whether there's at least one verified contact method
 }
 
 export interface LeadSearchCriteria {

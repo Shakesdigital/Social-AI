@@ -105,7 +105,7 @@ Think about:
 - What signals indicate a company is ready to engage?
 - How can we identify decision-makers (CMOs, Marketing Directors, Founders)?
 
-Generate ${count} leads as a JSON array. Each lead MUST include:
+Generate ${count} leads as a JSON array. Each lead MUST include multiple contact methods:
 [
   {
     "companyName": "Actual realistic company name",
@@ -114,14 +114,21 @@ Generate ${count} leads as a JSON array. Each lead MUST include:
     "size": "Employee range",
     "contactEmail": "realistic-format@domain.com",
     "contactName": "Full Name, Title (e.g., Sarah Chen, VP of Marketing)",
-    "website": "https://realistic-domain.com",
-    "linkedIn": "https://linkedin.com/company/name",
+    "website": "https://actual-working-domain.com (MUST be a real, active domain)",
+    "linkedIn": "https://linkedin.com/company/actual-company-name (MUST be real LinkedIn URL)",
+    "twitter": "https://twitter.com/companyhandle (optional)",
+    "facebook": "https://facebook.com/companypage (optional)",
+    "phone": "+1-XXX-XXX-XXXX (optional)",
     "summary": "2-3 sentences explaining WHY this is a good lead and the potential value of partnership",
     "outreachPotential": "High/Medium/Low with strategic reasoning"
   }
 ]
 
-CRITICAL: Make leads feel REAL - use realistic naming conventions, proper email formats, and specific reasons for outreach potential.`;
+CRITICAL REQUIREMENTS:
+1. ONLY use REAL, ACTIVE websites - NO fake domains like example.com, company.com, or generic names
+2. Include REAL LinkedIn company page URLs when possible
+3. If you're not sure a website exists, use the LinkedIn URL as primary contact
+4. Make leads feel REAL - use realistic naming conventions, proper email formats, and specific reasons for outreach potential.`;
 
     const options: LLMOptions = {
         type: 'reasoning',
@@ -168,8 +175,11 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
         size: item.size || criteria.companySize,
         contactEmail: item.contactEmail,
         contactName: item.contactName,
-        website: item.website,
-        linkedIn: item.linkedIn,
+        website: cleanUrl(item.website),
+        linkedIn: cleanUrl(item.linkedIn),
+        twitter: cleanUrl(item.twitter),
+        facebook: cleanUrl(item.facebook),
+        phone: item.phone,
         summary: item.summary || '',
         outreachPotential: item.outreachPotential?.split(' ')[0] || 'Medium',
         createdAt: new Date(),
@@ -177,63 +187,95 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
         isVerified: false // Will be updated after validation
     }));
 
-    // Step 4: Validate website URLs to ensure they are active
-    // STRICT MODE: Only return leads with verified active websites
-    console.log('[Leads] Validating website URLs (strict mode - active only)...');
-    const websiteUrls = leads
-        .map(l => l.website)
-        .filter((url): url is string => !!url && url.startsWith('http'));
+    // Helper function to clean URLs
+    function cleanUrl(url: string | undefined): string | undefined {
+        if (!url) return undefined;
+        // Remove description text like "(MUST be a real...)"
+        const cleaned = url.split('(')[0].trim();
+        if (cleaned.startsWith('http')) return cleaned;
+        return undefined;
+    }
 
-    if (websiteUrls.length > 0) {
+    // Step 4: Validate website AND LinkedIn URLs to ensure at least one is active
+    // ENHANCED MODE: Keep leads if website OR LinkedIn is active
+    console.log('[Leads] Validating website and LinkedIn URLs...');
+
+    // Collect all URLs to validate (websites + LinkedIn)
+    const allUrls: string[] = [];
+    leads.forEach(lead => {
+        if (lead.website && lead.website.startsWith('http')) {
+            allUrls.push(lead.website);
+        }
+        if (lead.linkedIn && lead.linkedIn.startsWith('http')) {
+            allUrls.push(lead.linkedIn);
+        }
+    });
+
+    if (allUrls.length > 0) {
         try {
-            const urlStatus = await validateUrls(websiteUrls, 5);
+            const urlStatus = await validateUrls(allUrls, 5);
 
-            // Update leads with validation status
+            // Update leads with validation status for both website and LinkedIn
             leads = leads.map(lead => {
-                if (lead.website && urlStatus.has(lead.website)) {
-                    const isActive = urlStatus.get(lead.website);
-                    return {
-                        ...lead,
-                        isVerified: isActive,
-                        notes: isActive ? '✓ Website verified active' : '⚠️ Website inactive'
-                    };
-                }
+                const websiteActive = lead.website ? urlStatus.get(lead.website) === true : false;
+                const linkedInActive = lead.linkedIn ? urlStatus.get(lead.linkedIn) === true : false;
+
+                // A lead is valid if either website OR LinkedIn is active
+                const hasVerifiedContact = websiteActive || linkedInActive;
+
+                let notes = '';
+                if (websiteActive) notes += '✓ Website active • ';
+                else if (lead.website) notes += '⚠️ Website inactive • ';
+                if (linkedInActive) notes += '✓ LinkedIn active';
+                else if (lead.linkedIn) notes += '⚠️ LinkedIn inactive';
+
                 return {
                     ...lead,
-                    isVerified: false,
-                    notes: '⚠️ No website to verify'
+                    isVerified: websiteActive,
+                    linkedInVerified: linkedInActive,
+                    hasBackupContact: hasVerifiedContact,
+                    notes: notes.trim().replace(/•\s*$/, '')
                 };
             });
 
-            // STRICT FILTERING: Only keep leads with VERIFIED ACTIVE websites
-            const activeLeads = leads.filter(lead => {
-                // Must have a website
-                if (!lead.website || !lead.website.startsWith('http')) {
-                    console.log(`[Leads] Filtered out "${lead.companyName}" - no valid website`);
-                    return false;
-                }
-                // Website must be verified as active
-                if (lead.isVerified !== true) {
-                    console.log(`[Leads] Filtered out "${lead.companyName}" - website inactive: ${lead.website}`);
+            // FLEXIBLE FILTERING: Keep leads with AT LEAST ONE verified contact (website OR LinkedIn)
+            const validLeads = leads.filter(lead => {
+                // Must have at least one working contact method
+                if (!lead.hasBackupContact) {
+                    // Check if it has any contact URLs at all
+                    const hasAnyUrl = lead.website || lead.linkedIn;
+                    if (!hasAnyUrl) {
+                        console.log(`[Leads] Filtered out "${lead.companyName}" - no contact URLs`);
+                    } else {
+                        console.log(`[Leads] Filtered out "${lead.companyName}" - all contacts inactive: Website: ${lead.website || 'none'}, LinkedIn: ${lead.linkedIn || 'none'}`);
+                    }
                     return false;
                 }
                 return true;
             });
 
-            const filteredCount = leads.length - activeLeads.length;
-            console.log(`[Leads] URL Validation Complete: ${activeLeads.length}/${leads.length} leads have active websites`);
+            const filteredCount = leads.length - validLeads.length;
+            const websiteOnlyCount = validLeads.filter(l => l.isVerified && !l.linkedInVerified).length;
+            const linkedInOnlyCount = validLeads.filter(l => !l.isVerified && l.linkedInVerified).length;
+            const bothActiveCount = validLeads.filter(l => l.isVerified && l.linkedInVerified).length;
+
+            console.log(`[Leads] URL Validation Complete: ${validLeads.length}/${leads.length} leads have at least one active contact`);
+            console.log(`[Leads] Breakdown: ${websiteOnlyCount} website-only, ${linkedInOnlyCount} LinkedIn-only, ${bothActiveCount} both active`);
             if (filteredCount > 0) {
-                console.log(`[Leads] Filtered out ${filteredCount} leads with inactive/missing websites`);
+                console.log(`[Leads] Filtered out ${filteredCount} leads with no active contacts`);
             }
-            leads = activeLeads;
+            leads = validLeads;
         } catch (e) {
-            console.warn('[Leads] URL validation failed, filtering leads without valid websites:', e);
-            // Even on error, filter out leads without proper websites
-            leads = leads.filter(lead => lead.website && lead.website.startsWith('http'));
+            console.warn('[Leads] URL validation failed, keeping leads with valid URL format:', e);
+            // On error, keep leads that at least have properly formatted URLs
+            leads = leads.filter(lead =>
+                (lead.website && lead.website.startsWith('http')) ||
+                (lead.linkedIn && lead.linkedIn.startsWith('http'))
+            );
         }
     } else {
-        // No websites to validate - filter out all leads without websites
-        console.warn('[Leads] No valid website URLs found in generated leads');
+        // No URLs to validate - filter out all leads
+        console.warn('[Leads] No valid URLs found in generated leads');
         leads = [];
     }
 
