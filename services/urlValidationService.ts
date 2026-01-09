@@ -219,14 +219,50 @@ function extractDomainFromUrl(url: string): string {
 }
 
 /**
- * Validate multiple URLs in parallel (with concurrency limit)
+ * Validate multiple URLs using server-side function
+ * This properly detects parked domains and redirects
  */
 export async function validateUrls(urls: string[], concurrency = 5): Promise<Map<string, boolean>> {
     const results = new Map<string, boolean>();
 
-    // Process in batches to avoid overwhelming the network
-    for (let i = 0; i < urls.length; i += concurrency) {
-        const batch = urls.slice(i, i + concurrency);
+    // First, do basic format validation and filter obvious fakes
+    const validFormatUrls: string[] = [];
+    for (const url of urls) {
+        if (!isValidUrlFormat(url)) {
+            console.log(`[URL Validation] Invalid format: ${url}`);
+            results.set(url, false);
+            continue;
+        }
+
+        // Pre-filter obvious fake domains
+        const domain = extractDomainFromUrl(url).toLowerCase();
+        if (isObviousFakeDomain(domain)) {
+            console.log(`[URL Validation] Obvious fake domain: ${domain}`);
+            results.set(url, false);
+            continue;
+        }
+
+        validFormatUrls.push(url);
+    }
+
+    if (validFormatUrls.length === 0) {
+        return results;
+    }
+
+    // Try to use the serverless function first (more accurate)
+    try {
+        const serverResults = await validateUrlsWithServer(validFormatUrls);
+        serverResults.forEach((isActive, url) => {
+            results.set(url, isActive);
+        });
+        return results;
+    } catch (serverError) {
+        console.warn('[URL Validation] Server validation failed, falling back to client-side:', serverError);
+    }
+
+    // Fallback: Use client-side validation
+    for (let i = 0; i < validFormatUrls.length; i += concurrency) {
+        const batch = validFormatUrls.slice(i, i + concurrency);
         const checks = await Promise.all(
             batch.map(async url => ({
                 url,
@@ -237,6 +273,79 @@ export async function validateUrls(urls: string[], concurrency = 5): Promise<Map
         checks.forEach(({ url, isActive }) => {
             results.set(url, isActive);
         });
+    }
+
+    return results;
+}
+
+/**
+ * Check if domain is obviously fake (without network request)
+ */
+function isObviousFakeDomain(domain: string): boolean {
+    const fakeDomainPatterns = [
+        'example.com', 'sample.com', 'test.com', 'placeholder.com',
+        'domain.com', 'company.com', 'yourcompany.com', 'website.com',
+        'fake.com', 'dummy.com', 'acme.com', 'lorem.com',
+        'tempurl.', 'localhost', '127.0.0.1', '0.0.0.0',
+        'parked', 'forsale', 'expired', 'thisdomain', 'domainpending',
+    ];
+
+    const genericPatterns = [
+        /^(www\.)?business\d*\.(com|net|org)$/,
+        /^(www\.)?company\d*\.(com|net|org)$/,
+        /^(www\.)?enterprise\d*\.(com|net|org)$/,
+    ];
+
+    if (fakeDomainPatterns.some(fake => domain.includes(fake))) {
+        return true;
+    }
+
+    if (genericPatterns.some(pattern => pattern.test(domain))) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Validate URLs using the Netlify serverless function
+ */
+async function validateUrlsWithServer(urls: string[]): Promise<Map<string, boolean>> {
+    const results = new Map<string, boolean>();
+
+    // Determine the API base URL
+    const baseUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : '';
+
+    const response = await fetch(`${baseUrl}/.netlify/functions/validate-urls`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ urls }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server validation failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.results) {
+        for (const result of data.results) {
+            const isActive = result.isActive === true;
+            results.set(result.url, isActive);
+
+            if (!isActive && result.reason) {
+                console.log(`[URL Validation] ${result.url} - Inactive: ${result.reason} (${result.detail || ''})`);
+            } else if (isActive) {
+                console.log(`[URL Validation] ${result.url} - Active ✓`);
+            }
+
+            // Cache the result
+            cacheUrlCheck(result.url, { isActive, timestamp: Date.now() });
+        }
     }
 
     return results;
