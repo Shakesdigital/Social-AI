@@ -178,7 +178,8 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
     }));
 
     // Step 4: Validate website URLs to ensure they are active
-    console.log('[Leads] Validating website URLs...');
+    // STRICT MODE: Only return leads with verified active websites
+    console.log('[Leads] Validating website URLs (strict mode - active only)...');
     const websiteUrls = leads
         .map(l => l.website)
         .filter((url): url is string => !!url && url.startsWith('http'));
@@ -187,31 +188,53 @@ Always return valid JSON arrays with realistic, actionable lead data.`,
         try {
             const urlStatus = await validateUrls(websiteUrls, 5);
 
-            // Update leads with validation status and filter inactive ones
+            // Update leads with validation status
             leads = leads.map(lead => {
                 if (lead.website && urlStatus.has(lead.website)) {
                     const isActive = urlStatus.get(lead.website);
                     return {
                         ...lead,
                         isVerified: isActive,
-                        // Mark inactive leads in notes
-                        notes: isActive ? '' : '⚠️ Website may be inactive'
+                        notes: isActive ? '✓ Website verified active' : '⚠️ Website inactive'
                     };
                 }
-                return lead;
+                return {
+                    ...lead,
+                    isVerified: false,
+                    notes: '⚠️ No website to verify'
+                };
             });
 
-            // Filter to only keep leads with active websites (or no website)
+            // STRICT FILTERING: Only keep leads with VERIFIED ACTIVE websites
             const activeLeads = leads.filter(lead => {
-                if (!lead.website) return true; // Keep leads without websites
-                return lead.isVerified !== false; // Keep verified or unknown status
+                // Must have a website
+                if (!lead.website || !lead.website.startsWith('http')) {
+                    console.log(`[Leads] Filtered out "${lead.companyName}" - no valid website`);
+                    return false;
+                }
+                // Website must be verified as active
+                if (lead.isVerified !== true) {
+                    console.log(`[Leads] Filtered out "${lead.companyName}" - website inactive: ${lead.website}`);
+                    return false;
+                }
+                return true;
             });
 
-            console.log(`[Leads] URL Validation: ${activeLeads.length}/${leads.length} leads have active websites`);
+            const filteredCount = leads.length - activeLeads.length;
+            console.log(`[Leads] URL Validation Complete: ${activeLeads.length}/${leads.length} leads have active websites`);
+            if (filteredCount > 0) {
+                console.log(`[Leads] Filtered out ${filteredCount} leads with inactive/missing websites`);
+            }
             leads = activeLeads;
         } catch (e) {
-            console.warn('[Leads] URL validation failed, returning unvalidated leads:', e);
+            console.warn('[Leads] URL validation failed, filtering leads without valid websites:', e);
+            // Even on error, filter out leads without proper websites
+            leads = leads.filter(lead => lead.website && lead.website.startsWith('http'));
         }
+    } else {
+        // No websites to validate - filter out all leads without websites
+        console.warn('[Leads] No valid website URLs found in generated leads');
+        leads = [];
     }
 
     // Track in memory to avoid future duplicates

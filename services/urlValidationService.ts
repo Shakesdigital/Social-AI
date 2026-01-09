@@ -87,37 +87,114 @@ function cacheUrlCheck(url: string, data: CachedUrlCheck): void {
 
 /**
  * Check if a URL is active (responds with 2xx or 3xx)
+ * Uses multiple methods to validate URLs as accurately as possible
  */
 export async function checkUrlActive(url: string, timeout = 5000): Promise<boolean> {
+    // First, validate URL format and filter obvious fake domains
+    if (!isValidUrlFormat(url)) {
+        console.log(`[URL Check] Invalid URL format: ${url}`);
+        return false;
+    }
+
     // Check cache first
     const cached = getCachedUrlCheck(url);
     if (cached !== null) {
         return cached.isActive;
     }
 
+    // Filter out common placeholder/fake domains
+    const domain = extractDomainFromUrl(url).toLowerCase();
+    const fakeDomainPatterns = [
+        'example.com', 'sample.com', 'test.com', 'placeholder.com',
+        'domain.com', 'company.com', 'yourcompany.com', 'website.com',
+        'fake.com', 'dummy.com', 'acme.com', 'lorem.com',
+        'tempurl.', 'localhost', '127.0.0.1', '0.0.0.0'
+    ];
+
+    if (fakeDomainPatterns.some(fake => domain.includes(fake))) {
+        console.log(`[URL Check] Filtered suspicious domain: ${domain}`);
+        cacheUrlCheck(url, { isActive: false, timestamp: Date.now() });
+        return false;
+    }
+
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        // Use HEAD request for faster checking
+        // Method 1: Try with cors mode first (more accurate but may fail due to CORS)
+        try {
+            const response = await fetch(url, {
+                method: 'HEAD',
+                mode: 'cors',
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; URLValidator/1.0)'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            const isActive = response.ok || response.status < 400;
+            console.log(`[URL Check] ${url} - Status: ${response.status}, Active: ${isActive}`);
+            cacheUrlCheck(url, { isActive, timestamp: Date.now() });
+            return isActive;
+        } catch (corsError) {
+            // CORS blocked - try no-cors fallback
+            clearTimeout(timeoutId);
+        }
+
+        // Method 2: Try no-cors (less accurate but catches network errors)
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), timeout);
+
         const response = await fetch(url, {
             method: 'HEAD',
-            mode: 'no-cors', // Allows checking even with CORS restrictions
-            signal: controller.signal,
+            mode: 'no-cors',
+            signal: controller2.signal,
         });
 
-        clearTimeout(timeoutId);
+        clearTimeout(timeoutId2);
 
-        // In no-cors mode, we can't access status, but if no error, it's likely active
-        const isActive = true;
+        // In no-cors mode, if we get here without error, the site likely exists
+        // But we can't verify the status code, so mark as potentially active
+        console.log(`[URL Check] ${url} - no-cors check passed (site exists)`);
+        cacheUrlCheck(url, { isActive: true, timestamp: Date.now() });
+        return true;
 
-        cacheUrlCheck(url, { isActive, timestamp: Date.now() });
-        return isActive;
     } catch (error: any) {
-        // Network error or timeout means the site is likely down
-        console.log(`[URL Check] ${url} appears inactive:`, error.message);
+        // Network error, timeout, or DNS failure means the site is down
+        console.log(`[URL Check] ${url} appears inactive:`, error.message || error.name);
         cacheUrlCheck(url, { isActive: false, timestamp: Date.now() });
         return false;
+    }
+}
+
+/**
+ * Validate URL format
+ */
+function isValidUrlFormat(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        // Must be http or https
+        if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+        // Must have a valid hostname
+        if (!parsed.hostname || parsed.hostname.length < 4) return false;
+        // Must have a TLD
+        if (!parsed.hostname.includes('.')) return false;
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Extract domain from URL
+ */
+function extractDomainFromUrl(url: string): string {
+    try {
+        return new URL(url).hostname.replace('www.', '');
+    } catch {
+        return '';
     }
 }
 
