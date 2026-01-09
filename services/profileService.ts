@@ -111,72 +111,70 @@ export const saveProfile = async (userId: string, profile: CompanyProfile): Prom
     console.log(`[ProfileService] Saving profile "${profile.name}" (${profile.id}) for user ${userId.substring(0, 8)}...`);
 
     try {
-        // Use composite key: user_id + profile_id
-        // First check if this profile already exists
-        const { data: existingProfile, error: selectError } = await supabase
+        // Build the profile data object
+        const profileData = {
+            user_id: userId,
+            profile_id: profile.id,
+            name: profile.name || '',
+            industry: profile.industry || '',
+            description: profile.description || '',
+            target_audience: profile.targetAudience || '',
+            brand_voice: profile.brandVoice || '',
+            goals: profile.goals || '',
+            website: profile.website || '',
+            updated_at: new Date().toISOString(),
+        };
+
+        // Use UPSERT - this will insert if doesn't exist, or update if it does
+        const { data, error } = await supabase
             .from('profiles')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('profile_id', profile.id)
-            .single();
+            .upsert(profileData, {
+                onConflict: 'user_id,profile_id', // Composite key
+                ignoreDuplicates: false, // Update if exists
+            })
+            .select();
 
-        if (selectError && selectError.code !== 'PGRST116') {
-            console.error('[ProfileService] Error checking existing profile:', selectError);
-        }
+        if (error) {
+            console.error('[ProfileService] ❌ Error saving profile:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+            });
 
-        if (existingProfile) {
-            // Update existing profile
-            console.log('[ProfileService] Profile exists, updating...');
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    name: profile.name,
-                    industry: profile.industry,
-                    description: profile.description,
-                    target_audience: profile.targetAudience,
-                    brand_voice: profile.brandVoice,
-                    goals: profile.goals,
-                    website: profile.website || '',
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('user_id', userId)
-                .eq('profile_id', profile.id);
-
-            if (error) {
-                console.error('[ProfileService] ❌ Error updating profile:', error);
-                return false;
-            }
-            console.log('[ProfileService] ✅ Profile updated successfully:', profile.id);
-        } else {
-            // Insert new profile
-            console.log('[ProfileService] Profile is new, inserting...');
-            const { error } = await supabase
-                .from('profiles')
-                .insert({
+            // If the error is about missing columns, try with minimal data
+            if (error.message?.includes('column') || error.code === '42703') {
+                console.log('[ProfileService] Trying with minimal columns...');
+                const minimalData = {
                     user_id: userId,
                     profile_id: profile.id,
-                    name: profile.name,
-                    industry: profile.industry,
-                    description: profile.description,
-                    target_audience: profile.targetAudience,
-                    brand_voice: profile.brandVoice,
-                    goals: profile.goals,
-                    website: profile.website || '',
-                    created_at: profile.createdAt || new Date().toISOString(),
+                    name: profile.name || '',
                     updated_at: new Date().toISOString(),
-                });
+                };
 
-            if (error) {
-                console.error('[ProfileService] ❌ Error inserting profile:', error);
-                console.error('[ProfileService] This might mean the profiles table is missing the profile_id column');
-                return false;
+                const { error: minimalError } = await supabase
+                    .from('profiles')
+                    .upsert(minimalData, {
+                        onConflict: 'user_id,profile_id',
+                        ignoreDuplicates: false,
+                    });
+
+                if (minimalError) {
+                    console.error('[ProfileService] ❌ Minimal save also failed:', minimalError);
+                    return false;
+                }
+
+                console.log('[ProfileService] ✅ Profile saved with minimal data');
+                return true;
             }
-            console.log('[ProfileService] ✅ Profile inserted successfully:', profile.id);
+
+            return false;
         }
 
+        console.log('[ProfileService] ✅ Profile saved successfully:', profile.id);
         return true;
-    } catch (error) {
-        console.error('[ProfileService] ❌ Error saving profile:', error);
+    } catch (error: any) {
+        console.error('[ProfileService] ❌ Exception saving profile:', error?.message || error);
         return false;
     }
 };
