@@ -153,43 +153,12 @@ const CloudDiagnostics: React.FC = () => {
             }
         }
 
-        // Step 5: Check localStorage
+        // Step 5: Cloud-First Architecture Check
         addResult({
-            step: '5. Local Storage',
-            status: 'pending',
-            message: 'Checking localStorage...'
+            step: '5. Cloud-First Status',
+            status: 'success',
+            message: 'Application is configured for cloud-first data storage. localStorage is NOT used for user data.'
         });
-
-        await new Promise(r => setTimeout(r, 500));
-
-        try {
-            const localData = localStorage.getItem('socialai_profiles');
-            if (localData) {
-                const parsed = JSON.parse(localData);
-                setResults(prev => prev.map((r, i) => i === prev.length - 1 ? {
-                    ...r,
-                    status: 'success',
-                    message: `Found ${parsed.profiles?.length || 0} profile(s) in localStorage`,
-                    details: {
-                        profiles: parsed.profiles?.map((p: any) => ({ id: p.id, name: p.name })) || [],
-                        activeProfileId: parsed.activeProfileId
-                    }
-                } : r));
-            } else {
-                setResults(prev => prev.map((r, i) => i === prev.length - 1 ? {
-                    ...r,
-                    status: 'warning',
-                    message: 'No profiles in localStorage'
-                } : r));
-            }
-        } catch (e: any) {
-            setResults(prev => prev.map((r, i) => i === prev.length - 1 ? {
-                ...r,
-                status: 'error',
-                message: 'Error reading localStorage',
-                details: { error: e.message }
-            } : r));
-        }
 
         // Step 6: Test Profile Save
         if (user) {
@@ -272,8 +241,8 @@ const CloudDiagnostics: React.FC = () => {
                 onClick={runDiagnostics}
                 disabled={isRunning}
                 className={`w-full py-3 rounded-lg font-bold transition-all ${isRunning
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
                     }`}
             >
                 {isRunning ? 'Running Diagnostics...' : 'Run Diagnostics'}

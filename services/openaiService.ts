@@ -624,13 +624,25 @@ You're like having a CMO on speed dial. Be helpful, specific, and actionable.`
  * Expert-level content crafted with 10+ years of social media expertise
  */
 export const generateBatchContent = async (profile: CompanyProfile, config: AutoPilotConfig) => {
+  console.log('[generateBatchContent] Starting with config:', {
+    cadence: config.cadence,
+    postingFrequency: config.postingFrequency,
+    autoApprove: config.autoApprove
+  });
+
   const platforms = Object.entries(config.postingFrequency)
     .filter(([_, count]) => count > 0)
     .map(([platform, count]) => ({ platform, count }));
 
-  if (platforms.length === 0) return [];
+  console.log('[generateBatchContent] Active platforms:', platforms);
+
+  if (platforms.length === 0) {
+    console.warn('[generateBatchContent] No platforms configured with frequency > 0. Returning empty array.');
+    return [];
+  }
 
   const totalPosts = platforms.reduce((acc, curr) => acc + curr.count, 0);
+  console.log('[generateBatchContent] Total posts to generate:', totalPosts);
 
   // Get business context and topics to avoid
   const businessContext = getBusinessContext(profile);
@@ -760,10 +772,62 @@ Respond with ONLY valid JSON. No explanations, no markdown.`,
       maxTokens: 4000
     });
 
-    const parsed = parseJSONFromLLM<any>(response.text);
-    if (!parsed) return [];
+    console.log('[generateBatchContent] Raw response length:', response.text.length);
+    console.log('[generateBatchContent] Response preview:', response.text.substring(0, 500));
 
-    const planData = parsed.posts || parsed.content || [];
+    const parsed = parseJSONFromLLM<any>(response.text);
+    if (!parsed) {
+      console.error('[generateBatchContent] Failed to parse JSON from LLM response.');
+      console.error('[generateBatchContent] Full response:', response.text);
+      throw new Error('Failed to parse content generation response. The AI returned an unexpected format.');
+    }
+
+    console.log('[generateBatchContent] Parsed result type:', Array.isArray(parsed) ? 'array' : typeof parsed);
+    if (!Array.isArray(parsed)) {
+      console.log('[generateBatchContent] Parsed object keys:', Object.keys(parsed));
+    }
+
+    // Handle both array and object responses
+    // LLM might return [{...}] directly or {"posts": [{...}]}
+    let planData: any[];
+    if (Array.isArray(parsed)) {
+      planData = parsed;
+      console.log('[generateBatchContent] Using parsed array directly');
+    } else {
+      // Try multiple possible keys for the posts array
+      planData = parsed.posts || parsed.content || parsed.results || parsed.items || parsed.data || [];
+      console.log('[generateBatchContent] Extracted posts from key, found:', planData.length);
+    }
+
+    if (!Array.isArray(planData)) {
+      console.error('[generateBatchContent] planData is not an array:', typeof planData, planData);
+      throw new Error('Content generation returned invalid data structure.');
+    }
+
+    // Validate that posts have required fields
+    const validPosts = planData.filter((item: any) => {
+      const isValid = item && typeof item === 'object' &&
+        (item.platform || item.Platform) &&
+        (item.caption || item.Caption || item.content || item.Content);
+      if (!isValid) {
+        console.warn('[generateBatchContent] Skipping invalid post item:', JSON.stringify(item).substring(0, 100));
+      }
+      return isValid;
+    });
+
+    if (validPosts.length === 0 && planData.length > 0) {
+      console.warn('[generateBatchContent] All parsed posts were invalid. Sample:', JSON.stringify(planData[0]).substring(0, 200));
+    }
+
+    if (validPosts.length === 0) {
+      console.warn('[generateBatchContent] No valid posts found after filtering');
+      console.warn('[generateBatchContent] Parsed structure:', JSON.stringify(parsed, null, 2).substring(0, 1000));
+    } else {
+      console.log('[generateBatchContent] Successfully parsed', validPosts.length, 'valid posts out of', planData.length);
+    }
+
+    // Use validPosts instead of planData going forward
+    const postsData = validPosts;
 
     const posts: SocialPost[] = [];
     const today = new Date();
@@ -773,8 +837,9 @@ Respond with ONLY valid JSON. No explanations, no markdown.`,
 
     // Group posts by platform to distribute them evenly
     const platformPosts: { [key: string]: any[] } = {};
-    planData.forEach((item: any) => {
-      const platform = item.platform;
+    postsData.forEach((item: any) => {
+      // Handle both 'platform' and 'Platform' keys
+      const platform = item.platform || item.Platform || 'Instagram';
       if (!platformPosts[platform]) platformPosts[platform] = [];
       platformPosts[platform].push(item);
     });
@@ -795,7 +860,7 @@ Respond with ONLY valid JSON. No explanations, no markdown.`,
         postDate.setDate(today.getDate() + dayOffset + 1); // Start from tomorrow
 
         // Parse suggested time or use default optimal times
-        let postTime = item.bestTime || '10:00 AM';
+        let postTime = item.bestTime || item.BestTime || item.best_time || item.time || item.Time || '10:00 AM';
         const timeMatch = postTime.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
         if (timeMatch) {
           let hours = parseInt(timeMatch[1]);
@@ -814,18 +879,24 @@ Respond with ONLY valid JSON. No explanations, no markdown.`,
           postDate.setHours(defaultTimes[platform] || 10, 0, 0, 0);
         }
 
+        // Extract properties with case-insensitive fallback
+        const itemPlatform = item.platform || item.Platform || platform;
+        const itemTopic = item.topic || item.Topic || 'Untitled';
+        const itemCaption = item.caption || item.Caption || item.content || item.Content || '';
+        const itemImagePrompt = item.imagePrompt || item.ImagePrompt || item.image_prompt || `Image for ${itemTopic}`;
+
         posts.push({
           id: Date.now() + globalIndex + Math.random().toString(),
           date: postDate,
-          platform: item.platform as any,
-          topic: item.topic,
-          caption: item.caption,
-          imagePrompt: item.imagePrompt,
+          platform: itemPlatform as any,
+          topic: itemTopic,
+          caption: itemCaption,
+          imagePrompt: itemImagePrompt,
           status: 'PendingApproval'
         });
 
         // Track each topic in memory
-        addGeneratedTopic(item.topic);
+        addGeneratedTopic(itemTopic);
         globalIndex++;
       });
     });

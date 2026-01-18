@@ -17,24 +17,11 @@ interface QuickAction {
   prompt: string;
 }
 
-const CHAT_STORAGE_KEY = 'marketmi_chat_history';
-
 export const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Load chat history from localStorage
-  const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-      const saved = localStorage.getItem(CHAT_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed : [];
-      }
-    } catch (e) {
-      console.warn('[ChatBot] Failed to load chat history');
-    }
-    return [];
-  });
+  // Chat history is session-only (no localStorage persistence for cloud-first approach)
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResearching, setIsResearching] = useState(false);
@@ -42,18 +29,15 @@ export const ChatBot: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Voice input state
+  // Voice input state - defaults to off (no localStorage)
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceModeEnabled, setVoiceModeEnabled] = useState(() => {
-    return localStorage.getItem('marketmi_voice_mode') === 'true';
-  });
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Toggle voice mode - stops speaking when disabled
   const toggleVoiceMode = () => {
     const newState = !voiceModeEnabled;
     setVoiceModeEnabled(newState);
-    localStorage.setItem('marketmi_voice_mode', String(newState));
 
     if (!newState) {
       // Turning OFF - stop any speaking
@@ -139,10 +123,7 @@ export const ChatBot: React.FC = () => {
 
   // Speak AI response when voice mode is on
   const speakResponse = async (text: string) => {
-    // Check both state and localStorage for consistency
-    const isVoiceOn = voiceModeEnabled || localStorage.getItem('marketmi_voice_mode') === 'true';
-
-    if (isVoiceOn) {
+    if (voiceModeEnabled) {
       setIsSpeaking(true);
       try {
         await ttsSpeak(text, 'female', {
@@ -171,21 +152,9 @@ export const ChatBot: React.FC = () => {
     if (isOpen) scrollToBottom();
   }, [messages, isOpen]);
 
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    if (messages.length > 0) {
-      try {
-        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
-      } catch (e) {
-        console.warn('[ChatBot] Failed to save chat history');
-      }
-    }
-  }, [messages]);
-
   // Clear all chat history
   const clearChatHistory = () => {
     setMessages([]);
-    localStorage.removeItem(CHAT_STORAGE_KEY);
     ttsStopSpeaking();
     setIsSpeaking(false);
   };

@@ -6,38 +6,16 @@ interface LandingPageProps {
   onSignIn: () => void;  // For NEW users - goes to auth then onboarding
   onLogIn: () => void;   // For EXISTING users - goes to auth then dashboard
   onContinueAsUser?: (profile: CompanyProfile) => void;
+  existingProfile?: CompanyProfile | null;  // Passed from App.tsx (cloud-loaded)
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onContinueAsUser }) => {
-  const [existingProfile, setExistingProfile] = useState<CompanyProfile | null>(null);
-  const [showLoginOption, setShowLoginOption] = useState(false);
-
-  // Check if there's an existing profile for returning users
-  useEffect(() => {
-    try {
-      // Check if user manually logged out - don't show "Welcome back" card
-      const isLoggedOut = localStorage.getItem('socialai_logged_out') === 'true';
-      if (isLoggedOut) {
-        setExistingProfile(null);
-        setShowLoginOption(false);
-        return;
-      }
-
-      const savedProfile = localStorage.getItem('socialai_profile');
-      if (savedProfile) {
-        const profile = JSON.parse(savedProfile) as CompanyProfile;
-        setExistingProfile(profile);
-        setShowLoginOption(true);
-      }
-    } catch (e) {
-      console.error('Failed to load existing profile:', e);
-    }
-  }, []);
+export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn, onLogIn, onContinueAsUser, existingProfile: propProfile }) => {
+  // Show login option if a profile is passed from parent (cloud-loaded)
+  const showLoginOption = !!propProfile;
+  const existingProfile = propProfile || null;
 
   const handleContinueAsUser = () => {
     if (existingProfile && onContinueAsUser) {
-      // Clear logged out flag and continue
-      localStorage.removeItem('socialai_logged_out');
       onContinueAsUser(existingProfile);
     }
   };

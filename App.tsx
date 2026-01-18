@@ -47,7 +47,7 @@ import { generateMarketResearch, generateMarketingStrategy, generateContentTopic
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, fetchAllProfiles, saveProfile, saveAllProfiles } from './services/profileService';
 import { markOnboardingComplete, hasCompletedOnboarding } from './services/authService';
-import { fetchAllProfileData, saveUserData, DataType } from './services/dataService';
+import { fetchAllProfileData, saveUserData, saveAllProfileData, DataType } from './services/dataService';
 import { supabase } from './services/supabase';
 import {
   createSession,
@@ -559,59 +559,10 @@ export default function App() {
   // Auth state from Supabase
   const { user, isAuthenticated, logout: authLogout, isLoading: authLoading } = useAuth();
 
-  // Multi-profile state management
-  const [allProfiles, setAllProfiles] = useState<CompanyProfile[]>(() => {
-    console.log('[Profile Init] Initializing profiles from localStorage...');
-    try {
-      // Try to load profiles store first
-      const saved = localStorage.getItem('socialai_profiles');
-      if (saved) {
-        const store: ProfilesStore = JSON.parse(saved);
-        console.log(`[Profile Init] Found ${store.profiles?.length || 0} profile(s) in localStorage`);
-        if (store.profiles && store.profiles.length > 0) {
-          console.log('[Profile Init] Profiles:', store.profiles.map(p => ({ id: p.id, name: p.name })));
-          return store.profiles;
-        }
-      }
-      // Migrate from old single profile format
-      const oldProfile = localStorage.getItem('socialai_profile');
-      if (oldProfile) {
-        console.log('[Profile Init] Found old single profile format, migrating...');
-        const parsed = JSON.parse(oldProfile);
-        // Add ID if missing (migration)
-        const migratedProfile = {
-          ...parsed,
-          id: parsed.id || 'profile_' + Date.now(),
-          createdAt: parsed.createdAt || new Date().toISOString()
-        };
-        return [migratedProfile];
-      }
-      console.log('[Profile Init] No profiles found in localStorage');
-      return [];
-    } catch (e) {
-      console.error("[Profile Init] Failed to load profiles from localStorage:", e);
-      return [];
-    }
-  });
-
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(() => {
-    try {
-      const saved = localStorage.getItem('socialai_profiles');
-      if (saved) {
-        const store: ProfilesStore = JSON.parse(saved);
-        return store.activeProfileId;
-      }
-      // Check for old format
-      const oldProfile = localStorage.getItem('socialai_profile');
-      if (oldProfile) {
-        const parsed = JSON.parse(oldProfile);
-        return parsed.id || 'profile_' + Date.now();
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  });
+  // Multi-profile state management - CLOUD ONLY, no localStorage
+  // Profiles are loaded from Supabase when user authenticates
+  const [allProfiles, setAllProfiles] = useState<CompanyProfile[]>([]);
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
   // Derived state: current active profile
   const profile = allProfiles.find(p => p.id === activeProfileId) || null;
@@ -619,41 +570,31 @@ export default function App() {
   // Track if we've completed cloud sync (to prevent showing empty state before sync)
   const [cloudSyncComplete, setCloudSyncComplete] = useState(false);
 
-  // Save profiles to localStorage AND cloud whenever they change
+  // Loading state for cloud data fetch
+  const [isLoadingCloudData, setIsLoadingCloudData] = useState(false);
+
+  // Save profiles to cloud whenever they change (CLOUD ONLY - no localStorage)
   // CRITICAL: Only save when we have actual data to prevent overwriting with empty arrays
   useEffect(() => {
     // SAFETY: Don't save empty profiles - this would overwrite valid data!
     if (allProfiles.length === 0) {
-      console.log('[Profile] Skipping save - no profiles to save');
+      console.log('[Cloud] Skipping save - no profiles to save');
       return;
     }
 
-    // Save to localStorage
-    const store: ProfilesStore = {
-      profiles: allProfiles,
-      activeProfileId
-    };
-    localStorage.setItem('socialai_profiles', JSON.stringify(store));
-    console.log(`[Profile] Saved ${allProfiles.length} profile(s) to localStorage`);
-
-    // Keep old format updated for backward compatibility
-    if (profile) {
-      localStorage.setItem('socialai_profile', JSON.stringify(profile));
-    }
-
-    // Also sync ALL profiles to cloud if authenticated (this ensures cloud is always up-to-date)
+    // Sync ALL profiles to cloud if authenticated
     if (isAuthenticated && user) {
       // Debounce cloud saves to prevent excessive API calls
       const timeoutId = setTimeout(() => {
-        console.log('[Profile] Syncing profiles to cloud...');
+        console.log('[Cloud] Syncing profiles to cloud...');
         saveAllProfiles(user.id, allProfiles).then(success => {
           if (success) {
-            console.log('[Profile] ✅ All profiles synced to cloud successfully');
+            console.log('[Cloud] ✅ All profiles synced to cloud successfully');
           } else {
-            console.error('[Profile] ❌ Cloud sync returned false - check Supabase connection');
+            console.error('[Cloud] ❌ Cloud sync returned false - check Supabase connection');
           }
         }).catch(e => {
-          console.error('[Profile] ❌ Failed to sync profiles to cloud:', e);
+          console.error('[Cloud] ❌ Failed to sync profiles to cloud:', e);
         });
       }, 1000); // Wait 1 second after last change before syncing
 
@@ -661,158 +602,134 @@ export default function App() {
     }
   }, [allProfiles, activeProfileId, profile, isAuthenticated, user]);
 
-  // Fetch profiles from cloud on mount if authenticated (recovers data after localStorage clear)
-  // This is the MOST IMPORTANT effect - cloud is the source of truth
+  // Fetch profiles from cloud when user authenticates (CLOUD IS SOURCE OF TRUTH)
   useEffect(() => {
-    const syncFromCloud = async () => {
+    const loadFromCloud = async () => {
       if (!isAuthenticated || !user || authLoading) {
-        console.log('[PROFILE RECOVERY] Skipping - not ready:', { isAuthenticated, hasUser: !!user, authLoading });
+        console.log('[Cloud] Skipping load - not ready:', { isAuthenticated, hasUser: !!user, authLoading });
         return;
       }
 
       console.log('='.repeat(60));
-      console.log('[PROFILE RECOVERY] Checking cloud database for profiles...');
-      console.log('[PROFILE RECOVERY] User ID:', user.id);
-      console.log('[PROFILE RECOVERY] User Email:', user.email);
-      console.log('[PROFILE RECOVERY] Current local profiles:', allProfiles.length);
+      console.log('[Cloud] Loading profiles from cloud database...');
+      console.log('[Cloud] User ID:', user.id);
+      console.log('[Cloud] User Email:', user.email);
       console.log('='.repeat(60));
 
+      setIsLoadingCloudData(true);
+
       try {
-        // Fetch from cloud
+        // Fetch ALL profiles for this user from cloud
         const cloudProfiles = await fetchAllProfiles(user.id);
 
-        console.log('[PROFILE RECOVERY] Found', cloudProfiles.length, 'profile(s) in cloud');
+        console.log('[Cloud] Found', cloudProfiles.length, 'profile(s) in cloud');
 
         if (cloudProfiles.length > 0) {
           cloudProfiles.forEach((p, i) => {
-            console.log(`  Cloud [${i + 1}]: ${p.name} (${p.id})`);
+            console.log(`  [${i + 1}]: ${p.name} (${p.id})`);
           });
-        }
 
-        // Get current local profiles (use a fresh read from state)
-        const currentLocalProfiles = allProfiles;
+          // Set profiles from cloud
+          setAllProfiles(cloudProfiles);
 
-        if (currentLocalProfiles.length > 0) {
-          currentLocalProfiles.forEach((p, i) => {
-            console.log(`  Local [${i + 1}]: ${p.name} (${p.id})`);
-          });
-        }
-
-        // MERGE STRATEGY:
-        // 1. Start with cloud profiles (they're the source of truth for saved profiles)
-        // 2. Add any local profiles that don't exist in cloud (newly created profiles)
-        // This prevents losing profiles that were just created but not synced yet
-
-        const cloudProfileIds = new Set(cloudProfiles.map(p => p.id));
-        const localOnlyProfiles = currentLocalProfiles.filter(p => !cloudProfileIds.has(p.id));
-
-        if (localOnlyProfiles.length > 0) {
-          console.log('[PROFILE RECOVERY] Found', localOnlyProfiles.length, 'local-only profile(s) to preserve');
-          localOnlyProfiles.forEach(p => console.log(`  - ${p.name} (${p.id})`));
-        }
-
-        // Merge: cloud profiles + local-only profiles
-        const mergedProfiles = [...cloudProfiles, ...localOnlyProfiles];
-
-        if (mergedProfiles.length > 0) {
-          console.log('[PROFILE RECOVERY] ✅ Setting', mergedProfiles.length, 'merged profile(s)');
-          setAllProfiles(mergedProfiles);
-
-          // Restore active profile - prefer current active, then localStorage, then first profile
-          let activeId = activeProfileId;
-
-          // If current active doesn't exist in merged, try localStorage
-          if (!activeId || !mergedProfiles.some(p => p.id === activeId)) {
-            const storedProfilesData = localStorage.getItem('socialai_profiles');
-            if (storedProfilesData) {
-              try {
-                const parsed = JSON.parse(storedProfilesData);
-                if (parsed.activeProfileId && mergedProfiles.some(p => p.id === parsed.activeProfileId)) {
-                  activeId = parsed.activeProfileId;
-                }
-              } catch (e) { /* ignore */ }
-            }
+          // Set active profile to first one if not already set
+          if (!activeProfileId || !cloudProfiles.some(p => p.id === activeProfileId)) {
+            setActiveProfileId(cloudProfiles[0].id);
           }
 
-          // Fallback to first profile
-          if (!activeId || !mergedProfiles.some(p => p.id === activeId)) {
-            activeId = mergedProfiles[0].id;
-          }
-
-          setActiveProfileId(activeId);
-
-          // Update localStorage to match merged state
-          localStorage.setItem('socialai_profiles', JSON.stringify({
-            profiles: mergedProfiles,
-            activeProfileId: activeId
-          }));
-
-          console.log('[PROFILE RECOVERY] ✅ Profile state restored, active:', activeId);
-
-          // Sync any local-only profiles to cloud
-          if (localOnlyProfiles.length > 0) {
-            console.log('[PROFILE RECOVERY] Syncing local-only profiles to cloud...');
-            for (const p of localOnlyProfiles) {
-              await saveProfile(user.id, p);
-            }
-          }
-        } else if (currentLocalProfiles.length === 0) {
-          console.log('[PROFILE RECOVERY] ⚠️ No profiles found anywhere for this user.');
+          console.log('[Cloud] ✅ Profiles loaded from cloud');
         } else {
-          console.log('[PROFILE RECOVERY] Using', currentLocalProfiles.length, 'local profile(s)');
+          console.log('[Cloud] No profiles found for this user');
         }
       } catch (e) {
-        console.error('[PROFILE RECOVERY] ❌ Failed to fetch profiles from cloud:', e);
+        console.error('[Cloud] ❌ Failed to fetch profiles from cloud:', e);
+      } finally {
+        setIsLoadingCloudData(false);
+        setCloudSyncComplete(true);
       }
 
       console.log('='.repeat(60));
-
-      // Mark that we've synced
-      localStorage.setItem('socialai_last_cloud_sync', new Date().toISOString());
-      setCloudSyncComplete(true);
     };
 
-    syncFromCloud();
+    loadFromCloud();
   }, [isAuthenticated, user, authLoading]);
 
-  // Periodic cloud sync every 2 minutes (ensures data is never lost)
+  // Periodic cloud sync every 2 minutes (ensures data is never lost across devices)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
     const interval = setInterval(async () => {
+      console.log('[Sync] Starting periodic cloud sync...');
+
+      // Sync profiles
       if (allProfiles.length > 0) {
-        console.log('[Profile] Periodic cloud sync...');
+        console.log('[Sync] Syncing profiles...');
         await saveAllProfiles(user.id, allProfiles);
       }
+
+      // Sync all component data for active profile
+      if (activeProfileId) {
+        const allData: Record<DataType, any> = {
+          calendar: calendarState,
+          leads: leadsState,
+          email: emailState,
+          blog: blogState,
+          research: researchState,
+          strategy: strategyState
+        };
+
+        const hasData = Object.values(allData).some(v => v !== null);
+        if (hasData) {
+          console.log('[Sync] Syncing component data for profile:', activeProfileId);
+          await saveAllProfileData(user.id, activeProfileId, allData);
+        }
+      }
+
+      console.log('[Sync] Periodic sync complete');
     }, 2 * 60 * 1000); // Every 2 minutes
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, user, allProfiles]);
+  }, [isAuthenticated, user, allProfiles, activeProfileId, calendarState, leadsState, emailState, blogState, researchState, strategyState]);
 
-  // Save profiles before page unload/close (last chance to save)
+  // Sync all component data before page unload/close (cloud-only)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
     const handleBeforeUnload = () => {
-      // Synchronously save to localStorage (this always works)
-      const store: ProfilesStore = {
-        profiles: allProfiles,
-        activeProfileId
-      };
-      localStorage.setItem('socialai_profiles', JSON.stringify(store));
-
       // Try to sync to cloud using sendBeacon (works even during page close)
       if (allProfiles.length > 0 && navigator.sendBeacon) {
-        // Note: sendBeacon has limitations, so we rely primarily on the debounced saves
-        console.log('[Profile] Saving profiles before unload');
+        console.log('[Cloud] Saving all data before unload via sendBeacon');
+        // Note: sendBeacon has limitations with JSON, so we rely primarily on visibility change
       }
     };
 
-    const handleVisibilityChange = () => {
-      // Sync when user switches tabs or minimizes browser
-      if (document.visibilityState === 'hidden' && allProfiles.length > 0) {
-        console.log('[Profile] Tab hidden, syncing to cloud...');
-        saveAllProfiles(user.id, allProfiles);
+    const handleVisibilityChange = async () => {
+      // Sync ALL data when user switches tabs or minimizes browser
+      // This is critical for cross-device data persistence
+      if (document.visibilityState === 'hidden' && activeProfileId) {
+        console.log('[Sync] Tab hidden, syncing all data to cloud...');
+
+        // Sync profiles
+        if (allProfiles.length > 0) {
+          saveAllProfiles(user.id, allProfiles);
+        }
+
+        // Sync all component data for current profile
+        const allData: Record<DataType, any> = {
+          calendar: calendarState,
+          leads: leadsState,
+          email: emailState,
+          blog: blogState,
+          research: researchState,
+          strategy: strategyState
+        };
+
+        // Only sync data that exists
+        const hasData = Object.values(allData).some(v => v !== null);
+        if (hasData) {
+          console.log('[Sync] Syncing component data for profile:', activeProfileId);
+          saveAllProfileData(user.id, activeProfileId, allData);
+        }
       }
     };
 
@@ -823,7 +740,7 @@ export default function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isAuthenticated, user, allProfiles, activeProfileId]);
+  }, [isAuthenticated, user, allProfiles, activeProfileId, calendarState, leadsState, emailState, blogState, researchState, strategyState]);
 
   // Profile management functions
   const updateProfile = (updatedProfile: CompanyProfile) => {
@@ -840,18 +757,20 @@ export default function App() {
   };
 
   const switchProfile = async (profileId: string) => {
-    // Save current profile's component state to localStorage before switching
-    if (activeProfileId) {
-      try {
-        if (calendarState) localStorage.setItem(`socialai_calendar_${activeProfileId}`, JSON.stringify(calendarState));
-        if (leadsState) localStorage.setItem(`socialai_leads_${activeProfileId}`, JSON.stringify(leadsState));
-        if (emailState) localStorage.setItem(`socialai_email_${activeProfileId}`, JSON.stringify(emailState));
-        if (blogState) localStorage.setItem(`socialai_blog_${activeProfileId}`, JSON.stringify(blogState));
-        if (researchState) localStorage.setItem(`socialai_research_${activeProfileId}`, JSON.stringify(researchState));
-        if (strategyState) localStorage.setItem(`socialai_strategy_${activeProfileId}`, JSON.stringify(strategyState));
-        console.log(`[Profile] Saved component state for profile ${activeProfileId} before switching`);
-      } catch (e) {
-        console.error('[Profile] Error saving component state before switch:', e);
+    // Save current profile's component state to CLOUD before switching
+    if (activeProfileId && isAuthenticated && user) {
+      console.log(`[Cloud] Saving component state for profile ${activeProfileId} before switching...`);
+      const currentData: Record<DataType, any> = {
+        calendar: calendarState,
+        leads: leadsState,
+        email: emailState,
+        blog: blogState,
+        research: researchState,
+        strategy: strategyState
+      };
+      const hasData = Object.values(currentData).some(v => v !== null);
+      if (hasData) {
+        await saveAllProfileData(user.id, activeProfileId, currentData);
       }
     }
 
@@ -865,39 +784,22 @@ export default function App() {
     setResearchState(null);
     setStrategyState(null);
 
-    // Load data for this profile from cloud if authenticated
+    // Load data for this profile from cloud (CLOUD ONLY)
     if (isAuthenticated && user) {
-      console.log(`[Profile] Loading data for profile ${profileId} from cloud...`);
-      const profileData = await fetchAllProfileData(user.id, profileId);
-
-      if (profileData.calendar) setCalendarState(profileData.calendar);
-      if (profileData.leads) setLeadsState(profileData.leads);
-      if (profileData.email) setEmailState(profileData.email);
-      if (profileData.blog) setBlogState(profileData.blog);
-      if (profileData.research) setResearchState(profileData.research);
-      if (profileData.strategy) setStrategyState(profileData.strategy);
-
-      console.log(`[Profile] Data loaded for profile ${profileId}`);
-    } else {
-      // Try to load from localStorage as fallback (per-profile keys)
+      console.log(`[Cloud] Loading data for profile ${profileId} from cloud...`);
       try {
-        const calendarData = localStorage.getItem(`socialai_calendar_${profileId}`);
-        const leadsData = localStorage.getItem(`socialai_leads_${profileId}`);
-        const emailData = localStorage.getItem(`socialai_email_${profileId}`);
-        const blogData = localStorage.getItem(`socialai_blog_${profileId}`);
-        const researchData = localStorage.getItem(`socialai_research_${profileId}`);
-        const strategyData = localStorage.getItem(`socialai_strategy_${profileId}`);
+        const profileData = await fetchAllProfileData(user.id, profileId);
 
-        if (calendarData) setCalendarState(JSON.parse(calendarData));
-        if (leadsData) setLeadsState(JSON.parse(leadsData));
-        if (emailData) setEmailState(JSON.parse(emailData));
-        if (blogData) setBlogState(JSON.parse(blogData));
-        if (researchData) setResearchState(JSON.parse(researchData));
-        if (strategyData) setStrategyState(JSON.parse(strategyData));
+        if (profileData.calendar) setCalendarState(profileData.calendar);
+        if (profileData.leads) setLeadsState(profileData.leads);
+        if (profileData.email) setEmailState(profileData.email);
+        if (profileData.blog) setBlogState(profileData.blog);
+        if (profileData.research) setResearchState(profileData.research);
+        if (profileData.strategy) setStrategyState(profileData.strategy);
 
-        console.log(`[Profile] Data loaded from localStorage for profile ${profileId}`);
+        console.log(`[Cloud] ✅ Data loaded for profile ${profileId}`);
       } catch (e) {
-        console.error('[Profile] Error loading local data:', e);
+        console.error(`[Cloud] ❌ Failed to load data for profile ${profileId}:`, e);
       }
     }
   };
@@ -951,15 +853,8 @@ export default function App() {
     setBlogState(null);
     setResearchState(null);
     setStrategyState(null);
-    // Clear all localStorage items for this app
-    localStorage.removeItem('socialai_profiles');
-    localStorage.removeItem('socialai_profile');
-    localStorage.removeItem('socialai_calendar_state');
-    localStorage.removeItem('socialai_research_state');
-    localStorage.removeItem('socialai_strategy_state');
-    localStorage.removeItem('socialai_leads_state');
-    localStorage.removeItem('socialai_email_state');
-    localStorage.removeItem('socialai_blog_state');
+    // Cloud data remains - it will be loaded fresh on next login
+    console.log('[Cloud] Cleared local state, cloud data preserved');
   };
 
 
@@ -982,7 +877,7 @@ export default function App() {
   const [sessionConflictEmail, setSessionConflictEmail] = useState<string | null>(null);
 
   // Cloud-first auth check: On mount, check if user is authenticated and has a cloud profile
-  // Uses session management service for proper multi-account handling
+  // CLOUD IS THE ONLY SOURCE OF TRUTH - no localStorage
   useEffect(() => {
     const checkAuthAndProfile = async () => {
       // Wait for auth loading to complete
@@ -993,15 +888,13 @@ export default function App() {
       if (!isAuthenticated || !user) {
         // Not authenticated - stay on landing
         console.log('[InitAuth] Not authenticated, staying on landing');
-        // Reset last checked user so we re-check when someone logs in
         if (lastCheckedUserId) {
           setLastCheckedUserId(null);
         }
         return;
       }
 
-      // CRITICAL: Check if we've already processed this specific user
-      // If a DIFFERENT user logs in, we need to re-run the check
+      // Check if we've already processed this specific user
       if (lastCheckedUserId === user.id) {
         console.log('[InitAuth] Already checked this user, skipping');
         return;
@@ -1010,24 +903,10 @@ export default function App() {
       // Mark that we're checking this user
       setLastCheckedUserId(user.id);
 
-      // User is authenticated - use session management for proper routing
-      console.log('[InitAuth] User authenticated, checking session...');
-
-      // Check stored user ID
-      const storedUserId = localStorage.getItem('socialai_user_id');
-      const isSameUser = storedUserId === user.id;
-      const isFirstTimeOnDevice = !storedUserId;
-
-      console.log('[InitAuth] Session check:', {
-        storedUserId,
-        currentUserId: user.id,
-        isSameUser,
-        isFirstTimeOnDevice,
-        localProfilesCount: allProfiles.length
-      });
+      console.log('[InitAuth] User authenticated, loading from cloud...');
 
       try {
-        // FIRST: Fetch ALL cloud profiles BEFORE clearing anything
+        // Fetch ALL cloud profiles for this user
         const [cloudProfiles, onboardingCompleted] = await Promise.all([
           fetchAllProfiles(user.id),
           hasCompletedOnboarding()
@@ -1038,48 +917,13 @@ export default function App() {
           onboardingCompleted
         });
 
-        // Save user ID
-        localStorage.setItem('socialai_user_id', user.id);
-
         // CASE 1: User has cloud profiles - they're a returning user
         if (cloudProfiles.length > 0) {
           console.log(`[InitAuth] Found ${cloudProfiles.length} cloud profile(s), using them`);
 
-          // If different user, show notification but DON'T clear data until after we set new data
-          if (!isSameUser && !isFirstTimeOnDevice) {
-            const currentSession = getCurrentSession();
-            if (currentSession && currentSession.email) {
-              setSessionConflictEmail(currentSession.email);
-            }
-          }
-
-          // Try to restore the last active profile ID from localStorage
-          let restoredActiveId = cloudProfiles[0].id;
-          try {
-            const storedProfilesData = localStorage.getItem('socialai_profiles');
-            if (storedProfilesData) {
-              const parsed = JSON.parse(storedProfilesData);
-              // Check if the stored active profile exists in cloud profiles
-              if (parsed.activeProfileId && cloudProfiles.some(p => p.id === parsed.activeProfileId)) {
-                restoredActiveId = parsed.activeProfileId;
-              }
-            }
-          } catch (e) {
-            console.warn('[InitAuth] Could not restore active profile ID:', e);
-          }
-
           // Set up profile state from cloud
           setAllProfiles(cloudProfiles);
-          setActiveProfileId(restoredActiveId);
-
-          // Update localStorage
-          localStorage.setItem('socialai_profiles', JSON.stringify({
-            profiles: cloudProfiles,
-            activeProfileId: restoredActiveId
-          }));
-          // Keep old format for backward compatibility
-          const activeProfile = cloudProfiles.find(p => p.id === restoredActiveId) || cloudProfiles[0];
-          localStorage.setItem('socialai_profile', JSON.stringify(activeProfile));
+          setActiveProfileId(cloudProfiles[0].id);
 
           createSession(user.id, user.email, false, true);
 
@@ -1088,26 +932,7 @@ export default function App() {
           return;
         }
 
-        // CASE 2: No cloud profile - check if same user with local profiles
-        if (isSameUser && allProfiles.length > 0) {
-          console.log('[InitAuth] Same user with local profiles, using them');
-          if (!activeProfileId) {
-            setActiveProfileId(allProfiles[0].id);
-          }
-
-          // Try to sync to cloud
-          saveProfile(user.id, allProfiles[0]).catch(e =>
-            console.warn('[InitAuth] Failed to sync profile to cloud:', e)
-          );
-
-          createSession(user.id, user.email, false, true);
-
-          console.log('[InitAuth] Routing to DASHBOARD');
-          setView(AppView.DASHBOARD);
-          return;
-        }
-
-        // CASE 3: Check if this is an existing user (account age > 2 minutes OR onboarding completed)
+        // CASE 2: Check if this is an existing user (account age > 2 minutes OR onboarding completed)
         const accountCreatedAt = new Date(user.created);
         const accountAgeMinutes = (Date.now() - accountCreatedAt.getTime()) / (1000 * 60);
         const isExistingAccount = accountAgeMinutes > 2 || onboardingCompleted;
@@ -1136,7 +961,6 @@ export default function App() {
 
           setAllProfiles([recoveryProfile]);
           setActiveProfileId(recoveryProfile.id);
-          localStorage.setItem('socialai_profile', JSON.stringify(recoveryProfile));
 
           // Save to cloud
           saveProfile(user.id, recoveryProfile).catch(e =>
@@ -1153,16 +977,12 @@ export default function App() {
           return;
         }
 
-        // CASE 4: New user (account just created) - go to onboarding
+        // CASE 3: New user (account just created) - go to onboarding
         console.log('[InitAuth] New user, going to onboarding');
 
-        // Clear any leftover data from different users
-        if (!isSameUser && !isFirstTimeOnDevice) {
-          setAllProfiles([]);
-          setActiveProfileId(null);
-          localStorage.removeItem('socialai_profiles');
-          localStorage.removeItem('socialai_profile');
-        }
+        // Clear state for new user
+        setAllProfiles([]);
+        setActiveProfileId(null);
 
         createSession(user.id, user.email, true, false);
 
@@ -1171,23 +991,10 @@ export default function App() {
 
       } catch (e) {
         console.error('[InitAuth] Error during auth check:', e);
-
-        // FALLBACK: If cloud fetch failed, use local data if same user
-        if (isSameUser && allProfiles.length > 0) {
-          console.log('[InitAuth] Error occurred, using local profiles as fallback');
-          if (!activeProfileId) {
-            setActiveProfileId(allProfiles[0].id);
-          }
-          localStorage.setItem('socialai_user_id', user.id);
-          createSession(user.id, user.email, false, true);
-          setView(AppView.DASHBOARD);
-        } else {
-          // Can't determine and no fallback - go to onboarding
-          console.log('[InitAuth] Error occurred, no local fallback, going to onboarding');
-          localStorage.setItem('socialai_user_id', user.id);
-          createSession(user.id, user.email, true, false);
-          setView(AppView.ONBOARDING);
-        }
+        // On error, go to onboarding so user can set up their profile
+        console.log('[InitAuth] Error occurred, going to onboarding');
+        createSession(user.id, user.email, true, false);
+        setView(AppView.ONBOARDING);
       }
     };
 
@@ -1225,22 +1032,8 @@ export default function App() {
   const authHandledForUserRef = React.useRef<string | null>(null);
 
   // Track auth mode: 'signin' for NEW users (go to onboarding), 'login' for EXISTING users (go to dashboard)
-  // Persist to localStorage so it survives OAuth redirect
-  const [authMode, setAuthMode] = useState<'signin' | 'login' | null>(() => {
-    try {
-      const saved = localStorage.getItem('socialai_auth_mode');
-      return saved as 'signin' | 'login' | null;
-    } catch { return null; }
-  });
-
-  // Save authMode to localStorage when it changes
-  useEffect(() => {
-    if (authMode) {
-      localStorage.setItem('socialai_auth_mode', authMode);
-    } else {
-      localStorage.removeItem('socialai_auth_mode');
-    }
-  }, [authMode]);
+  // This is ephemeral - cloud metadata (onboarding_completed) is used for persistent state
+  const [authMode, setAuthMode] = useState<'signin' | 'login' | null>(null);
 
   // Handle auth state changes (including OAuth callback)
   useEffect(() => {
@@ -1297,16 +1090,15 @@ export default function App() {
       return;
     }
 
-    // CRITICAL: Check if a DIFFERENT user is now authenticated
-    // This handles the case where user A logs out and user B logs in on same browser
-    const storedUserId = localStorage.getItem('socialai_user_id');
-    const isDifferentUserLoggingIn = storedUserId && storedUserId !== user.id;
+    // Check if we already handled auth for this user using the ref
+    // (No localStorage - use React state/refs only)
+    const previouslyHandledUser = authHandledForUserRef.current;
+    const isDifferentUserLoggingIn = previouslyHandledUser && previouslyHandledUser !== user.id;
 
     console.log('[Auth Effect] User switch check:', {
-      storedUserId,
+      previouslyHandledUser,
       currentUserId: user.id,
-      isDifferentUserLoggingIn,
-      previouslyHandledUser: authHandledForUserRef.current
+      isDifferentUserLoggingIn
     });
 
     // If a different user is logging in, we MUST handle it to switch data
@@ -1341,20 +1133,14 @@ export default function App() {
       console.log('[Auth] Starting handleAuthChange...');
       console.log('[Auth] Browser:', navigator.userAgent);
 
-      // User is authenticated
-      localStorage.removeItem('socialai_logged_out');
-
-      // Check for session conflict (different user was logged in)
+      // Check for session conflict using session service (no localStorage)
       const currentSession = getCurrentSession();
-      const storedUserId = localStorage.getItem('socialai_user_id');
-      const isDifferentUser = storedUserId && storedUserId !== user.id;
-      const isFirstTimeUser = !storedUserId;
+      const previousUserId = authHandledForUserRef.current;
+      const isDifferentUser = previousUserId && previousUserId !== user.id;
 
       console.log('[Auth] User authenticated:', user.id);
-      console.log('[Auth] Stored user ID:', storedUserId);
+      console.log('[Auth] Previous user ID:', previousUserId);
       console.log('[Auth] Is different user:', isDifferentUser);
-      console.log('[Auth] Is first time user:', isFirstTimeUser);
-      console.log('[Auth] Local profiles count:', allProfiles.length);
 
       // === STEP 1: Handle session conflict notification ===
       if (isDifferentUser && currentSession && currentSession.email) {
@@ -1363,7 +1149,7 @@ export default function App() {
         setSessionConflict(currentSession.email);
       }
 
-      // === STEP 2: Fetch cloud profile FIRST (before clearing anything) ===
+      // === STEP 2: Fetch cloud profile FIRST ===
       console.log('[Auth] Fetching profile from Supabase for user:', user.id);
       let cloudProfile = null;
       let onboardingCompleted = false;
@@ -1389,30 +1175,18 @@ export default function App() {
         console.warn('[Auth] Error fetching profile (might be blocked by browser):', e.message);
       }
 
-      // === STEP 3: Handle user switching - clear data from previous user ===
+      // === STEP 3: Handle user switching - clear in-memory data ===
       let currentLocalProfiles = allProfiles;
 
-      // CRITICAL FIX: Only clear local data if a DIFFERENT user is logging in
-      // Do NOT clear for "first time user" - they might have cloud data from another device!
-      // If cloudProfile exists, the user has data in the cloud - don't clear anything
       if (isDifferentUser && !cloudProfile) {
-        console.log('[Auth] Different user with no cloud profile - clearing local data');
+        console.log('[Auth] Different user with no cloud profile - clearing local state');
         clearAllProfiles();
         currentLocalProfiles = [];
-        localStorage.removeItem('socialai_profiles');
-        localStorage.removeItem('socialai_profile');
         setOauthHandled(false);
       } else if (isDifferentUser && cloudProfile) {
         console.log('[Auth] Different user WITH cloud profile - will use their cloud data');
-        // Don't clear, just reset for later loading
         currentLocalProfiles = [];
-      } else if (isFirstTimeUser) {
-        console.log('[Auth] First time on this device - checking for cloud profile');
-        // Don't clear anything - cloud profile will be loaded by other effects
       }
-
-      // Save current user ID
-      localStorage.setItem('socialai_user_id', user.id);
 
       // === STEP 4: Use session service for routing decision ===
       const routingDecision = await determineUserRoute(
@@ -1463,30 +1237,13 @@ export default function App() {
             const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
             console.log('[Auth] Cloud data loaded:', loadedTypes);
 
-            if (cloudData.calendar) {
-              setCalendarState(cloudData.calendar);
-              localStorage.setItem(`socialai_calendar_${cloudProfileId}`, JSON.stringify(cloudData.calendar));
-            }
-            if (cloudData.leads) {
-              setLeadsState(cloudData.leads);
-              localStorage.setItem(`socialai_leads_${cloudProfileId}`, JSON.stringify(cloudData.leads));
-            }
-            if (cloudData.email) {
-              setEmailState(cloudData.email);
-              localStorage.setItem(`socialai_email_${cloudProfileId}`, JSON.stringify(cloudData.email));
-            }
-            if (cloudData.blog) {
-              setBlogState(cloudData.blog);
-              localStorage.setItem(`socialai_blog_${cloudProfileId}`, JSON.stringify(cloudData.blog));
-            }
-            if (cloudData.research) {
-              setResearchState(cloudData.research);
-              localStorage.setItem(`socialai_research_${cloudProfileId}`, JSON.stringify(cloudData.research));
-            }
-            if (cloudData.strategy) {
-              setStrategyState(cloudData.strategy);
-              localStorage.setItem(`socialai_strategy_${cloudProfileId}`, JSON.stringify(cloudData.strategy));
-            }
+            // Set state directly from cloud data (no localStorage caching)
+            if (cloudData.calendar) setCalendarState(cloudData.calendar);
+            if (cloudData.leads) setLeadsState(cloudData.leads);
+            if (cloudData.email) setEmailState(cloudData.email);
+            if (cloudData.blog) setBlogState(cloudData.blog);
+            if (cloudData.research) setResearchState(cloudData.research);
+            if (cloudData.strategy) setStrategyState(cloudData.strategy);
           } catch (e) {
             console.error('[Auth] Error fetching cloud data:', e);
           }
@@ -1573,19 +1330,12 @@ export default function App() {
     // Add to multi-profile system
     const newProfile = createNewProfile(p);
 
-    // Save to legacy local storage for backward compatibility
-    localStorage.setItem('socialai_profile', JSON.stringify(newProfile));
-    localStorage.removeItem('socialai_logged_out'); // Clear logged out flag
-
-    // Mark this user as having completed onboarding
+    // Save profile and mark onboarding complete (CLOUD ONLY)
     if (user) {
-      localStorage.setItem('socialai_user_id', user.id);
-      localStorage.setItem(`socialai_onboarded_${user.id}`, 'true');
-
       console.log('[Onboarding] Saving profile to Supabase...');
       await saveProfile(user.id, newProfile);
 
-      // CRITICAL: Mark onboarding complete in user metadata (reliable fallback)
+      // Mark onboarding complete in user metadata (cloud database)
       console.log('[Onboarding] Marking onboarding complete in user metadata...');
       await markOnboardingComplete();
 
@@ -1602,12 +1352,8 @@ export default function App() {
     // Clear the current session in session service
     clearCurrentSession();
 
-    // Log out from Supabase
+    // Log out from Supabase (cloud auth)
     await authLogout();
-
-    // Set a flag indicating the user is logged out
-    // We preserve user ID so if same user comes back, we know it's them
-    localStorage.setItem('socialai_logged_out', 'true');
 
     // Reset OAuth handled so next user can sign in with OAuth
     setOauthHandled(false);
@@ -1621,8 +1367,8 @@ export default function App() {
     // Clear session conflict email
     setSessionConflictEmail(null);
 
-    // Clear active profile but preserve profiles for returning user
-    setActiveProfileId(null);
+    // Clear local state (cloud data will be loaded on next login)
+    clearAllProfiles();
 
     // Reset component states
     setCalendarState(null);
@@ -1651,106 +1397,72 @@ export default function App() {
   // Profile loading state - prevents components from rendering before data is loaded
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-  // Load per-profile data when activeProfileId changes
+  // Load per-profile data from CLOUD when activeProfileId changes (CLOUD ONLY)
   useEffect(() => {
     if (!activeProfileId) return;
 
-    console.log(`[State] Loading data for profile: ${activeProfileId}`);
-    setIsProfileLoading(true);
-
-    // Load from per-profile localStorage keys SYNCHRONOUSLY
-    try {
-      const calendarData = localStorage.getItem(`socialai_calendar_${activeProfileId}`);
-      const blogData = localStorage.getItem(`socialai_blog_${activeProfileId}`);
-      const leadsData = localStorage.getItem(`socialai_leads_${activeProfileId}`);
-      const emailData = localStorage.getItem(`socialai_email_${activeProfileId}`);
-      const researchData = localStorage.getItem(`socialai_research_${activeProfileId}`);
-      const strategyData = localStorage.getItem(`socialai_strategy_${activeProfileId}`);
-
-      // Set all states in one batch
-      setCalendarState(calendarData ? JSON.parse(calendarData) : null);
-      setBlogState(blogData ? JSON.parse(blogData) : null);
-      setLeadsState(leadsData ? JSON.parse(leadsData) : null);
-      setEmailState(emailData ? JSON.parse(emailData) : null);
-      setResearchState(researchData ? JSON.parse(researchData) : null);
-      setStrategyState(strategyData ? JSON.parse(strategyData) : null);
-
-      console.log(`[State] Loaded local data for profile: ${activeProfileId}`);
-    } catch (e) {
-      console.error('[State] Error loading local data:', e);
+    // Only load from cloud if authenticated
+    if (!isAuthenticated || !user) {
+      console.log(`[Cloud] Cannot load data - not authenticated`);
+      return;
     }
 
-    // Mark loading complete after a brief delay to ensure state updates have propagated
-    setTimeout(() => setIsProfileLoading(false), 100);
+    console.log(`[Cloud] Loading data for profile: ${activeProfileId}`);
+    setIsProfileLoading(true);
 
-    // Also try to load from cloud if authenticated (async, updates will merge)
-    if (isAuthenticated && user) {
-      fetchAllProfileData(user.id, activeProfileId).then(cloudData => {
+    // Load from cloud (async)
+    fetchAllProfileData(user.id, activeProfileId)
+      .then(cloudData => {
         if (cloudData.calendar) setCalendarState(cloudData.calendar);
         if (cloudData.blog) setBlogState(cloudData.blog);
         if (cloudData.leads) setLeadsState(cloudData.leads);
         if (cloudData.email) setEmailState(cloudData.email);
         if (cloudData.research) setResearchState(cloudData.research);
         if (cloudData.strategy) setStrategyState(cloudData.strategy);
-        console.log(`[State] Loaded cloud data for profile: ${activeProfileId}`);
+        console.log(`[Cloud] ✅ Data loaded for profile: ${activeProfileId}`);
+      })
+      .catch(e => {
+        console.error('[Cloud] ❌ Failed to load profile data:', e);
+      })
+      .finally(() => {
+        setIsProfileLoading(false);
       });
-    }
-  }, [activeProfileId]); // Only run when profile changes
+  }, [activeProfileId, isAuthenticated, user]); // Re-run when profile or auth changes
 
-  // Save states to localStorage and cloud when they change (per-profile)
+  // Save states to CLOUD when they change (CLOUD ONLY - no localStorage)
   useEffect(() => {
-    if (calendarState && activeProfileId) {
-      // Save to per-profile localStorage key
-      localStorage.setItem(`socialai_calendar_${activeProfileId}`, JSON.stringify(calendarState));
-      // Sync to cloud if authenticated
-      if (isAuthenticated && user) {
-        saveUserData(user.id, activeProfileId, 'calendar', calendarState);
-      }
+    if (calendarState && activeProfileId && isAuthenticated && user) {
+      saveUserData(user.id, activeProfileId, 'calendar', calendarState);
     }
   }, [calendarState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (blogState && activeProfileId) {
-      localStorage.setItem(`socialai_blog_${activeProfileId}`, JSON.stringify(blogState));
-      if (isAuthenticated && user) {
-        saveUserData(user.id, activeProfileId, 'blog', blogState);
-      }
+    if (blogState && activeProfileId && isAuthenticated && user) {
+      saveUserData(user.id, activeProfileId, 'blog', blogState);
     }
   }, [blogState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (leadsState && activeProfileId) {
-      localStorage.setItem(`socialai_leads_${activeProfileId}`, JSON.stringify(leadsState));
-      if (isAuthenticated && user) {
-        saveUserData(user.id, activeProfileId, 'leads', leadsState);
-      }
+    if (leadsState && activeProfileId && isAuthenticated && user) {
+      saveUserData(user.id, activeProfileId, 'leads', leadsState);
     }
   }, [leadsState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (emailState && activeProfileId) {
-      localStorage.setItem(`socialai_email_${activeProfileId}`, JSON.stringify(emailState));
-      if (isAuthenticated && user) {
-        saveUserData(user.id, activeProfileId, 'email', emailState);
-      }
+    if (emailState && activeProfileId && isAuthenticated && user) {
+      saveUserData(user.id, activeProfileId, 'email', emailState);
     }
   }, [emailState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (researchState && activeProfileId) {
-      localStorage.setItem(`socialai_research_${activeProfileId}`, JSON.stringify(researchState));
-      if (isAuthenticated && user) {
-        saveUserData(user.id, activeProfileId, 'research', researchState);
-      }
+    if (researchState && activeProfileId && isAuthenticated && user) {
+      saveUserData(user.id, activeProfileId, 'research', researchState);
     }
   }, [researchState, isAuthenticated, user, activeProfileId]);
 
   useEffect(() => {
-    if (strategyState && activeProfileId) {
-      localStorage.setItem(`socialai_strategy_${activeProfileId}`, JSON.stringify(strategyState));
-      if (isAuthenticated && user) {
-        saveUserData(user.id, activeProfileId, 'strategy', strategyState);
-      }
+    if (strategyState && activeProfileId && isAuthenticated && user) {
+      saveUserData(user.id, activeProfileId, 'strategy', strategyState);
     }
   }, [strategyState, isAuthenticated, user, activeProfileId]);
 
@@ -1771,10 +1483,9 @@ export default function App() {
     if (view === AppView.LANDING) {
       return (
         <LandingPage
+          existingProfile={profile}
           onSignIn={async () => {
             // Sign In - Check if already authenticated first
-            localStorage.removeItem('socialai_logged_out');
-
             if (isAuthenticated && user) {
               // Already authenticated - fetch cloud profile to be sure
               console.log('[Landing] onSignIn: Already authenticated, fetching cloud profile...');
@@ -1789,9 +1500,7 @@ export default function App() {
                     setAllProfiles(prev => [cloudProfile, ...prev]);
                   }
                   setActiveProfileId(cloudProfile.id);
-                  // Save to localStorage for page refresh
-                  localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
-                  localStorage.setItem('socialai_user_id', user.id);
+                  // Cloud data will be loaded by the profile loading effect
                   setView(AppView.DASHBOARD);
                   return;
                 }
@@ -1819,8 +1528,6 @@ export default function App() {
           }}
           onLogIn={async () => {
             // Log In - Check if already authenticated first
-            localStorage.removeItem('socialai_logged_out');
-
             if (isAuthenticated && user) {
               // Already authenticated - fetch cloud profile to be sure
               console.log('[Landing] onLogIn: Already authenticated, fetching cloud profile...');
@@ -1835,9 +1542,7 @@ export default function App() {
                     setAllProfiles(prev => [cloudProfile, ...prev]);
                   }
                   setActiveProfileId(cloudProfile.id);
-                  // Save to localStorage for page refresh
-                  localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
-                  localStorage.setItem('socialai_user_id', user.id);
+                  // Cloud data will be loaded by the profile loading effect
                   setView(AppView.DASHBOARD);
                   return;
                 }
@@ -1873,7 +1578,7 @@ export default function App() {
             } else {
               createNewProfile(p);
             }
-            localStorage.removeItem('socialai_logged_out');
+            // Cloud profile already saved by createNewProfile
             setView(AppView.DASHBOARD);
           }}
         />
@@ -1892,7 +1597,6 @@ export default function App() {
 
               // Clear auth mode immediately
               setAuthMode(null);
-              localStorage.removeItem('socialai_logged_out');
 
               try {
                 // Small delay to let auth state settle
@@ -1908,9 +1612,6 @@ export default function App() {
                 }
 
                 console.log('[AuthPage] Got authenticated user:', authUser.id);
-
-                // Save current user ID
-                localStorage.setItem('socialai_user_id', authUser.id);
 
                 // Try to fetch cloud profile
                 let cloudProfile = null;
@@ -1939,11 +1640,7 @@ export default function App() {
                   console.log('[AuthPage] Cloud profile found - going to DASHBOARD');
                   setAllProfiles([cloudProfile]);
                   setActiveProfileId(cloudProfile.id);
-                  localStorage.setItem('socialai_profile', JSON.stringify(cloudProfile));
-                  localStorage.setItem('socialai_profiles', JSON.stringify({
-                    profiles: [cloudProfile],
-                    activeProfileId: cloudProfile.id
-                  }));
+                  // Cloud data already exists - no localStorage needed
                   createSession(authUser.id, authUser.email || '', false, true);
                   setView(AppView.DASHBOARD);
                   return;
@@ -1975,7 +1672,6 @@ export default function App() {
                   };
                   setAllProfiles([recoveryProfile]);
                   setActiveProfileId(recoveryProfile.id);
-                  localStorage.setItem('socialai_profile', JSON.stringify(recoveryProfile));
                   saveProfile(authUser.id, recoveryProfile).catch(e => console.warn('Save failed:', e));
                   markOnboardingComplete().catch(e => console.warn('Mark complete failed:', e));
                   createSession(authUser.id, authUser.email || '', false, true);

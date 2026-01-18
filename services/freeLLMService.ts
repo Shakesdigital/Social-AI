@@ -575,6 +575,7 @@ export class AllProvidersFailedError extends Error {
 
 /**
  * Parse JSON from LLM response with multiple fallback patterns
+ * Uses bracket matching for reliable extraction of nested JSON
  */
 export function parseJSONFromLLM<T>(text: string): T | null {
     if (!text || typeof text !== 'string') {
@@ -584,37 +585,89 @@ export function parseJSONFromLLM<T>(text: string): T | null {
 
     console.log('[parseJSON] Attempting to parse response of length:', text.length);
 
-    // Clean up common issues
+    // Helper function to extract complete JSON using bracket matching
+    function extractCompleteJSON(str: string, startChar: '{' | '['): string | null {
+        const endChar = startChar === '{' ? '}' : ']';
+        const startIndex = str.indexOf(startChar);
+        if (startIndex === -1) return null;
+
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+
+        for (let i = startIndex; i < str.length; i++) {
+            const char = str[i];
+
+            if (escape) {
+                escape = false;
+                continue;
+            }
+
+            if (char === '\\' && inString) {
+                escape = true;
+                continue;
+            }
+
+            if (char === '"' && !escape) {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                if (char === startChar) depth++;
+                else if (char === endChar) {
+                    depth--;
+                    if (depth === 0) {
+                        return str.substring(startIndex, i + 1);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // Try extracting from markdown code blocks first
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch) {
+        const codeContent = codeBlockMatch[1].trim();
+        try {
+            const parsed = JSON.parse(codeContent);
+            console.log('[parseJSON] Parsed from code block successfully');
+            return parsed;
+        } catch (e) {
+            console.log('[parseJSON] Code block parse failed, trying extraction...');
+        }
+    }
+
+    // Try to extract complete JSON object starting with {
+    const objectJSON = extractCompleteJSON(text, '{');
+    if (objectJSON) {
+        try {
+            const parsed = JSON.parse(objectJSON);
+            console.log('[parseJSON] Parsed complete object successfully, keys:', Object.keys(parsed));
+            return parsed;
+        } catch (e) {
+            console.log('[parseJSON] Object extraction failed:', (e as Error).message);
+        }
+    }
+
+    // Try to extract complete JSON array starting with [
+    const arrayJSON = extractCompleteJSON(text, '[');
+    if (arrayJSON) {
+        try {
+            const parsed = JSON.parse(arrayJSON);
+            console.log('[parseJSON] Parsed complete array successfully, length:', Array.isArray(parsed) ? parsed.length : 'N/A');
+            return parsed;
+        } catch (e) {
+            console.log('[parseJSON] Array extraction failed:', (e as Error).message);
+        }
+    }
+
+    // Clean up common issues and try direct parse
     let cleanText = text
         .replace(/^[\s\S]*?(\{|\[)/m, '$1')  // Remove text before first { or [
         .replace(/(\}|\])[\s\S]*$/m, '$1');   // Remove text after last } or ]
 
-    // Try multiple patterns to find JSON
-    const patterns = [
-        /```json\s*([\s\S]*?)\s*```/,       // ```json ... ```
-        /```\s*([\s\S]*?)\s*```/,            // ``` ... ```
-        /(\{"posts"\s*:\s*\[[\s\S]*?\]\s*\})/,  // {"posts": [...]}
-        /(\[\s*\{[\s\S]*?\}\s*\])/,          // Array of objects
-        /(\{[\s\S]*"topic"[\s\S]*\})/,       // Object with topic key
-        /(\{[\s\S]*"posts"[\s\S]*\})/,       // Object with posts key
-    ];
-
-    for (const pattern of patterns) {
-        try {
-            const match = text.match(pattern);
-            if (match) {
-                const jsonStr = (match[1] || match[0]).trim();
-                console.log('[parseJSON] Trying pattern match:', pattern.source.substring(0, 30) + '...');
-                const parsed = JSON.parse(jsonStr);
-                console.log('[parseJSON] Success! Parsed type:', typeof parsed, Array.isArray(parsed) ? `Array(${parsed.length})` : '');
-                return parsed;
-            }
-        } catch (e) {
-            // Continue to next pattern
-        }
-    }
-
-    // Try parsing the cleaned text
     try {
         const parsed = JSON.parse(cleanText);
         console.log('[parseJSON] Parsed cleaned text successfully');
@@ -629,7 +682,8 @@ export function parseJSONFromLLM<T>(text: string): T | null {
         console.log('[parseJSON] Parsed whole text successfully');
         return parsed;
     } catch (e) {
-        console.warn('[parseJSON] All patterns failed. First 500 chars of text:', text.substring(0, 500));
+        console.warn('[parseJSON] All extraction methods failed. First 500 chars of text:', text.substring(0, 500));
+        console.warn('[parseJSON] Last 200 chars of text:', text.substring(text.length - 200));
         return null;
     }
 }
