@@ -152,22 +152,25 @@ export interface TrendingTopic {
 // APP NAVIGATION
 // ============================================
 
-export enum AppView {
-  LANDING = 'LANDING',
-  AUTH = 'AUTH',
-  ONBOARDING = 'ONBOARDING',
-  DASHBOARD = 'DASHBOARD',
-  RESEARCH = 'RESEARCH',
-  STRATEGY = 'STRATEGY',
-  CALENDAR = 'CALENDAR',
-  LEADS = 'LEADS',
-  EMAIL = 'EMAIL',
-  BLOG = 'BLOG',
-  ANALYTICS = 'ANALYTICS',
-  SETTINGS = 'SETTINGS',
-  PRICING = 'PRICING',
-  CLOUD_DIAGNOSTICS = 'CLOUD_DIAGNOSTICS',
-}
+// Using const object instead of enum to avoid production minification issues
+export const AppView = {
+  LANDING: 'LANDING',
+  AUTH: 'AUTH',
+  ONBOARDING: 'ONBOARDING',
+  DASHBOARD: 'DASHBOARD',
+  RESEARCH: 'RESEARCH',
+  STRATEGY: 'STRATEGY',
+  CALENDAR: 'CALENDAR',
+  LEADS: 'LEADS',
+  EMAIL: 'EMAIL',
+  BLOG: 'BLOG',
+  ANALYTICS: 'ANALYTICS',
+  SETTINGS: 'SETTINGS',
+  PRICING: 'PRICING',
+  CLOUD_DIAGNOSTICS: 'CLOUD_DIAGNOSTICS',
+} as const;
+
+export type AppView = typeof AppView[keyof typeof AppView];
 
 export interface ImageGenerationConfig {
   size: '1K' | '2K' | '4K';
