@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: true,
-      minify: false, // Disable minification to debug initialization error
       rollupOptions: {
         output: {
           // Preserve module structure to avoid initialization order issues

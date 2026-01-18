@@ -573,6 +573,22 @@ export default function App() {
   // Loading state for cloud data fetch
   const [isLoadingCloudData, setIsLoadingCloudData] = useState(false);
 
+  // ========================================
+  // LIFTED STATE FOR COMPONENT PERSISTENCE
+  // (Must be declared before effects that use them)
+  // ========================================
+
+  // Component states - these will be loaded per-profile
+  const [calendarState, setCalendarState] = useState<any>(null);
+  const [blogState, setBlogState] = useState<any>(null);
+  const [leadsState, setLeadsState] = useState<any>(null);
+  const [emailState, setEmailState] = useState<any>(null);
+  const [researchState, setResearchState] = useState<any>(null);
+  const [strategyState, setStrategyState] = useState<any>(null);
+
+  // Profile loading state - prevents components from rendering before data is loaded
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+
   // Save profiles to cloud whenever they change (CLOUD ONLY - no localStorage)
   // CRITICAL: Only save when we have actual data to prevent overwriting with empty arrays
   useEffect(() => {
@@ -1381,21 +1397,6 @@ export default function App() {
     console.log('[Logout] Logout complete, redirecting to landing');
     setView(AppView.LANDING);
   };
-
-  // ========================================
-  // LIFTED STATE FOR COMPONENT PERSISTENCE
-  // ========================================
-
-  // Component states - these will be loaded per-profile
-  const [calendarState, setCalendarState] = useState<any>(null);
-  const [blogState, setBlogState] = useState<any>(null);
-  const [leadsState, setLeadsState] = useState<any>(null);
-  const [emailState, setEmailState] = useState<any>(null);
-  const [researchState, setResearchState] = useState<any>(null);
-  const [strategyState, setStrategyState] = useState<any>(null);
-
-  // Profile loading state - prevents components from rendering before data is loaded
-  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
   // Load per-profile data from CLOUD when activeProfileId changes (CLOUD ONLY)
   useEffect(() => {
