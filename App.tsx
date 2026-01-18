@@ -47,7 +47,7 @@ import { generateMarketResearch, generateMarketingStrategy, generateContentTopic
 import { hasFreeLLMConfigured } from './services/freeLLMService';
 import { fetchProfile, fetchAllProfiles, saveProfile, saveAllProfiles } from './services/profileService';
 import { markOnboardingComplete, hasCompletedOnboarding } from './services/authService';
-import { fetchAllProfileData, saveUserData, saveAllProfileData, DataType } from './services/dataService';
+import { fetchAllProfileData, saveUserData, saveAllProfileData } from './services/dataService';
 import { supabase } from './services/supabase';
 import {
   createSession,
@@ -669,7 +669,7 @@ export default function App() {
 
       // Sync all component data for active profile
       if (activeProfileId) {
-        const allData: Record<DataType, any> = {
+        const allData = {
           calendar: calendarState,
           leads: leadsState,
           email: emailState,
@@ -715,7 +715,7 @@ export default function App() {
         }
 
         // Sync all component data for current profile
-        const allData: Record<DataType, any> = {
+        const allData = {
           calendar: calendarState,
           leads: leadsState,
           email: emailState,
@@ -760,7 +760,7 @@ export default function App() {
     // Save current profile's component state to CLOUD before switching
     if (activeProfileId && isAuthenticated && user) {
       console.log(`[Cloud] Saving component state for profile ${activeProfileId} before switching...`);
-      const currentData: Record<DataType, any> = {
+      const currentData = {
         calendar: calendarState,
         leads: leadsState,
         email: emailState,
@@ -1234,7 +1234,7 @@ export default function App() {
           console.log('[Auth] Fetching cloud data for profile:', cloudProfileId);
           try {
             const cloudData = await fetchAllProfileData(user.id, cloudProfileId);
-            const loadedTypes = Object.keys(cloudData).filter(k => cloudData[k as DataType] !== null);
+            const loadedTypes = Object.keys(cloudData).filter(k => (cloudData as any)[k] !== null);
             console.log('[Auth] Cloud data loaded:', loadedTypes);
 
             // Set state directly from cloud data (no localStorage caching)
